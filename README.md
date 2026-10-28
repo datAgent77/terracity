@@ -6,8 +6,9 @@ A seated, tabletop-scale mixed-reality game (WebXR, Meta Immersive Web SDK)
 where players shape a sustainable coastal city with their hands.
 Entry for the Meta VR Start Developer Competition 2026 (in development).
 
-> Status: **Phase 2 (signature experience) complete** — see
-> [docs/PHASE2_REPORT.md](docs/PHASE2_REPORT.md) and [docs/PROGRESS.md](docs/PROGRESS.md).
+> Status: **Phase 3 (polish) complete** — see
+> [docs/PHASE3_REPORT.md](docs/PHASE3_REPORT.md) and [docs/PROGRESS.md](docs/PROGRESS.md).
+> Third-party notices: [ATTRIBUTION.md](ATTRIBUTION.md).
 
 ## How it plays
 
@@ -33,6 +34,7 @@ npm test             # simulation/rules unit tests (Vitest)
 npm run test:e2e     # desktop mouse/keyboard browser tests (Playwright)
 ./scripts/xr-phase1-test.sh      # emulated hand + controller building checks (needs `npm run dev`)
 ./scripts/xr-phase2-test.sh      # emulated hands: start, time travel, read-only future, finish
+./scripts/xr-phase3-test.sh      # emulated hands: tips, hover, larger text, skip tips
 npm run build        # production build into dist/
 ```
 
@@ -52,6 +54,7 @@ npm run build        # production build into dist/
 | Compare A/B | **Compare A/B** | same | `C` |
 | Pause / finish | **Pause**, **Finish plan** | same | `P` / `F` |
 | Start / play again | **Start** / **Play again** on the card | same | `Enter` |
+| Tips on/off, larger text, sound | HUD chips | same | `H`, `L`, `M` |
 
 While carrying, the target tile glows green (valid) or red (blocked) and the HUD
 shows the cost and consequences; after each change the HUD shows the effect,
@@ -65,7 +68,8 @@ Rules and numbers: [SIMULATION_ASSUMPTIONS.md](SIMULATION_ASSUMPTIONS.md).
 src/config/       scenario, structure table, balance constants
 src/core/         GameState (undo/redo), shared commands and signals
 src/simulation/   pure placement rules, metrics, 2035/2050 projection, A/B comparison
-src/world/        terrain, procedural meshes, future visuals, feedback pulses, mini boards
+src/world/        terrain, procedural meshes, future visuals, feedback, ambient, mini boards
+src/audio/        synthesised sound effects
 src/interactions/ ECS placement system (hand / controller / ray / mouse / keyboard)
 src/gameplay/     challenge rules (timer, judgement, hints) + flow system
 src/ui/           spatial UI binding (HUD, Plan pad, tray, time, card, comparison)

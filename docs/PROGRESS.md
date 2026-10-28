@@ -25,13 +25,20 @@ Deadline: 2026-11-18 12:00 PT.
     win/lose summary, hints, replay, pause.
   - 86 unit tests, 13 desktop e2e tests, hands-only IWER script for the full loop.
 
-## Next (Phase 3 — not started; awaiting go-ahead)
-- Guided onboarding (first placement walkthrough), sound effects.
-- Visual polish (lighting, water shader, sprawl/flood look), desktop camera/layout.
-- Accessibility (text size, colour-blind safe markers), performance (code-split).
+- **Phase 3 — polish** (2026-10-28). See [PHASE3_REPORT.md](PHASE3_REPORT.md).
+  - Guided tips, synthesised sound, shadows/sky/water/boats, hand hover, larger
+    text, colour-independent cues, reduced motion.
+  - Draw calls 224 → ~95; main bundle 6.6 MB → 2.4 MB (0.68 MB gzip).
+  - 91 unit, 19 e2e (dev) + 17 e2e on the production build, IWER hand script.
+
+## Next (Phase 4 — submission; not started, awaiting go-ahead)
+- HTTPS deployment (static `dist/`; host to be chosen), public repository.
+- Under-3-minute gameplay video from the real app/emulator, screenshots,
+  Devpost description, setup + architecture + hand-interaction docs.
+- Resolve `@drawcall/uikitml` license question; decide on an emulator-enabled demo.
 
 ## Open blockers / risks
-- No physical Quest: all XR evidence is IWER emulation only.
-- Main JS chunk is 6.5 MB (1.7 MB gzip); needs code-splitting in Phase 3.
+- No physical Quest: all XR evidence is IWER emulation only. Finger poke on
+  panels and real-hand ray accuracy remain unverified.
 - Production build ships without IWER, so desktop judges get the mouse/keyboard
   path; an emulator-enabled public build is an open decision.

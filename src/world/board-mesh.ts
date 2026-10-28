@@ -25,6 +25,7 @@ import {
   TerrainType,
 } from '../config/scenario.js';
 import { tileCenter } from './board-coords.js';
+import { mergeStatic } from './merge.js';
 import type { TerrainMap, Tile } from './terrain-map.js';
 
 export const TERRAIN_COLORS: Record<TerrainType, string> = {
@@ -101,6 +102,8 @@ export function buildBoard(terrain: TerrainMap): Group {
       opacity: 0.55,
       roughness: 0.15,
       metalness: 0.1,
+      emissive: '#2ec4d0',
+      emissiveIntensity: 0.12,
     }),
   );
   water.rotation.x = -Math.PI / 2;
@@ -108,8 +111,9 @@ export function buildBoard(terrain: TerrainMap): Group {
   water.name = 'water-surface';
   board.add(water);
 
-  board.add(buildForest(terrain));
-  board.add(buildTown(terrain));
+  // Static decoration is baked to one mesh per material (draw-call budget).
+  board.add(mergeStatic(buildForest(terrain)));
+  board.add(mergeStatic(buildTown(terrain)));
   return board;
 }
 
@@ -155,7 +159,15 @@ function buildTown(terrain: TerrainMap): Group {
   return town;
 }
 
-/** Three small Mediterranean houses on one tile footprint. */
+const roofGeo = new ConeGeometry(0.0125, 0.008, 4);
+const wallGeos = new Map<number, BoxGeometry>();
+const wallGeo = (h: number) => {
+  let g = wallGeos.get(h);
+  if (!g) wallGeos.set(h, (g = new BoxGeometry(0.016, h, 0.016)));
+  return g;
+};
+
+/** Three small Mediterranean houses on one tile footprint (shared geometry). */
 export function createHouseCluster(
   wallMat: MeshStandardMaterial,
   roofMat: MeshStandardMaterial,
@@ -175,10 +187,10 @@ export function createHouseCluster(
           [0.002, -0.013, 0.014],
         ];
   for (const [hx, hz, h] of spots) {
-    const wall = new Mesh(new BoxGeometry(0.016, h, 0.016), wallMat);
+    const wall = new Mesh(wallGeo(h), wallMat);
     wall.position.set(hx, h / 2, hz);
     wall.castShadow = true;
-    const roof = new Mesh(new ConeGeometry(0.0125, 0.008, 4), roofMat);
+    const roof = new Mesh(roofGeo, roofMat);
     roof.rotation.y = Math.PI / 4;
     roof.position.set(hx, h + 0.004, hz);
     cluster.add(wall, roof);

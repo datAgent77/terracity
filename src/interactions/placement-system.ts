@@ -79,6 +79,7 @@ export class PlacementSystem extends createSystem({
   private board!: Object3D;
   private highlight!: Mesh;
   private highlightMat!: MeshBasicMaterial;
+  private blockedMark!: Mesh;
   private entitiesById = new Map<string, Entity>();
   private rotors: Object3D[] = [];
   /** Carried tray model waiting to be adopted by the next `add`. */
@@ -106,9 +107,23 @@ export class PlacementSystem extends createSystem({
     this.highlight = new Mesh(new PlaneGeometry(TILE_SIZE, TILE_SIZE), this.highlightMat);
     this.highlight.rotation.x = -Math.PI / 2;
     this.highlight.name = 'placement-highlight';
-    this.highlight.visible = false;
+    this.hideHighlight();
     this.highlight.raycast = () => {};
     this.board.add(this.highlight);
+    // Colour-independent cue for blocked tiles: a dark X over the red square.
+    this.blockedMark = new Mesh(
+      new BoxGeometry(TILE_SIZE * 0.7, 0.002, TILE_SIZE * 0.12),
+      new MeshBasicMaterial({ color: '#3a0d0a' }),
+    );
+    const bar2 = this.blockedMark.clone();
+    bar2.rotation.y = Math.PI / 2;
+    this.blockedMark.add(bar2);
+    this.blockedMark.rotation.y = Math.PI / 4;
+    this.blockedMark.name = 'blocked-mark';
+    this.blockedMark.visible = false;
+    this.blockedMark.raycast = () => {};
+    bar2.raycast = () => {};
+    this.board.add(this.blockedMark);
 
     this.buildTray();
     for (const type of STRUCTURE_ORDER) this.spawnToken(type);
@@ -116,7 +131,7 @@ export class PlacementSystem extends createSystem({
     const onBoardClick = (e: { point: Vector3 }) => this.onBoardTap(e.point);
     const onBoardMove = (e: { point: Vector3 }) => this.onBoardHover(e.point);
     const onBoardLeave = () => {
-      if (this.queries.held.entities.size === 0) this.highlight.visible = false;
+      if (this.queries.held.entities.size === 0) this.hideHighlight();
     };
     this.board.addEventListener('click' as never, onBoardClick as never);
     this.board.addEventListener('pointermove' as never, onBoardMove as never);
@@ -170,7 +185,7 @@ export class PlacementSystem extends createSystem({
     if (kb.getKeyDown('KeyY')) cmd.redo();
     if (kb.getKeyDown('Escape')) {
       cmd.clearSelection();
-      this.highlight.visible = false;
+      this.hideHighlight();
     }
     const sel = selectedId.peek();
     if (!sel || !game.get(sel)) return;
@@ -295,7 +310,7 @@ export class PlacementSystem extends createSystem({
       this.entitiesById.delete(id);
       if (selectedId.peek() === id) selectedId.value = null;
     }
-    if (this.queries.held.entities.size === 0) this.highlight.visible = false;
+    if (this.queries.held.entities.size === 0) this.hideHighlight();
   }
 
   private connects(col: number, row: number): boolean {
@@ -355,7 +370,7 @@ export class PlacementSystem extends createSystem({
     const obj = entity.object3D!;
     const tile = this.tileUnder(obj);
     const rotation = yawToQuarter(obj.rotation.y);
-    this.highlight.visible = false;
+    this.hideHighlight();
 
     if (!id) {
       // Carried from the tray: build, or cancel when dropped off-board/invalid.
@@ -387,9 +402,14 @@ export class PlacementSystem extends createSystem({
 
   // ---------------------------------------------------------- highlight --
 
+  private hideHighlight(): void {
+    this.highlight.visible = false;
+    if (this.blockedMark) this.blockedMark.visible = false;
+  }
+
   private showHighlight(tile: { col: number; row: number } | null, type: StructureType, movingId?: string): void {
     if (!tile) {
-      this.highlight.visible = false;
+      this.hideHighlight();
       statusText.value = movingId ? 'Release here to remove.' : 'Release here to cancel.';
       return;
     }
@@ -399,6 +419,8 @@ export class PlacementSystem extends createSystem({
     this.highlight.position.set(x, structureBaseY(t) + 0.003, z);
     this.highlightMat.color.set(verdict.ok ? VALID_COLOR : INVALID_COLOR);
     this.highlight.visible = true;
+    this.blockedMark.position.set(x, structureBaseY(t) + 0.004, z);
+    this.blockedMark.visible = !verdict.ok;
     const noun = STRUCTURES[type].label;
     statusText.value = verdict.ok
       ? `${noun} here: cost ${verdict.cost}${verdict.warning ? ` - ${verdict.warning}` : ''}.`

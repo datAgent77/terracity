@@ -30,6 +30,8 @@ import { Placeable, TrayToken } from '../interactions/placeable-component.js';
 import { projectYear, type YearMetrics } from '../simulation/projection.js';
 import { tileCenter } from './board-coords.js';
 import { createHouseCluster, tileTopY, WATER_LEVEL } from './board-mesh.js';
+import { prefersReducedMotion } from '../ui/accessibility.js';
+import { mergeStatic } from './merge.js';
 import { createMiniBoard } from './mini-board.js';
 
 const SPRAWL_POOL = 10;
@@ -54,7 +56,9 @@ export class FutureSystem extends createSystem({
   private shown = 0;
   private goal = 0;
   private envShown: number = BALANCE.baseEnvironment;
-  private tmp = new Color();
+  /** Park tree crowns, rebuilt when placeables come and go (no per-frame traversal). */
+  private crowns: Object3D[] = [];
+  private crownsDirty = true;
 
   init(): void {
     this.board = this.world.scene.getObjectByName('terrain-board')!;
@@ -64,7 +68,7 @@ export class FutureSystem extends createSystem({
     const wallMat = new MeshStandardMaterial({ color: '#f3efe6', roughness: 0.85 });
     const roofMat = new MeshStandardMaterial({ color: '#8d8a86', flatShading: true });
     for (let i = 0; i < SPRAWL_POOL; i++) {
-      const g = createHouseCluster(wallMat, roofMat, i % 2);
+      const g = mergeStatic(createHouseCluster(wallMat, roofMat, i % 2));
       g.name = `sprawl-${i}`;
       g.visible = false;
       this.board.add(g);
@@ -99,6 +103,13 @@ export class FutureSystem extends createSystem({
     this.minis.name = 'plan-comparison-minis';
     this.world.scene.add(this.minis);
 
+    const dirty = () => {
+      this.crownsDirty = true;
+    };
+    this.cleanupFuncs.push(
+      this.queries.placeables.subscribe('qualify', dirty),
+      this.queries.placeables.subscribe('disqualify', dirty),
+    );
     const refresh = () => this.recompute();
     this.cleanupFuncs.push(
       viewYear.subscribe(refresh),
@@ -148,7 +159,7 @@ export class FutureSystem extends createSystem({
   update(delta: number): void {
     if (!this.target) return;
     // Ease the time-travel animation toward the viewed year (~0.8 s).
-    const step = Math.min(1, delta * 2.5);
+    const step = prefersReducedMotion() ? 1 : Math.min(1, delta * 2.5);
     this.shown += (this.goal - this.shown) * step;
     if (Math.abs(this.goal - this.shown) < 0.002) this.shown = this.goal;
     const k = this.goal === 0 ? 0 : this.shown / this.goal; // 0..1 within this transition
@@ -172,13 +183,18 @@ export class FutureSystem extends createSystem({
     const dryness = Math.max(0, Math.min(1, (BALANCE.baseEnvironment - this.envShown) / 45));
     this.tilesMat.color.copy(WHITE).lerp(DRY, dryness);
 
-    const crownScale = 1 + 0.6 * this.shown;
-    for (const e of this.queries.placeables.entities) {
-      if (e.getValue(Placeable, 'structureType') !== 'park') continue;
-      e.object3D!.traverse((o) => {
-        if (o.name === 'crown') o.scale.setScalar((o.userData.baseScale as number) * crownScale);
-      });
+    if (this.crownsDirty) {
+      this.crowns.length = 0;
+      for (const e of this.queries.placeables.entities) {
+        if (e.getValue(Placeable, 'structureType') !== 'park') continue;
+        e.object3D!.traverse((o) => {
+          if (o.name === 'crown') this.crowns.push(o);
+        });
+      }
+      this.crownsDirty = false;
     }
+    const crownScale = 1 + 0.6 * this.shown;
+    for (const o of this.crowns) o.scale.setScalar((o.userData.baseScale as number) * crownScale);
   }
 
   private rebuildMinis(): void {

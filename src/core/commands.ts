@@ -10,6 +10,7 @@ import { projectYear } from '../simulation/projection.js';
 import {
   armedType,
   challenge,
+  coachText,
   compareOpen,
   game,
   paused,
@@ -19,6 +20,7 @@ import {
   selectedId,
   statusText,
   timeLeft,
+  tutorial,
   viewYear,
 } from './session.js';
 
@@ -160,9 +162,33 @@ export function loadStoredPlanA(): void {
 
 // -------------------------------------------------------------- challenge --
 
+let tutorialFinished = false;
+
+/** Re-evaluate the coach after any state change. */
+export function updateTutorial(): void {
+  if (!tutorial.active) return;
+  tutorial.update({ placements: game.placements, servedIds: game.metrics.servedIds, viewYear: viewYear.peek() });
+  if (!tutorial.active) tutorialFinished = true;
+  coachText.value = phase.peek() === 'building' ? tutorial.text : '';
+}
+
+export function toggleTips(): void {
+  if (tutorial.active) {
+    tutorial.skip();
+    tutorialFinished = true;
+  } else {
+    tutorial.reset();
+    tutorialFinished = false;
+  }
+  updateTutorial();
+  coachText.value = phase.peek() === 'building' ? tutorial.text : '';
+}
+
 export function startGame(): void {
   clearSelection();
   game.reset();
+  // Tips run on the first session (and again if the player turns them back on).
+  if (!tutorialFinished) tutorial.reset();
   challenge.start();
   phase.value = 'building';
   timeLeft.value = challenge.timeLeft;
@@ -171,6 +197,7 @@ export function startGame(): void {
   compareOpen.value = false;
   paused.value = false;
   statusText.value = 'Plan Costa Verde for 2050. Pinch a structure from the tray.';
+  updateTutorial();
 }
 
 export function finishGame(timedOut = false): void {

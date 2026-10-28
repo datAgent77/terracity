@@ -15,6 +15,10 @@ import {
 } from '@iwsdk/core';
 import { StructureType, TILE_SIZE } from '../config/scenario.js';
 import { createHouseCluster } from './board-mesh.js';
+import { mergeStatic } from './merge.js';
+
+/** Parts that animate or are restyled per instance stay separate meshes. */
+const DYNAMIC = /^(rotor|crown|pad|arm-[ewsn])$/;
 
 const PAD = TILE_SIZE * 0.9;
 const shared = {
@@ -89,7 +93,7 @@ function wind(): Group {
     rotor.add(blade);
   }
   rotor.add(new Mesh(new ConeGeometry(0.0025, 0.005, 8).rotateX(Math.PI / 2), shared.tower));
-  g.add(tower, nacelle, rotor);
+  g.add(tower, nacelle, mergeStatic(rotor)); // rotor spins as one mesh
   return g;
 }
 
@@ -155,7 +159,7 @@ function road(): Group {
 const BUILDERS: Record<StructureType, () => Group> = { residential, solar, wind, park, road };
 
 export function createStructureModel(type: StructureType, name: string): Group {
-  const g = BUILDERS[type]();
+  const g = mergeStatic(BUILDERS[type](), (o) => DYNAMIC.test(o.name));
   g.name = name;
   return g;
 }

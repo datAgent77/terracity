@@ -1,5 +1,6 @@
 import {
   createSystem,
+  ScreenSpace,
   UIKit,
   UIKitMLAsset,
   Vector3,
@@ -20,7 +21,10 @@ import {
   viewYear,
 } from '../core/session.js';
 import { formatClock } from '../gameplay/challenge.js';
+import { coachText, tutorial } from '../core/session.js';
+import { largeText, prefersReducedMotion, soundOn } from './accessibility.js';
 import { projectYear, type YearMetrics } from '../simulation/projection.js';
+import { sfx } from '../audio/sfx.js';
 
 const MET = '#1f8a4c';
 const UNMET = '#b5651d';
@@ -32,6 +36,10 @@ const ACTION_IDS = [
 ];
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
+
+/** Panels enlarged by the "Larger text" preference. */
+const SCALABLE_PANELS = ['hud-panel', 'actions-panel', 'time-panel', 'overlay-panel', 'compare-panel'];
+const LARGE = 1.3;
 
 type Settable = { setProperties(p: Record<string, unknown>): void };
 type Clickable = {
@@ -95,6 +103,17 @@ export class PanelSystem extends createSystem({}) {
     text('t-budget')?.setProperties({ text: `of ${BALANCE.startBudget}` });
     text('t-renewable')?.setProperties({ text: `goal ${TARGETS.renewableCoverage}%` });
 
+    // Colour-independent status: the goal label reads "met" once a target is reached.
+    const goalText: Record<string, string> = {
+      'm-population': `goal ${fmt(TARGETS.population)}`,
+      'm-environment': `goal ${TARGETS.environment}+`,
+      'm-renewable': `goal ${TARGETS.renewableCoverage}%`,
+    };
+    const goalEl: Record<string, Settable | undefined> = {
+      'm-population': text('t-population') ?? undefined,
+      'm-environment': text('t-environment') ?? undefined,
+      'm-renewable': text('t-renewable') ?? undefined,
+    };
     const tween = (id: string, format: (n: number) => string, met: (n: number) => boolean): Tween => {
       const t: Tween = { el: text(id) ?? undefined, shown: NaN, target: 0, format, met, last: '' };
       this.tweens.push(t);
@@ -109,8 +128,14 @@ export class PanelSystem extends createSystem({}) {
       const year = viewYear.value;
       const y: YearMetrics = projectYear(game.terrain, game.placements, year, game.metrics);
       const set = (t: Tween, v: number) => {
-        if (Number.isNaN(t.shown)) t.shown = v; // first paint: no animation
+        if (Number.isNaN(t.shown) || prefersReducedMotion()) t.shown = v; // no animation
         t.target = v;
+        const id = (t.el as { name?: string } | undefined)?.name ?? '';
+        goalEl[id]?.setProperties({
+          text: t.met(v) ? `met (${goalText[id].replace('goal ', '')})` : goalText[id],
+          color: t.met(v) ? MET : '#777777',
+          fontWeight: t.met(v) ? 700 : 400,
+        });
         if (t.shown === v) {
           t.last = t.format(v);
           t.el?.setProperties({ text: t.last, color: t.met(v) ? MET : UNMET });
@@ -135,6 +160,30 @@ export class PanelSystem extends createSystem({}) {
       timeLeft.subscribe((s) => clock?.setProperties({ text: formatClock(s) })),
       paused.subscribe((p) => clock?.setProperties({ text: p ? 'paused' : formatClock(timeLeft.peek()) })),
     );
+
+    // Guided tips line + preference chips (tips, text size, sound).
+    const coach = text('coach');
+    const skipLabel = text('skip-tips-label');
+    const sizeLabel = text('text-size-label');
+    const soundLabel = text('sound-label');
+    this.cleanupFuncs.push(
+      coachText.subscribe((t) => {
+        coach?.setProperties({ text: t || '-', display: t ? 'flex' : 'none' });
+        skipLabel?.setProperties({ text: tutorial.active ? 'Skip tips' : 'Show tips' });
+      }),
+      largeText.subscribe((on) => {
+        sizeLabel?.setProperties({ text: on ? 'Normal text' : 'Larger text' });
+        this.applyTextSize(on);
+      }),
+      soundOn.subscribe((on) => soundLabel?.setProperties({ text: on ? 'Sound on' : 'Sound off' })),
+    );
+    this.onClick(panel.getElementById('btn-skip-tips') as unknown as Clickable, cmd.toggleTips);
+    this.onClick(panel.getElementById('btn-text-size') as unknown as Clickable, () => (largeText.value = !largeText.peek()));
+    this.onClick(panel.getElementById('btn-sound') as unknown as Clickable, () => (soundOn.value = !soundOn.peek()));
+    for (const id of ['btn-skip-tips', 'btn-text-size', 'btn-sound']) {
+      const el = panel.getElementById(id);
+      if (el) el.name = id;
+    }
 
     const xrButton = panel.getElementById('xr-button');
     const exitButton = panel.getElementById('exit-button');
@@ -247,6 +296,7 @@ export class PanelSystem extends createSystem({}) {
         ...ACTION_IDS.map((id) => ['actions-panel', id] as [string, string]),
         ['time-panel', 'year-2026'], ['time-panel', 'year-2035'], ['time-panel', 'year-2050'],
         ['overlay-panel', 'ov-primary'], ['overlay-panel', 'ov-secondary'],
+        ['hud-panel', 'btn-skip-tips'], ['hud-panel', 'btn-text-size'], ['hud-panel', 'btn-sound'],
       ];
       const log = () =>
         setTimeout(() => {
@@ -255,12 +305,41 @@ export class PanelSystem extends createSystem({}) {
             const p = locate(panelId, id);
             if (p) console.info(`[terracity] ui ${mode} ${id} ${p.toArray().map((n) => n.toFixed(3)).join(',')}`);
           }
-        }, 1500);
-      this.cleanupFuncs.push(this.world.visibilityState.subscribe(log));
+        }, 900);
+      // Re-log when layouts shift (coach line, larger text, phase changes).
+      for (const sig of [this.world.visibilityState, coachText, largeText, phase] as const) {
+        this.cleanupFuncs.push((sig as { subscribe(f: () => void): () => void }).subscribe(log));
+      }
     }
   }
 
-  private onClick(el: Clickable, fn: () => void): void {
+  /** Scale spatial panels (XR) and their desktop overlay size together. */
+  private applyTextSize(on: boolean): void {
+    const k = on ? LARGE : 1;
+    for (const id of SCALABLE_PANELS) {
+      const entity = this.world.getSceneEntity(id);
+      const obj = entity?.object3D;
+      if (!entity || !obj) continue;
+      obj.userData.baseScale ??= obj.scale.x;
+      obj.scale.setScalar((obj.userData.baseScale as number) * k);
+      if (!entity.hasComponent(ScreenSpace)) continue;
+      for (const field of ['width', 'height'] as const) {
+        const key = `base_${field}`;
+        obj.userData[key] ??= entity.getValue(ScreenSpace, field);
+        const base = String(obj.userData[key]);
+        const m = /^([\d.]+)(.*)$/.exec(base);
+        if (m) entity.setValue(ScreenSpace, field, `${(parseFloat(m[1]) * k).toFixed(1)}${m[2]}`);
+      }
+    }
+    // ScreenSpace only re-lays out on viewport changes; nudge it.
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  private onClick(el: Clickable, action: () => void): void {
+    const fn = () => {
+      sfx.click();
+      action();
+    };
     el.addEventListener('click', fn);
     this.cleanupFuncs.push(() => el.removeEventListener('click', fn));
   }

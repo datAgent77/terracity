@@ -3,6 +3,7 @@ import { signal } from '@iwsdk/core';
 import type { Year } from '../config/projection.js';
 import type { StructureType } from '../config/scenario.js';
 import { Challenge, type ChallengeResult, type Phase } from '../gameplay/challenge.js';
+import { Tutorial } from '../gameplay/tutorial.js';
 import type { Placement } from '../simulation/metrics.js';
 import { GameState } from './game-state.js';
 
@@ -30,3 +31,8 @@ export const timeLeft = signal(challenge.timeLeft);
 export const result = signal<ChallengeResult | null>(null);
 /** Paused (e.g. headset removed / overlay open). */
 export const paused = signal(false);
+
+/** Guided tips for the first session. */
+export const tutorial = new Tutorial();
+/** Current coach line ('' when tips are finished or skipped). */
+export const coachText = signal(tutorial.text);

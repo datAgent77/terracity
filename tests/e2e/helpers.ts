@@ -43,11 +43,24 @@ export const snap = (page: Page) =>
     };
   });
 
+/** Pointer and key input is processed inside the render loop: wait for real frames. */
+export const frames = (page: Page, n = 4) =>
+  page.evaluate(
+    (count) =>
+      new Promise<void>((resolve) => {
+        let left = count;
+        const step = () => (--left <= 0 ? resolve() : requestAnimationFrame(step));
+        requestAnimationFrame(step);
+      }),
+    n,
+  );
+
 export async function clickAt(page: Page, fn: string, ...args: (string | number)[]) {
   const pt = await page.evaluate(([f, a]) => window.__terracity[f as string](...(a as unknown[])), [fn, args] as const);
   expect(pt, `${fn}(${args.join(',')}) on screen`).toBeTruthy();
   await page.mouse.click(pt!.x, pt!.y);
-  await page.waitForTimeout(180);
+  await frames(page);
+  await page.waitForTimeout(60);
 }
 export const tile = (page: Page, c: number, r: number) => clickAt(page, 'tileToScreen', c, r);
 export const slot = (page: Page, s: number) => clickAt(page, 'slotToScreen', s);
@@ -55,7 +68,7 @@ export const ui = (page: Page, panel: string, id: string) => clickAt(page, 'uiTo
 export const button = (page: Page, id: string) => ui(page, 'actions-panel', id);
 export const key = async (page: Page, k: string) => {
   await page.keyboard.press(k);
-  await page.waitForTimeout(130);
+  await frames(page);
 };
 
 export async function open(page: Page, { start = true } = {}) {

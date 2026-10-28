@@ -11,6 +11,7 @@ import { SESSION_SECONDS } from '../gameplay/challenge.js';
 import { comparePlans, METRIC_KEYS, type MetricKey } from '../simulation/compare.js';
 import type { TargetCheck } from '../simulation/projection.js';
 import { setPanelVisible } from './panel-visibility.js';
+import { sfx } from '../audio/sfx.js';
 
 const MET = '#1f8a4c';
 const UNMET = '#b5651d';
@@ -44,9 +45,13 @@ export class FlowPanelSystem extends createSystem({}) {
     this.bindCompare();
   }
 
-  private click(el: Clickable | null | undefined, id: string, fn: () => void): void {
+  private click(el: Clickable | null | undefined, id: string, action: () => void): void {
     if (!el) return;
     el.name = id;
+    const fn = () => {
+      sfx.click();
+      action();
+    };
     el.addEventListener('click', fn);
     this.cleanupFuncs.push(() => el.removeEventListener('click', fn));
   }
