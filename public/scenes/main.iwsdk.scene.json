@@ -37,24 +37,83 @@
         "position": [
           -0.5,
           1.0,
-          -0.55
+          -0.28
         ],
         "rotationDeg": [
           -15,
-          40,
+          50,
           0
         ],
         "scale": 0.09
       },
       "components": {
         "RayInteractable": {},
+        "PokeInteractable": {},
         "ScreenSpace": {
-          "top": "20px",
-          "left": "20px",
-          "width": "24vw",
-          "height": "34%"
+          "top": "16px",
+          "left": "16px",
+          "width": "26vw",
+          "height": "52%"
         }
       }
+    },
+    {
+      "id": "actions-panel",
+      "name": "Plan Actions",
+      "content": {
+        "type": "asset",
+        "asset": "actions-panel"
+      },
+      "transform": {
+        "position": [
+          0.5,
+          0.95,
+          -0.26
+        ],
+        "rotationDeg": [
+          -20,
+          -50,
+          0
+        ],
+        "scale": 0.09
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {},
+        "ScreenSpace": {
+          "top": "16px",
+          "right": "16px",
+          "width": "13vw",
+          "height": "48%"
+        }
+      }
+    },
+    {
+      "id": "tray-labels",
+      "name": "Tray Labels",
+      "metadata": {
+        "iwsdk.validation": {
+          "allowFloating": true
+        }
+      },
+      "content": {
+        "type": "asset",
+        "asset": "tray-labels"
+      },
+      "transform": {
+        "position": [
+          0,
+          0.777,
+          -0.087
+        ],
+        "rotationDeg": [
+          -65,
+          0,
+          0
+        ],
+        "scale": 1
+      },
+      "components": {}
     }
   ]
 }

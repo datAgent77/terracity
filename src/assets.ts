@@ -9,4 +9,14 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'TerraCity HUD',
   },
+  'actions-panel': {
+    url: publicAssetUrl('ui/actions.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Plan Actions',
+  },
+  'tray-labels': {
+    url: publicAssetUrl('ui/tray-labels.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Tray Labels',
+  },
 });

@@ -50,6 +50,7 @@ npm test                               # vitest run
 npx @iwsdk/cli dev up                  # managed Chromium + IWER (Meta Quest 3, living_room)
 npx @iwsdk/cli xr enter                # emulated immersive-ar session
 ./scripts/xr-hand-grab-test.sh         # hand pinch → carry → release, then sea rejection
+                                       # (superseded by scripts/xr-phase1-test.sh; original in commit c81af04)
 npx playwright test                    # desktop mouse/keyboard e2e
 npm run build                          # vite production build
 ```
@@ -105,7 +106,8 @@ Uses fertile farmland."), `phase0-xr-hand-placed.png`, `phase0-xr-hand-over-sea.
 
 - **No physical Meta Quest testing.** Real hand-tracking jitter, pinch reliability,
   comfort, reach, legibility and frame rate on device are unknown.
-- **Controller squeeze grab: not working in the emulator.** With
+- **Controller squeeze grab: not working in the emulator.** *(Resolved in Phase 1: it
+  works when the emulated controller is within ~1-2 cm of the object; see PHASE1_REPORT.)* With
   `set-input-mode controller`, controller-right at the homes and gamepad button 1
   (squeeze) = 1, `Grabbed` never qualified (tested at y = 0.80/0.81/0.83). Not yet
   diagnosed (grip-space offset vs. emulator button mapping). Hands are the primary

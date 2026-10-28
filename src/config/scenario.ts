@@ -34,5 +34,9 @@ export type TerrainType = (typeof TerrainType)[keyof typeof TerrainType];
 
 export const StructureType = {
   Residential: 'residential',
+  Solar: 'solar',
+  Wind: 'wind',
+  Park: 'park',
+  Road: 'road',
 } as const;
 export type StructureType = (typeof StructureType)[keyof typeof StructureType];

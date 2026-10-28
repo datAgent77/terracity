@@ -1,0 +1,32 @@
+<!--
+  TerraCity action pad: large poke/ray targets for the plan-editing commands.
+-->
+<style>
+  .panel-root { flex-direction: column; width: 220px; padding-top: 12px; padding-bottom: 12px; }
+  .heading { font-size: 16px; font-weight: 700; color: #1d5f6b; margin-left: 20px; margin-bottom: 4px; }
+  .heading:dark { color: #7fe3ea; }
+  .button { justify-content: flex-start; margin-left: 16px; margin-right: 16px; margin-top: 8px; }
+</style>
+<Panel class="panel-root">
+  <div class="heading">Plan</div>
+  <Button id="btn-undo" class="button">
+    <ButtonIcon><Undo2></Undo2></ButtonIcon>
+    <ButtonLabel>Undo</ButtonLabel>
+  </Button>
+  <Button id="btn-redo" class="button">
+    <ButtonIcon><Redo2></Redo2></ButtonIcon>
+    <ButtonLabel>Redo</ButtonLabel>
+  </Button>
+  <Button id="btn-rotate" class="button">
+    <ButtonIcon><RotateCw></RotateCw></ButtonIcon>
+    <ButtonLabel>Rotate</ButtonLabel>
+  </Button>
+  <Button id="btn-remove" class="button">
+    <ButtonIcon><Trash2></Trash2></ButtonIcon>
+    <ButtonLabel>Remove</ButtonLabel>
+  </Button>
+  <Button id="btn-restart" class="button">
+    <ButtonIcon><RefreshCw></RefreshCw></ButtonIcon>
+    <ButtonLabel>Restart</ButtonLabel>
+  </Button>
+</Panel>

@@ -1,77 +1,64 @@
 <!--
-  TerraCity Phase 0 HUD. Panel, Divider, Button, ButtonIcon and ButtonLabel come
-  from the bundled Horizon kit; RectangleGoggles/LogIn are Lucide icons.
+  TerraCity HUD: title, the four plan metrics against their 2050 targets, and
+  the live cause -> consequence line. Horizon kit + Lucide icons.
 -->
 <style>
-  .panel-root {
-    flex-direction: column;
-    width: 360px;
-  }
-
-  .panel-content {
-    flex-direction: column;
-    padding-top: 16px;
-    padding-left: 24px;
-    padding-right: 24px;
-  }
-
-  .title {
-    font-size: 26px;
-    font-weight: 700;
-    color: #1d5f6b;
-  }
-
-  .title:dark {
-    color: #7fe3ea;
-  }
-
-  .tagline {
-    font-size: 13px;
-    color: #4a4a4a;
-    margin-bottom: 10px;
-  }
-
-  .tagline:dark {
-    color: rgba(255, 255, 255, 0.75);
-  }
-
-  .status {
-    font-size: 16px;
-    font-weight: 500;
-    color: #272727;
-    margin-top: 12px;
-    width: 100%;
-  }
-
-  .status:dark {
-    color: rgba(255, 255, 255, 0.92);
-  }
-
-  .button {
-    justify-content: flex-start;
-    margin-left: 24px;
-    margin-right: 24px;
-    margin-top: 16px;
-    margin-bottom: 20px;
-  }
+  .panel-root { flex-direction: column; width: 380px; }
+  .panel-content { flex-direction: column; padding-top: 14px; padding-left: 22px; padding-right: 22px; }
+  .title { font-size: 26px; font-weight: 700; color: #1d5f6b; }
+  .title:dark { color: #7fe3ea; }
+  .tagline { font-size: 13px; color: #4a4a4a; margin-bottom: 8px; }
+  .tagline:dark { color: rgba(255, 255, 255, 0.75); }
+  .row { flex-direction: row; align-items: center; gap: 10px; margin-top: 8px; width: 100%; }
+  .icon { width: 20px; height: 20px; color: #3b6f78; }
+  .label { font-size: 15px; font-weight: 500; color: #333333; width: 120px; }
+  .label:dark { color: rgba(255, 255, 255, 0.85); }
+  .value { font-size: 17px; font-weight: 700; color: #272727; width: 110px; }
+  .value:dark { color: #ffffff; }
+  .target { font-size: 12px; color: #777777; }
+  .target:dark { color: rgba(255, 255, 255, 0.6); }
+  .status { font-size: 15px; font-weight: 500; color: #272727; margin-top: 12px; margin-bottom: 4px; width: 100%; }
+  .status:dark { color: rgba(255, 255, 255, 0.92); }
+  .button { justify-content: flex-start; margin-left: 22px; margin-right: 22px; margin-top: 12px; margin-bottom: 18px; }
 </style>
 <Panel class="panel-root">
   <div class="panel-content">
     <div class="title">TerraCity</div>
-    <div class="tagline">Build a city with your hands.</div>
+    <div class="tagline">Plan Costa Verde for 2050.</div>
     <Divider></Divider>
-    <div id="status-text" class="status">Pinch the houses and drop them on the map.</div>
+    <div class="row">
+      <Users class="icon"></Users>
+      <div class="label">Population</div>
+      <div id="m-population" class="value">12,000</div>
+      <div id="t-population" class="target">goal 28,000</div>
+    </div>
+    <div class="row">
+      <Leaf class="icon"></Leaf>
+      <div class="label">Environment</div>
+      <div id="m-environment" class="value">72</div>
+      <div id="t-environment" class="target">goal 60+</div>
+    </div>
+    <div class="row">
+      <Wallet class="icon"></Wallet>
+      <div class="label">Budget left</div>
+      <div id="m-budget" class="value">120</div>
+      <div id="t-budget" class="target">of 120</div>
+    </div>
+    <div class="row">
+      <Zap class="icon"></Zap>
+      <div class="label">Renewable</div>
+      <div id="m-renewable" class="value">17%</div>
+      <div id="t-renewable" class="target">goal 80%</div>
+    </div>
+    <Divider></Divider>
+    <div id="status-text" class="status">Pinch a structure from the tray and drop it on the map.</div>
   </div>
   <Button id="xr-button" class="button">
-    <ButtonIcon>
-      <RectangleGoggles></RectangleGoggles>
-    </ButtonIcon>
+    <ButtonIcon><RectangleGoggles></RectangleGoggles></ButtonIcon>
     <ButtonLabel>Enter Mixed Reality</ButtonLabel>
   </Button>
   <Button id="exit-button" class="button" style="display: none">
-    <ButtonIcon>
-      <LogIn></LogIn>
-    </ButtonIcon>
+    <ButtonIcon><LogIn></LogIn></ButtonIcon>
     <ButtonLabel>Exit to Browser</ButtonLabel>
   </Button>
 </Panel>

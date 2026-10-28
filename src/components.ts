@@ -1,4 +1,9 @@
 import { defineComponents } from '@iwsdk/core';
-import { Placeable, TerrainBoard } from './interactions/placeable-component.js';
+import {
+  Placeable,
+  SupplyTray,
+  TerrainBoard,
+  TrayToken,
+} from './interactions/placeable-component.js';
 
-export default defineComponents([Placeable, TerrainBoard]);
+export default defineComponents([Placeable, TrayToken, TerrainBoard, SupplyTray]);
