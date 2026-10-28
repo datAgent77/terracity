@@ -1,0 +1,60 @@
+{
+  "version": "iwsdk.scene.v1",
+  "units": "meters",
+  "components": {
+    "com.iwsdk.components.IBLGradient": {
+      "sky": [
+        0.78,
+        0.88,
+        0.95,
+        1
+      ],
+      "equator": [
+        0.93,
+        0.89,
+        0.8,
+        1
+      ],
+      "ground": [
+        0.82,
+        0.76,
+        0.66,
+        1
+      ],
+      "intensity": 0.75
+    }
+  },
+  "resources": {},
+  "nodes": [
+    {
+      "id": "hud-panel",
+      "name": "HUD Panel",
+      "content": {
+        "type": "asset",
+        "asset": "hud-panel"
+      },
+      "transform": {
+        "position": [
+          -0.5,
+          1.0,
+          -0.55
+        ],
+        "rotationDeg": [
+          -15,
+          40,
+          0
+        ],
+        "scale": 0.09
+      },
+      "components": {
+        "RayInteractable": {},
+        "ScreenSpace": {
+          "top": "20px",
+          "left": "20px",
+          "width": "24vw",
+          "height": "34%"
+        }
+      }
+    }
+  ]
+}

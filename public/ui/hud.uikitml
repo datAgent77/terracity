@@ -1,0 +1,77 @@
+<!--
+  TerraCity Phase 0 HUD. Panel, Divider, Button, ButtonIcon and ButtonLabel come
+  from the bundled Horizon kit; RectangleGoggles/LogIn are Lucide icons.
+-->
+<style>
+  .panel-root {
+    flex-direction: column;
+    width: 360px;
+  }
+
+  .panel-content {
+    flex-direction: column;
+    padding-top: 16px;
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1d5f6b;
+  }
+
+  .title:dark {
+    color: #7fe3ea;
+  }
+
+  .tagline {
+    font-size: 13px;
+    color: #4a4a4a;
+    margin-bottom: 10px;
+  }
+
+  .tagline:dark {
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  .status {
+    font-size: 16px;
+    font-weight: 500;
+    color: #272727;
+    margin-top: 12px;
+    width: 100%;
+  }
+
+  .status:dark {
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  .button {
+    justify-content: flex-start;
+    margin-left: 24px;
+    margin-right: 24px;
+    margin-top: 16px;
+    margin-bottom: 20px;
+  }
+</style>
+<Panel class="panel-root">
+  <div class="panel-content">
+    <div class="title">TerraCity</div>
+    <div class="tagline">Build a city with your hands.</div>
+    <Divider></Divider>
+    <div id="status-text" class="status">Pinch the houses and drop them on the map.</div>
+  </div>
+  <Button id="xr-button" class="button">
+    <ButtonIcon>
+      <RectangleGoggles></RectangleGoggles>
+    </ButtonIcon>
+    <ButtonLabel>Enter Mixed Reality</ButtonLabel>
+  </Button>
+  <Button id="exit-button" class="button" style="display: none">
+    <ButtonIcon>
+      <LogIn></LogIn>
+    </ButtonIcon>
+    <ButtonLabel>Exit to Browser</ButtonLabel>
+  </Button>
+</Panel>
