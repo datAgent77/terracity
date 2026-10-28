@@ -23,7 +23,7 @@ trends (electrification, sea defences) is affordable. Documented in the assumpti
 npm run typecheck            # 0 errors
 npm test                     # Vitest: 86 / 86 passed
 npx playwright test          # desktop e2e: 13 / 13 passed (7 Phase 1 + 6 Phase 2)
-./scripts/xr-phase1-test.sh  # still passes (building in XR)
+./scripts/xr-phase1-test.sh  # see correction below
 ./scripts/xr-phase2-test.sh  # IWER, hands only, output below
 npm run build                # succeeds
 ```
@@ -63,6 +63,12 @@ the emulator (Start, year buttons, Save Plan A, Finish).
 Evidence (`docs/evidence/`): `phase2-intro.png`, `phase2-e2e-2050-sprawl.png`,
 `phase2-e2e-compare.png`, `phase2-e2e-win.png`, `phase2-e2e-lose.png`,
 `phase2-xr-intro.png`, `phase2-xr-2050.png`, `phase2-xr-result.png`.
+
+> **Correction (2026-10-28, Phase 4):** this report originally said
+> `xr-phase1-test.sh` "still passes". It had **not** been re-run in Phase 2, and it
+> did not pass: the new intro card blocks editing until Start, and the script never
+> pressed Start. The script now presses Start with a hand ray and passes all five
+> scenarios again (verified 2026-10-28).
 
 ## Issues found and fixed
 

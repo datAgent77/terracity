@@ -35,16 +35,16 @@
       },
       "transform": {
         "position": [
-          -0.55,
-          1.16,
-          -0.36
+          -0.38,
+          1.12,
+          -0.62
         ],
         "rotationDeg": [
-          -15,
-          50,
+          -5.9,
+          29.6,
           0
         ],
-        "scale": 0.09
+        "scale": 0.075
       },
       "components": {
         "RayInteractable": {},
@@ -66,16 +66,16 @@
       },
       "transform": {
         "position": [
-          0.56,
-          0.95,
-          -0.24
+          0.38,
+          1.08,
+          -0.62
         ],
         "rotationDeg": [
-          -20,
-          -50,
+          -8.9,
+          -29.6,
           0
         ],
-        "scale": 0.09
+        "scale": 0.075
       },
       "components": {
         "RayInteractable": {},
@@ -124,16 +124,16 @@
       },
       "transform": {
         "position": [
-          -0.38,
-          0.86,
-          -0.12
+          0.0,
+          0.93,
+          -0.88
         ],
         "rotationDeg": [
-          -40,
-          45,
+          -16.2,
+          0.0,
           0
         ],
-        "scale": 0.09
+        "scale": 0.08
       },
       "components": {
         "RayInteractable": {},
@@ -155,13 +155,13 @@
       },
       "transform": {
         "position": [
-          0,
+          0.0,
           1.1,
           -0.52
         ],
         "rotationDeg": [
-          -10,
-          0,
+          -10.0,
+          0.0,
           0
         ],
         "scale": 0.1
@@ -186,16 +186,16 @@
       },
       "transform": {
         "position": [
-          0,
-          1.22,
-          -0.95
+          0.0,
+          1.24,
+          -0.98
         ],
         "rotationDeg": [
-          -8,
-          0,
+          2.2,
+          0.0,
           0
         ],
-        "scale": 0.09
+        "scale": 0.085
       },
       "components": {
         "RayInteractable": {},

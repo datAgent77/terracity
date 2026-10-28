@@ -26,9 +26,18 @@ shot() { iw browser screenshot --output-file "docs/evidence/$1.png" >/dev/null; 
 
 iw xr status | grep -q '"sessionActive": true' || iw xr enter >/dev/null
 iw xr set-input-mode --input-json '{"mode":"hand"}' >/dev/null
-iw xr set-transform --input-json '{"device":"headset","position":{"x":0,"y":1.3,"z":0.2}}' >/dev/null
+iw xr set-transform --input-json '{"device":"headset","position":{"x":0,"y":1.2,"z":0.05}}' >/dev/null
 iw xr look-at --input-json '{"device":"headset","target":{"x":0,"y":0.78,"z":-0.45}}' >/dev/null
 UP='{"x":0,"y":0,"z":0,"w":1}'
+
+# Since Phase 2 the game opens on an intro card: press Start with a hand ray first.
+state() { iw browser logs | grep -o '\[terracity\] state [^"]*' | tail -1; }
+uipos() { iw browser logs | grep -v non-immersive | grep -o "\[terracity\] ui [a-z-]* $1 [-0-9.,]*" | tail -1 | awk '{print $5}'; }
+P=$(uipos ov-primary); IFS=, read -r X Y Z <<<"$P"
+iw xr set-transform --input-json "{\"device\":\"hand-right\",\"position\":{\"x\":$(node -e "console.log($X*0.45)"),\"y\":$(node -e "console.log($Y+(1.15-$Y)*0.55)"),\"z\":$(node -e "console.log($Z+(0.1-($Z))*0.55)")}}" >/dev/null
+iw xr look-at --input-json "{\"device\":\"hand-right\",\"target\":{\"x\":$X,\"y\":$Y,\"z\":$Z}}" >/dev/null
+sleep 0.4; iw xr select --input-json '{"device":"hand-right","duration":0.2}' >/dev/null; sleep 0.8
+echo "== 0. Start -> $(state | grep -o 'phase=[a-z]*')"
 
 echo "== 1. tray Homes -> tile (6,4)"
 T=$(idx_of tray-residential); echo "token entity $T: $(pose "$T")"

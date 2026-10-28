@@ -47,3 +47,4 @@ pids/
 # Test artifacts
 test-results/
 playwright-report/
+opencode.json

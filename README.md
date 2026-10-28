@@ -4,11 +4,24 @@
 
 A seated, tabletop-scale mixed-reality game (WebXR, Meta Immersive Web SDK)
 where players shape a sustainable coastal city with their hands.
-Entry for the Meta VR Start Developer Competition 2026 (in development).
+Entry for the Meta VR Start Developer Competition 2026 (Gaming · New Experience).
 
-> Status: **Phase 3 (polish) complete** — see
-> [docs/PHASE3_REPORT.md](docs/PHASE3_REPORT.md) and [docs/PROGRESS.md](docs/PROGRESS.md).
-> Third-party notices: [ATTRIBUTION.md](ATTRIBUTION.md).
+**Play:** https://datagent77.github.io/terracity/ — open in the Meta Quest Browser
+and tap *Enter Mixed Reality* (desktop browsers get a mouse/keyboard fallback).
+Judges: see [docs/submission/TESTING.md](docs/submission/TESTING.md).
+
+> **Not tested on a physical Meta Quest headset** — all XR testing used Meta's
+> IWER emulator. See [known limitations](docs/submission/KNOWN_LIMITATIONS.md).
+
+> Status: **Phase 4 (submission) in progress** — see [docs/PROGRESS.md](docs/PROGRESS.md)
+> and the per-phase reports in `docs/`.
+> Third-party notices: [ATTRIBUTION.md](ATTRIBUTION.md) · License: [MIT](LICENSE)
+>
+> Submission docs: [testing](docs/submission/TESTING.md) ·
+> [hand interactions](docs/submission/HAND_INTERACTIONS.md) ·
+> [architecture](docs/submission/ARCHITECTURE.md) ·
+> [test results](docs/submission/TEST_RESULTS.md) ·
+> [known limitations](docs/submission/KNOWN_LIMITATIONS.md)
 
 ## How it plays
 
@@ -21,7 +34,6 @@ Entry for the Meta VR Start Developer Competition 2026 (in development).
 4. **Compare futures** — **Save Plan A**, change the map (Plan B), **Compare A/B**:
    two 2050 miniatures side by side plus a one-line verdict.
 5. **Finish** — the 2050 projection is judged against the targets; replay any time.
-> Not yet tested on a physical Meta Quest headset.
 
 ## Run locally
 

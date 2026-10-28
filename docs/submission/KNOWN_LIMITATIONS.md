@@ -1,0 +1,17 @@
+# Known limitations (honest list)
+
+1. **No physical headset testing.** The developer had no Meta Quest. All XR
+   behaviour was verified in Meta's IWER emulator (Meta Quest 3 profile). Real
+   hand-tracking reliability, comfort and legibility are untested.
+2. **Frame rate on Quest is unmeasured.** Desktop render cost is ~95 draw calls
+   and ~12k triangles for a full plan, with one 1024² shadow map. The 60 fps
+   requirement could not be confirmed.
+3. **Fingertip poke on panels is unverified**; point-and-pinch rays are verified.
+4. **Passthrough is not room-aware.** The board appears at a fixed seated
+   position; no scene understanding or anchoring to a detected table.
+5. **Simulation is a stylized game model**, not a planning or engineering tool
+   (see SIMULATION_ASSUMPTIONS.md).
+6. **Desktop fallback**: panels overlay the 3D view; "Larger text" makes the HUD
+   cover the left edge of the board.
+7. **Third-party license question**: `@drawcall/uikitml` (a dependency of the
+   IWSDK) declares no license; see ATTRIBUTION.md.

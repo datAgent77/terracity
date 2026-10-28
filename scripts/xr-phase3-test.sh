@@ -53,8 +53,8 @@ panel_scale() {
 
 iw xr status | grep -q '"sessionActive": true' || iw xr enter >/dev/null
 iw xr set-input-mode --input-json '{"mode":"hand"}' >/dev/null
-iw xr set-transform --input-json '{"device":"headset","position":{"x":0,"y":1.3,"z":0.2}}' >/dev/null
-iw xr look-at --input-json '{"device":"headset","target":{"x":0,"y":0.85,"z":-0.5}}' >/dev/null
+iw xr set-transform --input-json '{"device":"headset","position":{"x":0,"y":1.2,"z":0.05}}' >/dev/null
+iw xr look-at --input-json '{"device":"headset","target":{"x":0,"y":0.85,"z":-0.55}}' >/dev/null
 sleep 2
 
 echo "== 1. Start"
