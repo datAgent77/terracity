@@ -1,62 +1,14 @@
-import { expect, test, type Page } from '@playwright/test';
-
-type Hook = {
-  game: {
-    placements: Array<{ id: string; type: string; col: number; row: number; rotation: number }>;
-    metrics: { population: number; environment: number; budgetLeft: number; renewableCoverage: number; unservedHomes: number };
-    canUndo: boolean;
-  };
-  selectedId: { value: string | null };
-  armedType: { value: string | null };
-  statusText: { value: string };
-  tileToScreen(col: number, row: number): { x: number; y: number };
-  slotToScreen(slot: number): { x: number; y: number };
-  uiToScreen(panel: string, element: string): { x: number; y: number } | null;
-};
-declare global {
-  interface Window { __terracity: Hook }
-}
-
-const snap = (page: Page) =>
-  page.evaluate(() => {
-    const t = window.__terracity;
-    return {
-      plan: t.game.placements.map((p) => ({ ...p })),
-      metrics: { ...t.game.metrics, servedIds: undefined },
-      selected: t.selectedId.value,
-      armed: t.armedType.value,
-      status: t.statusText.value,
-    };
-  });
-
-async function clickAt(page: Page, fn: string, ...args: (string | number)[]) {
-  const pt = await page.evaluate(
-    ([f, a]) => (window.__terracity as unknown as Record<string, (...x: unknown[]) => { x: number; y: number }>)[f as string](...(a as unknown[])),
-    [fn, args] as const,
-  );
-  expect(pt).toBeTruthy();
-  await page.mouse.click(pt.x, pt.y);
-  await page.waitForTimeout(150);
-}
-const tile = (page: Page, c: number, r: number) => clickAt(page, 'tileToScreen', c, r);
-const slot = (page: Page, s: number) => clickAt(page, 'slotToScreen', s);
-const button = (page: Page, id: string) => clickAt(page, 'uiToScreen', 'actions-panel', id);
-const key = async (page: Page, k: string) => {
-  await page.keyboard.press(k);
-  await page.waitForTimeout(120);
-};
+import { expect, test } from '@playwright/test';
+import { button, key, open, slot, snap, tile } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/');
-  await page.waitForFunction(() => 'uiToScreen' in (window.__terracity ?? {}) && 'slotToScreen' in window.__terracity);
-  await page.waitForTimeout(1500); // let panels lay out and the first frames render
+  await open(page);
 });
 
 test('baseline: empty plan with starting metrics', async ({ page }) => {
   const s = await snap(page);
   expect(s.plan).toEqual([]);
-  expect(s.metrics).toMatchObject({ population: 12000, environment: 72, budgetLeft: 120, renewableCoverage: 17 });
-  await page.screenshot({ path: 'docs/evidence/phase1-e2e-baseline.png' });
+  expect(s.metrics).toMatchObject({ population: 12000, environment: 72, budgetLeft: 130, renewableCoverage: 17 });
 });
 
 test('mouse: tap tray slot then tile builds homes next to the town', async ({ page }) => {
@@ -66,7 +18,7 @@ test('mouse: tap tray slot then tile builds homes next to the town', async ({ pa
   const s = await snap(page);
   expect(s.plan).toHaveLength(1);
   expect(s.plan[0]).toMatchObject({ type: 'residential', col: 6, row: 4 });
-  expect(s.metrics).toMatchObject({ population: 16000, budgetLeft: 108 });
+  expect(s.metrics).toMatchObject({ population: 16000, budgetLeft: 118 });
   expect(s.status).toMatch(/Homes built on plain.*\+4,000 residents/);
 });
 
@@ -79,9 +31,8 @@ test('roads connect isolated homes; bridge crosses the river', async ({ page }) 
   const s = await snap(page);
   expect(s.metrics.unservedHomes).toBe(0);
   expect(s.metrics.population).toBe(16000);
-  expect(s.metrics.budgetLeft).toBe(120 - 12 - 2 - 8 - 2);
+  expect(s.metrics.budgetLeft).toBe(130 - 12 - 2 - 8 - 2);
   await key(page, 'Escape');
-  await page.screenshot({ path: 'docs/evidence/phase1-e2e-roads.png' });
 });
 
 test('blocked placements are rejected without cost', async ({ page }) => {
@@ -94,7 +45,7 @@ test('blocked placements are rejected without cost', async ({ page }) => {
   s = await snap(page);
   expect(s.plan).toHaveLength(0);
   expect(s.status).toMatch(/steep/i);
-  expect(s.metrics.budgetLeft).toBe(120);
+  expect(s.metrics.budgetLeft).toBe(130);
 });
 
 test('renewables raise coverage; wind ridge bonus', async ({ page }) => {
@@ -133,7 +84,7 @@ test('undo / redo via keyboard and via the action pad buttons', async ({ page })
   await button(page, 'btn-undo');
   const empty = await snap(page);
   expect(empty.plan).toHaveLength(0);
-  expect(empty.metrics.budgetLeft).toBe(120);
+  expect(empty.metrics.budgetLeft).toBe(130);
 
   await button(page, 'btn-redo');
   await key(page, 'KeyY');

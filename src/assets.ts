@@ -19,4 +19,19 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Tray Labels',
   },
+  'time-panel': {
+    url: publicAssetUrl('ui/time.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Time Control',
+  },
+  'overlay-panel': {
+    url: publicAssetUrl('ui/overlay.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Intro and Result',
+  },
+  'compare-panel': {
+    url: publicAssetUrl('ui/compare.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Plan Comparison',
+  },
 });

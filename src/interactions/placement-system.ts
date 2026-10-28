@@ -18,6 +18,7 @@ import {
   createSystem,
   Entity,
   Grabbed,
+  GrabSystem,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -37,7 +38,7 @@ import {
 } from '../config/scenario.js';
 import { STRUCTURE_ORDER, STRUCTURES } from '../config/structures.js';
 import * as cmd from '../core/commands.js';
-import { armedType, game, planVersion, selectedId, statusText } from '../core/session.js';
+import { armedType, game, planVersion, selectedId, statusText, viewYear } from '../core/session.js';
 import { localToTile, tileCenter } from '../world/board-coords.js';
 import { buildBoard, tileTopY } from '../world/board-mesh.js';
 import { createStructureModel, setRoadArms } from '../world/structure-models.js';
@@ -82,6 +83,8 @@ export class PlacementSystem extends createSystem({
   private rotors: Object3D[] = [];
   /** Carried tray model waiting to be adopted by the next `add`. */
   private adopting: Entity | null = null;
+  /** Grabs refused because the plan is read-only (future year / not playing). */
+  private blocked = new Set<Entity>();
   private local = new Vector3();
   private world3 = new Vector3();
 
@@ -155,6 +158,7 @@ export class PlacementSystem extends createSystem({
 
     // Live hover feedback while a structure is carried by a hand/controller.
     for (const entity of this.queries.held.entities) {
+      if (this.blocked.has(entity)) continue;
       this.showHighlight(this.tileUnder(entity.object3D!), this.typeOf(entity), this.idOf(entity));
     }
 
@@ -171,7 +175,7 @@ export class PlacementSystem extends createSystem({
     const sel = selectedId.peek();
     if (!sel || !game.get(sel)) return;
     for (const key in ARROWS) {
-      if (kb.getKeyDown(key)) {
+      if (kb.getKeyDown(key) && cmd.canEdit()) {
         const p = game.get(sel)!;
         const [dc, dr] = ARROWS[key];
         game.move(sel, p.col + dc, p.row + dr);
@@ -197,7 +201,7 @@ export class PlacementSystem extends createSystem({
     const onTrayClick = (e: { point: Vector3 }) => {
       const slot = Math.round((e.point.x - BOARD_CENTER[0]) / SLOT_SPACING) + 3;
       const type = STRUCTURE_ORDER[slot - 1];
-      if (type) cmd.arm(type);
+      if (type) cmd.arm(type, true);
     };
     tray.addEventListener('click' as never, onTrayClick as never);
     this.cleanupFuncs.push(() => tray.removeEventListener('click' as never, onTrayClick as never));
@@ -322,6 +326,12 @@ export class PlacementSystem extends createSystem({
   // --------------------------------------------------------------- grab --
 
   private onGrab(entity: Entity): void {
+    if (!cmd.canEdit()) {
+      // Read-only view: refuse the grab and put the piece back on release.
+      this.blocked.add(entity);
+      this.world.getSystem(GrabSystem)?.forceRelease(entity);
+      return;
+    }
     selectedId.value = null;
     armedType.value = null;
     const type = this.typeOf(entity);
@@ -335,6 +345,11 @@ export class PlacementSystem extends createSystem({
   }
 
   private onRelease(entity: Entity): void {
+    if (this.blocked.delete(entity)) {
+      this.reconcile();
+      this.reconcileTokens();
+      return;
+    }
     const id = this.idOf(entity);
     const type = this.typeOf(entity);
     const obj = entity.object3D!;
@@ -395,7 +410,7 @@ export class PlacementSystem extends createSystem({
   /** Tap (ray, mouse): select a structure, build the armed type, or move the selection. */
   private onBoardTap(worldPoint: Vector3): void {
     const tile = this.pointToTile(worldPoint);
-    if (!tile) return;
+    if (!tile || !cmd.canEdit()) return;
     const here = game.at(tile.col, tile.row);
     const armed = armedType.peek();
     const sel = selectedId.peek();
@@ -416,7 +431,7 @@ export class PlacementSystem extends createSystem({
   }
 
   private onBoardHover(worldPoint: Vector3): void {
-    if (this.queries.held.entities.size > 0) return;
+    if (this.queries.held.entities.size > 0 || viewYear.peek() !== 2026) return;
     const armed = armedType.peek();
     const sel = selectedId.peek();
     const type = armed ?? (sel ? game.get(sel)?.type : undefined);

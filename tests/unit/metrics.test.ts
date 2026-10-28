@@ -122,7 +122,7 @@ describe('describeDelta', () => {
   });
 });
 
-describe('balance: 2050 targets are reachable but not trivial', () => {
+describe('balance (2026 snapshot; the 2050 judgement is in projection.test.ts)', () => {
   // Hand-designed reference plan (also documented in SIMULATION_ASSUMPTIONS.md).
   const reference = (): Placement[] => [
     p(S.Road, 6, 3), p(S.Road, 7, 3), // town -> bridge east
@@ -131,7 +131,7 @@ describe('balance: 2050 targets are reachable but not trivial', () => {
     p(S.Park, 9, 3), p(S.Park, 1, 4),
   ];
 
-  it('the reference plan meets every target', async () => {
+  it('the Phase 1 reference plan meets every target in 2026', async () => {
     const { TARGETS } = await import('../../src/config/balance');
     const m = computeMetrics(terrain, reference());
     expect(m.unservedHomes).toBe(0);

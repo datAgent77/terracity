@@ -1,7 +1,7 @@
 /** Scenario-wide balancing constants (2026 starting conditions). */
 export const BALANCE = {
   /** Infrastructure budget available for the whole plan, in credits (M€). */
-  startBudget: 120,
+  startBudget: 130,
   /** Residents of the existing town (always served). */
   basePopulation: 12000,
   /** Environmental health of the untouched region, 0-100. */

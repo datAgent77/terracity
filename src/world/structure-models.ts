@@ -111,6 +111,8 @@ function park(): Group {
     const t = new Mesh(trunk, shared.trunk);
     t.position.set(x, 0.008, z);
     const c = new Mesh(crown, shared.treeTop);
+    c.name = 'crown';
+    c.userData.baseScale = s;
     c.position.set(x, 0.015 * s + 0.004, z);
     c.scale.setScalar(s);
     g.add(t, c);

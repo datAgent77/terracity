@@ -15,7 +15,7 @@ hillside sprawl, renewables siting).
 
 | Quantity | Value | Meaning |
 |---|---|---|
-| Budget | 120 credits | Total infrastructure money for the whole plan ("M€", illustrative) |
+| Budget | 130 credits | Total infrastructure money for the whole plan ("M€", illustrative) |
 | Population served | 12,000 | Residents of the existing town |
 | Environmental health | 72 / 100 | Untouched region score |
 | Renewable supply | 2 units | Existing small hydro plant on the river |
@@ -62,18 +62,48 @@ Road on a river tile = bridge, **+6** cost.
 6. **Farmland lost:** count of farmland tiles built on (tracked for Phase 2 visuals).
 7. Rotation is cosmetic (stored so a plan replays exactly).
 
-## 2050 targets (challenge, wired up in Phase 2)
+## Future projections (2035, 2050)
 
-Population ≥ 28,000 · Environment ≥ 60 · Renewable ≥ 80 % · Budget ≥ 0.
+The plan is treated as built in 2026. Switching the time control to 2035 or 2050
+applies these explicit trends (`src/config/projection.ts`,
+`src/simulation/projection.ts`). 2035 applies **half** of each 2026→2050 change,
+2050 applies all of it.
 
-A reference plan that meets all four (tested in `tests/unit/metrics.test.ts`):
-roads (6,3) + bridge (7,3); homes at (6,2), (6,4), (2,4), (8,3); wind turbines on
-the ridge at (10,8), (11,8), (12,8); parks at (9,3) and (1,4) → 28,000 residents,
-environment 62, 82 % renewable, 12 credits left. A "naive" plan (homes on farmland,
-solar only) reaches the population but fails environment and renewables.
+| Trend | Rule | Why it matters |
+|---|---|---|
+| Housing demand | Grows linearly from 12,000 (2026) to **28,000** (2050) | People keep coming whether or not you planned homes |
+| Unplanned sprawl | Demand − planned connected housing becomes sprawl; −1.5 env per 1,000; drawn on free land nearest the town, 2,000 people per tile | Under-housing shows up as grey sprawl and a worse environment |
+| Electrification | Electricity per person +10 % by 2050 (sprawl residents count too) | A plan "just at 80 %" today drops below target |
+| Park maturity | +2 env per park by 2050 (trees grow) | Green space pays off over time |
+| Food imports | −1 env per built-over farmland tile by 2050 | Farmland loss has a delayed cost |
+| Sea-level rise | Beaches flood visually; every structure on flat land next to beach/sea needs sea defences: −4 budget by 2050 | Coastal sites look cheap in 2026 |
+
+Population (housed in planned, connected homes) and renewable *supply* do not
+change over time; budget changes only through sea defences.
+
+## 2050 targets — the challenge
+
+The session lasts **7 minutes**. The plan is judged on its **2050 projection**:
+population housed ≥ 28,000 · environment ≥ 60 · renewable coverage ≥ 80 % ·
+budget left ≥ 0. Finishing early or running out of time both trigger the judgement.
+Each missed target produces one concrete hint.
+
+Reference plan that wins (tested in `tests/unit/projection.test.ts` and in the
+browser e2e test): road (6,3) + bridge (7,3); homes at (6,2), (6,4), (2,4), (8,3);
+wind turbines on the ridge at (10,8), (11,8), (12,8); parks at (9,3) and (1,4);
+solar at (9,4) → 2050: 28,000 housed, environment 65, 88 % renewable, 1 credit left
+(three coastal sites pay sea defences). Without the solar farm the same plan reaches
+80 %+ in 2026 but falls below 80 % by 2050 — exactly the kind of insight the time
+control is for. A do-nothing plan sprawls 16,000 people by 2050 and fails three targets.
+
+## Plan comparison
+
+"Save Plan A" snapshots the map; further edits form Plan B. "Compare A/B" projects
+both to 2050 and shows, per metric, each plan's value, whether it meets the target,
+and which plan is better, plus a headline ("Plan B meets 4 of 4 targets in 2050
+(other: 1)"). Plan A is also kept in the browser's local storage when available.
 
 ## Not modelled (by design)
 
 Traffic, water supply capacity, land prices, jobs, demographics, weather, grid
-storage, real-world emissions factors. Future-year projections (2035/2050) arrive
-in Phase 2 and will be documented here with their explicit growth assumptions.
+storage, real-world emissions factors, discounting, maintenance costs.

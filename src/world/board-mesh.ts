@@ -27,7 +27,7 @@ import {
 import { tileCenter } from './board-coords.js';
 import type { TerrainMap, Tile } from './terrain-map.js';
 
-const TERRAIN_COLORS: Record<TerrainType, string> = {
+export const TERRAIN_COLORS: Record<TerrainType, string> = {
   sea: '#1d8ea3',
   beach: '#f0dcaa',
   river: '#2fb6c8',
@@ -38,14 +38,14 @@ const TERRAIN_COLORS: Record<TerrainType, string> = {
   town: '#e6d9c3',
 };
 
-const WATER_LEVEL = TILE_BASE_HEIGHT * 0.55;
+export const WATER_LEVEL = TILE_BASE_HEIGHT * 0.55;
 
 export function tileTopY(tile: Tile): number {
   if (tile.type === TerrainType.Sea || tile.type === TerrainType.River) return WATER_LEVEL;
   return TILE_BASE_HEIGHT + tile.elevation * ELEVATION_STEP;
 }
 
-function tileColor(tile: Tile): Color {
+export function tileColor(tile: Tile): Color {
   const c = new Color(TERRAIN_COLORS[tile.type]);
   // Crop stripes on farmland; darker shading with altitude on hills.
   if (tile.type === TerrainType.Farmland && tile.col % 2 === 0) c.offsetHSL(0.02, 0, -0.05);

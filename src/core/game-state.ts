@@ -19,7 +19,7 @@ import { generateTerrain, tileAt, type TerrainMap } from '../world/terrain-map.j
 
 export type { Placement } from '../simulation/metrics.js';
 
-export type ActionKind = 'add' | 'move' | 'remove' | 'rotate' | 'undo' | 'redo' | 'reset';
+export type ActionKind = 'add' | 'move' | 'remove' | 'rotate' | 'undo' | 'redo' | 'reset' | 'load';
 
 export type GameEvent =
   | {
@@ -151,6 +151,13 @@ export class GameState {
     return true;
   }
 
+  /** Replace the plan with a saved one (undoable), e.g. restoring Plan A. */
+  load(plan: readonly Placement[], label: string): void {
+    const ids = plan.map((p) => Number(p.id.split('-').pop()) || 0);
+    this.nextId = Math.max(this.nextId, ...ids, 0) + 1;
+    this.commit('load', null, plan.map((p) => ({ ...p })), `${label} restored`);
+  }
+
   /** Clear the plan and history (restart). */
   reset(): void {
     this.past = [];
@@ -159,7 +166,7 @@ export class GameState {
     this.apply('reset', null, [], 'Fresh start');
   }
 
-  private commit(action: ActionKind, id: string, next: Plan, message: string): void {
+  private commit(action: ActionKind, id: string | null, next: Plan, message: string): void {
     this.past.push(this.plan);
     this.future = [];
     this.apply(action, id, next, message);

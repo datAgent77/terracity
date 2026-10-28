@@ -19,10 +19,16 @@ Deadline: 2026-11-18 12:00 PT.
   - 69 unit tests, 7 desktop e2e tests, 5-scenario IWER script (hands + controller).
   - `SIMULATION_ASSUMPTIONS.md`.
 
-## Next (Phase 2 — not started; awaiting go-ahead)
-- 2026 / 2035 / 2050 time control (hand-operated) with transparent projections.
-- Visual consequences (highlight, animated metrics, farmland/vegetation changes).
-- Save Plan A, build Plan B, side-by-side comparison; win/lose + replay.
+- **Phase 2 — signature experience** (2026-10-27). See [PHASE2_REPORT.md](PHASE2_REPORT.md).
+  - 2026/2035/2050 time control, transparent projections, animated future visuals.
+  - Plan A/B save, restore, side-by-side 2050 comparison; timed challenge with
+    win/lose summary, hints, replay, pause.
+  - 86 unit tests, 13 desktop e2e tests, hands-only IWER script for the full loop.
+
+## Next (Phase 3 — not started; awaiting go-ahead)
+- Guided onboarding (first placement walkthrough), sound effects.
+- Visual polish (lighting, water shader, sprawl/flood look), desktop camera/layout.
+- Accessibility (text size, colour-blind safe markers), performance (code-split).
 
 ## Open blockers / risks
 - No physical Quest: all XR evidence is IWER emulation only.

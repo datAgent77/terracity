@@ -1,0 +1,21 @@
+<!--
+  Time control: three large year buttons (poke / ray / click). The active
+  year is highlighted at runtime.
+-->
+<style>
+  .root { flex-direction: column; align-items: center; width: 330px; padding-top: 10px; padding-bottom: 12px; }
+  .caption { font-size: 13px; font-weight: 600; color: #3b6f78; margin-bottom: 6px; }
+  .caption:dark { color: #7fe3ea; }
+  .row { flex-direction: row; gap: 10px; }
+  .year { width: 92px; height: 52px; border-radius: 14px; justify-content: center; align-items: center;
+          background-color: #e8eef0; border-width: 2px; border-color: #c7d6da; cursor: pointer; }
+  .label { font-size: 22px; font-weight: 700; color: #1d3f46; }
+</style>
+<Panel id="root" class="root">
+  <div id="time-caption" class="caption">See the future of your plan</div>
+  <div class="row">
+    <div id="year-2026" class="year"><div id="year-2026-label" class="label">2026</div></div>
+    <div id="year-2035" class="year"><div id="year-2035-label" class="label">2035</div></div>
+    <div id="year-2050" class="year"><div id="year-2050-label" class="label">2050</div></div>
+  </div>
+</Panel>

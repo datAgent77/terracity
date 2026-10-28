@@ -19,12 +19,22 @@
   .target:dark { color: rgba(255, 255, 255, 0.6); }
   .status { font-size: 15px; font-weight: 500; color: #272727; margin-top: 12px; margin-bottom: 4px; width: 100%; }
   .status:dark { color: rgba(255, 255, 255, 0.92); }
+  .yearline { flex-direction: row; justify-content: space-between; width: 100%; margin-bottom: 6px; }
+  .year { font-size: 16px; font-weight: 700; color: #1d3f46; }
+  .year:dark { color: #ffffff; }
+  .clock { font-size: 16px; font-weight: 700; color: #1d5f6b; }
+  .clock:dark { color: #7fe3ea; }
+  .sprawl { font-size: 12px; color: #b5651d; margin-left: 30px; }
   .button { justify-content: flex-start; margin-left: 22px; margin-right: 22px; margin-top: 12px; margin-bottom: 18px; }
 </style>
 <Panel class="panel-root">
   <div class="panel-content">
     <div class="title">TerraCity</div>
     <div class="tagline">Plan Costa Verde for 2050.</div>
+    <div class="yearline">
+      <div id="m-year" class="year">2026 - today</div>
+      <div id="m-clock" class="clock">7:00</div>
+    </div>
     <Divider></Divider>
     <div class="row">
       <Users class="icon"></Users>
@@ -32,6 +42,7 @@
       <div id="m-population" class="value">12,000</div>
       <div id="t-population" class="target">goal 28,000</div>
     </div>
+    <div id="m-sprawl" class="sprawl"></div>
     <div class="row">
       <Leaf class="icon"></Leaf>
       <div class="label">Environment</div>

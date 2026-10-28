@@ -35,9 +35,9 @@
       },
       "transform": {
         "position": [
-          -0.5,
-          1.0,
-          -0.28
+          -0.52,
+          1.02,
+          -0.32
         ],
         "rotationDeg": [
           -15,
@@ -53,7 +53,7 @@
           "top": "16px",
           "left": "16px",
           "width": "26vw",
-          "height": "52%"
+          "height": "60%"
         }
       }
     },
@@ -66,9 +66,9 @@
       },
       "transform": {
         "position": [
-          0.5,
+          0.56,
           0.95,
-          -0.26
+          -0.24
         ],
         "rotationDeg": [
           -20,
@@ -83,8 +83,8 @@
         "ScreenSpace": {
           "top": "16px",
           "right": "16px",
-          "width": "13vw",
-          "height": "48%"
+          "width": "24vw",
+          "height": "40%"
         }
       }
     },
@@ -114,6 +114,99 @@
         "scale": 1
       },
       "components": {}
+    },
+    {
+      "id": "time-panel",
+      "name": "Time Control",
+      "content": {
+        "type": "asset",
+        "asset": "time-panel"
+      },
+      "transform": {
+        "position": [
+          -0.42,
+          0.87,
+          -0.13
+        ],
+        "rotationDeg": [
+          -40,
+          45,
+          0
+        ],
+        "scale": 0.09
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {},
+        "ScreenSpace": {
+          "top": "64px",
+          "left": "37vw",
+          "width": "26vw",
+          "height": "14%"
+        }
+      }
+    },
+    {
+      "id": "overlay-panel",
+      "name": "Intro and Result",
+      "content": {
+        "type": "asset",
+        "asset": "overlay-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          1.1,
+          -0.52
+        ],
+        "rotationDeg": [
+          -10,
+          0,
+          0
+        ],
+        "scale": 0.1
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {},
+        "ScreenSpace": {
+          "top": "16%",
+          "left": "28vw",
+          "width": "44vw",
+          "height": "64%"
+        }
+      }
+    },
+    {
+      "id": "compare-panel",
+      "name": "Plan Comparison",
+      "content": {
+        "type": "asset",
+        "asset": "compare-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          1.22,
+          -0.95
+        ],
+        "rotationDeg": [
+          -8,
+          0,
+          0
+        ],
+        "scale": 0.09
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {},
+        "ScreenSpace": {
+          "bottom": "24%",
+          "right": "16px",
+          "width": "26vw",
+          "height": "30%"
+        }
+      }
     }
   ]
 }

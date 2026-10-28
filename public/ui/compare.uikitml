@@ -1,0 +1,23 @@
+<!--
+  Plan A vs Plan B in 2050: one headline + a 4-row table. Cells are coloured
+  at runtime (green = meets target, amber = misses; bold = better plan).
+-->
+<style>
+  .root { flex-direction: column; width: 380px; padding-top: 14px; padding-bottom: 16px; padding-left: 20px; padding-right: 20px; }
+  .headline { font-size: 17px; font-weight: 700; color: #1d3f46; margin-bottom: 8px; width: 100%; }
+  .headline:dark { color: #ffffff; }
+  .row { flex-direction: row; align-items: center; margin-top: 6px; }
+  .name { width: 130px; font-size: 14px; color: #444444; }
+  .name:dark { color: rgba(255, 255, 255, 0.8); }
+  .cell { width: 110px; font-size: 16px; font-weight: 500; color: #272727; }
+  .head { width: 110px; font-size: 15px; font-weight: 700; color: #1d5f6b; }
+  .head:dark { color: #7fe3ea; }
+</style>
+<Panel id="root" class="root">
+  <div id="cmp-headline" class="headline">Plan A vs Plan B in 2050</div>
+  <div class="row"><div class="name">2050</div><div class="head">Plan A</div><div class="head">Plan B (now)</div></div>
+  <div class="row"><div class="name">Population</div><div id="a-population" class="cell">-</div><div id="b-population" class="cell">-</div></div>
+  <div class="row"><div class="name">Environment</div><div id="a-environment" class="cell">-</div><div id="b-environment" class="cell">-</div></div>
+  <div class="row"><div class="name">Renewable</div><div id="a-renewableCoverage" class="cell">-</div><div id="b-renewableCoverage" class="cell">-</div></div>
+  <div class="row"><div class="name">Budget left</div><div id="a-budgetLeft" class="cell">-</div><div id="b-budgetLeft" class="cell">-</div></div>
+</Panel>
