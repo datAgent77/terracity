@@ -79,7 +79,7 @@ export async function open(page: Page, { start = true } = {}) {
       /* ignore */
     }
   });
-  await page.goto('/');
+  await page.goto('./'); // relative: works under a sub-path such as GitHub Pages
   await page.waitForFunction(() => {
     const t = window.__terracity as unknown as Record<string, unknown> | undefined;
     return !!t && 'uiToScreen' in t && 'slotToScreen' in t && 'phase' in t;

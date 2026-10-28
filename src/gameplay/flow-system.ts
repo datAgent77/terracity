@@ -6,6 +6,9 @@
  */
 import { createSystem, VisibilityState } from '@iwsdk/core';
 import * as cmd from '../core/commands.js';
+import { game } from '../core/session.js';
+import { projectYear } from '../simulation/projection.js';
+import type { Year } from '../config/projection.js';
 import { largeText, soundOn } from '../ui/accessibility.js';
 import { challenge, coachText, compareOpen, paused, phase, planA, result, timeLeft, viewYear } from '../core/session.js';
 
@@ -15,7 +18,10 @@ export class FlowSystem extends createSystem({}) {
     cmd.loadStoredPlanA();
     // Test/debug hook: read-only view of the challenge state.
     const hook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
-    Object.assign(hook, { viewYear, phase, planA, compareOpen, result, timeLeft, paused, challenge, coachText, largeText, soundOn });
+    Object.assign(hook, {
+      /** Projection of the current plan (read-only; used by tests and the video recorder). */
+      project: (year: Year) => projectYear(game.terrain, game.placements, year, game.metrics),
+      viewYear, phase, planA, compareOpen, result, timeLeft, paused, challenge, coachText, largeText, soundOn });
     // Dev only: state trace so CLI-driven XR tests (which cannot read JS) can assert on it.
     if (import.meta.env.DEV) {
       const trace = () =>

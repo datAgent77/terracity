@@ -9,6 +9,7 @@
 | IWER emulator, hands + controller building | `scripts/xr-phase1-test.sh` | 5 / 5 scenarios |
 | IWER emulator, hands only: start, time travel, read-only future, save, finish | `scripts/xr-phase2-test.sh` | 5 / 5 steps |
 | IWER emulator, hands only: tips, hover, larger text, skip tips | `scripts/xr-phase3-test.sh` | 5 / 5 steps |
+| Desktop browser e2e on the **live site** | `E2E_BASE_URL=https://datagent77.github.io/terracity/ …` | **17 / 17 passed** |
 | Production build | `npm run build` | succeeds |
 
 Required simulation tests from the brief — all present in `tests/unit/`:

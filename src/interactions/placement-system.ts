@@ -495,6 +495,26 @@ export class PlacementSystem extends createSystem({
         probe.set(x, tileTopY(t), z);
         return toScreen(this.board.localToWorld(probe));
       },
+      /** Tile under the piece currently held by a hand/controller (or null). */
+      heldTile: () => {
+        for (const e of this.queries.held.entities) return this.tileUnder(e.object3D!);
+        return null;
+      },
+      /** Held piece: tile under it and its offset (m) from that tile's centre. */
+      heldOffset: () => {
+        for (const e of this.queries.held.entities) {
+          const t = this.tileUnder(e.object3D!);
+          if (!t) return null;
+          const c = tileCenter(t.col, t.row);
+          return { ...t, dx: this.local.x - c.x, dz: this.local.z - c.z };
+        }
+        return null;
+      },
+      /** Structure type of the piece currently held (or null). */
+      heldType: () => {
+        for (const e of this.queries.held.entities) return this.typeOf(e);
+        return null;
+      },
       /** Page pixel position of a tray slot's front edge (clear of the token). */
       slotToScreen: (slot: number) =>
         toScreen(probe.set(BOARD_CENTER[0] + slotX(slot), BOARD_CENTER[1], BOARD_CENTER[2] + TRAY_Z + 0.03)),

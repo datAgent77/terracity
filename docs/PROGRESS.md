@@ -31,11 +31,10 @@ Deadline: 2026-11-18 12:00 PT.
   - Draw calls 224 → ~95; main bundle 6.6 MB → 2.4 MB (0.68 MB gzip).
   - 91 unit, 19 e2e (dev) + 17 e2e on the production build, IWER hand script.
 
-## Next (Phase 4 — submission; not started, awaiting go-ahead)
-- HTTPS deployment (static `dist/`; host to be chosen), public repository.
-- Under-3-minute gameplay video from the real app/emulator, screenshots,
-  Devpost description, setup + architecture + hand-interaction docs.
-- Resolve `@drawcall/uikitml` license question; decide on an emulator-enabled demo.
+- **Phase 4 — submission** (2026-10-28). See [PHASE4_REPORT.md](PHASE4_REPORT.md).
+  - Live: https://datagent77.github.io/terracity/ · repo github.com/datAgent77/terracity (MIT).
+  - FoV-aware layout, judge docs, 2:01 silent emulator video + voice-over script,
+    screenshots. Remaining: voice-over, video upload, launch date, Devpost form.
 
 ## Open blockers / risks
 - No physical Quest: all XR evidence is IWER emulation only. Finger poke on

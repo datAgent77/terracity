@@ -38,7 +38,7 @@ const SPRAWL_POOL = 10;
 const WALL_POOL = 10;
 const DRY = new Color('#d2b77a');
 const WHITE = new Color('#ffffff');
-const MINI_SCALE = 0.42;
+const MINI_SCALE = 0.36;
 
 export class FutureSystem extends createSystem({
   placeables: { required: [Placeable] },
@@ -212,13 +212,15 @@ export class FutureSystem extends createSystem({
     const place = (plan: readonly typeof b[number][], x: number, label: string) => {
       const mini = createMiniBoard(game.terrain, plan, projectYear(game.terrain, plan, 2050));
       mini.scale.setScalar(MINI_SCALE);
-      mini.position.set(BOARD_CENTER[0] + x, BOARD_CENTER[1] + 0.13, BOARD_CENTER[2] - 0.42);
-      mini.rotation.x = 0.55; // tilt toward the seated player
+      // Float the two 2050 cities over the front of the table, between the side
+      // panels and inside a comfortable field of view, tilted to the seated eye.
+      mini.position.set(BOARD_CENTER[0] + x, BOARD_CENTER[1] + 0.17, BOARD_CENTER[2] + 0.06);
+      mini.rotation.x = 0.7;
       mini.add(labelPlate(label));
       this.minis.add(mini);
     };
-    place(a, -0.27, 'Plan A - 2050');
-    place(b, 0.27, 'Plan B - 2050');
+    place(a, -0.165, 'Plan A - 2050');
+    place(b, 0.165, 'Plan B - 2050');
   }
 }
 

@@ -99,7 +99,9 @@ export class FlowPanelSystem extends createSystem({}) {
       const ph = phase.value;
       const isPaused = paused.value;
       const r = result.value;
-      if (ph === 'building' && !isPaused) {
+      // While comparing after the game, the card steps aside for the two cities;
+      // the Plan pad's Compare button brings it back.
+      if ((ph === 'building' && !isPaused) || (ph === 'finished' && compareOpen.value)) {
         setPanelVisible(this.world, 'overlay-panel', false);
         return;
       }

@@ -13,7 +13,7 @@ Judges: see [docs/submission/TESTING.md](docs/submission/TESTING.md).
 > **Not tested on a physical Meta Quest headset** — all XR testing used Meta's
 > IWER emulator. See [known limitations](docs/submission/KNOWN_LIMITATIONS.md).
 
-> Status: **Phase 4 (submission) in progress** — see [docs/PROGRESS.md](docs/PROGRESS.md)
+> Status: **submission build** — see [docs/PROGRESS.md](docs/PROGRESS.md)
 > and the per-phase reports in `docs/`.
 > Third-party notices: [ATTRIBUTION.md](ATTRIBUTION.md) · License: [MIT](LICENSE)
 >
@@ -47,6 +47,8 @@ npm run test:e2e     # desktop mouse/keyboard browser tests (Playwright)
 ./scripts/xr-phase1-test.sh      # emulated hand + controller building checks (needs `npm run dev`)
 ./scripts/xr-phase2-test.sh      # emulated hands: start, time travel, read-only future, finish
 ./scripts/xr-phase3-test.sh      # emulated hands: tips, hover, larger text, skip tips
+node scripts/video/record.mjs    # records the demo in the IWER emulator (needs `npm run dev`)
+node scripts/video/assemble.mjs  # -> video/terracity-silent.mp4
 npm run build        # production build into dist/
 ```
 
