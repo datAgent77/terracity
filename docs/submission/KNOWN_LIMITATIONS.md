@@ -15,3 +15,11 @@
    cover the left edge of the board.
 7. **Third-party license question**: `@drawcall/uikitml` (a dependency of the
    IWSDK) declares no license; see ATTRIBUTION.md.
+
+## Visual overhaul (branch `feature/premium-visual-overhaul`, V1–V2)
+
+8. Richer world geometry roughly triples triangle count (~35k per eye for our
+   content); draw calls rose ~10 %. Measured only in desktop/IWER software
+   rendering — **not** on a Quest.
+9. The 2035/2050 sprawl/flood visuals and the A/B mini dioramas have not yet been
+   restyled to match the new world (planned V3/V4).

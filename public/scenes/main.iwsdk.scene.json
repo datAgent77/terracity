@@ -4,24 +4,24 @@
   "components": {
     "com.iwsdk.components.IBLGradient": {
       "sky": [
-        0.78,
-        0.88,
-        0.95,
+        0.74,
+        0.86,
+        0.96,
         1
       ],
       "equator": [
-        0.93,
-        0.89,
-        0.8,
+        0.95,
+        0.9,
+        0.82,
         1
       ],
       "ground": [
-        0.82,
-        0.76,
-        0.66,
+        0.72,
+        0.64,
+        0.52,
         1
       ],
-      "intensity": 0.75
+      "intensity": 0.62
     }
   },
   "resources": {},

@@ -1,12 +1,15 @@
 /**
- * Procedural low-poly diorama: wooden table slab, terrain tiles, sea surface,
- * pine forest on protected land, and the existing white-stone town.
+ * The Mediterranean diorama: a layered earth base in a wooden frame, seamless
+ * terrain tiles (coloured tops, earth-cut sides), a depth-graded sea, the old
+ * town with a bell tower, and the decoration layer (fields, forest, shore).
+ *
+ * The logical grid is unchanged: every tile keeps its centre and top height
+ * (`tileTopY`), so placement, snapping and the simulation are unaffected.
  */
 import {
   BoxGeometry,
+  BufferAttribute,
   Color,
-  ConeGeometry,
-  CylinderGeometry,
   Group,
   InstancedMesh,
   Matrix4,
@@ -16,158 +19,177 @@ import {
   Quaternion,
   Vector3,
 } from '@iwsdk/core';
-import {
-  ELEVATION_STEP,
-  GRID_COLS,
-  GRID_ROWS,
-  TILE_BASE_HEIGHT,
-  TILE_SIZE,
-  TerrainType,
-} from '../config/scenario.js';
-import { tileCenter } from './board-coords.js';
+import { GRID_COLS, GRID_ROWS, TILE_SIZE, TerrainType } from '../config/scenario.js';
+import { tileCenter, tileTopY, WATER_LEVEL } from './board-coords.js';
+import { createBellTower, createHomes, HOME_VARIANTS } from './houses.js';
 import { mergeStatic } from './merge.js';
+import { block, COLORS } from './palette.js';
+import { hashInts, rng } from './rand.js';
+import { decorPlan, TerrainDecor } from './terrain-decor.js';
 import type { TerrainMap, Tile } from './terrain-map.js';
 
+export { tileTopY, WATER_LEVEL } from './board-coords.js';
+
+/** Base colours of each terrain's top surface. */
 export const TERRAIN_COLORS: Record<TerrainType, string> = {
-  sea: '#1d8ea3',
-  beach: '#f0dcaa',
-  river: '#2fb6c8',
-  farmland: '#94c04c',
-  plain: '#b9d27e',
-  hill: '#a9b46a',
-  protected: '#4e8748',
-  town: '#e6d9c3',
+  sea: '#2a7fa6',
+  beach: '#ecd9a6',
+  river: '#3aa5b8',
+  farmland: '#a7b862',
+  plain: '#9cc76a',
+  hill: '#b5b36f',
+  protected: '#5c8f4a',
+  town: '#e3d6bd',
 };
 
-export const WATER_LEVEL = TILE_BASE_HEIGHT * 0.55;
-
-export function tileTopY(tile: Tile): number {
-  if (tile.type === TerrainType.Sea || tile.type === TerrainType.River) return WATER_LEVEL;
-  return TILE_BASE_HEIGHT + tile.elevation * ELEVATION_STEP;
+/** Distance (in tiles) from a tile to the nearest land tile, for water depth. */
+function landDistance(terrain: TerrainMap, col: number, row: number): number {
+  let best = Infinity;
+  for (const t of terrain) {
+    if (t.type === TerrainType.Sea || t.type === TerrainType.River) continue;
+    best = Math.min(best, Math.hypot(t.col - col, t.row - row));
+  }
+  return best;
 }
 
-export function tileColor(tile: Tile): Color {
+export function tileColor(tile: Tile, terrain?: TerrainMap): Color {
   const c = new Color(TERRAIN_COLORS[tile.type]);
-  // Crop stripes on farmland; darker shading with altitude on hills.
-  if (tile.type === TerrainType.Farmland && tile.col % 2 === 0) c.offsetHSL(0.02, 0, -0.05);
-  if (tile.type === TerrainType.Hill) c.offsetHSL(-0.02, -0.05 * tile.elevation, 0.04 * tile.elevation);
+  const r = rng(hashInts(tile.col, tile.row, 3));
+  // Gentle per-tile patchwork so large areas never look like flat paint.
+  c.offsetHSL((r() - 0.5) * 0.015, (r() - 0.5) * 0.06, (r() - 0.5) * 0.05);
+  if (tile.type === TerrainType.Hill) c.offsetHSL(0.01, -0.04 * tile.elevation, 0.03 * tile.elevation);
+  if (tile.type === TerrainType.Sea && terrain) {
+    // Shallow sea floor near the coast, deep blue offshore.
+    const d = Math.min(1, (landDistance(terrain, tile.col, tile.row) - 1) / 2.5);
+    c.set('#8fd3c5').lerp(new Color('#1d5f8c'), Math.max(0, d));
+  }
   return c;
 }
 
 export function buildBoard(terrain: TerrainMap): Group {
   const board = new Group();
   board.name = 'terrain-board';
-
   const width = GRID_COLS * TILE_SIZE;
   const depth = GRID_ROWS * TILE_SIZE;
 
-  // Wooden table slab under the diorama.
-  const slab = new Mesh(
-    new BoxGeometry(width + 0.06, 0.03, depth + 0.06),
-    new MeshStandardMaterial({ color: '#8a6a4a', roughness: 0.8 }),
-  );
-  slab.position.y = -0.015;
-  slab.name = 'table-slab';
-  board.add(slab);
+  // Diorama base: layered earth in a wooden frame (one merged mesh).
+  const base = new Group();
+  base.add(block(width + 0.004, 0.012, depth + 0.004, COLORS.earthDark, 0, -0.03, 0));
+  base.add(block(width + 0.004, 0.018, depth + 0.004, COLORS.earth, 0, -0.018, 0));
+  const rim = 0.014;
+  base.add(block(width + 2 * rim, 0.034, rim, COLORS.wood, 0, -0.032, -(depth + rim) / 2));
+  base.add(block(width + 2 * rim, 0.034, rim, COLORS.wood, 0, -0.032, (depth + rim) / 2));
+  base.add(block(rim, 0.034, depth, COLORS.wood, -(width + rim) / 2, -0.032, 0));
+  base.add(block(rim, 0.034, depth, COLORS.wood, (width + rim) / 2, -0.032, 0));
+  base.name = 'table-slab';
+  board.add(mergeStatic(base));
 
-  // Terrain tiles as one instanced mesh (one draw call, per-tile colour).
-  const tileGeo = new BoxGeometry(TILE_SIZE * 0.98, 1, TILE_SIZE * 0.98);
-  tileGeo.translate(0, 0.5, 0);
-  const tiles = new InstancedMesh(
-    tileGeo,
-    new MeshStandardMaterial({ roughness: 0.9, flatShading: true }),
-    terrain.length,
-  );
-  tiles.name = 'terrain-tiles';
+  // Seamless terrain: earth-coloured columns + a coloured cap on each tile.
   const m = new Matrix4();
   const q = new Quaternion();
   const s = new Vector3();
   const p = new Vector3();
+  const columnGeo = new BoxGeometry(TILE_SIZE, 1, TILE_SIZE).translate(0, 0.5, 0);
+  const columns = new InstancedMesh(columnGeo, new MeshStandardMaterial({ roughness: 0.95 }), terrain.length);
+  columns.name = 'terrain-columns';
+  const capGeo = new BoxGeometry(TILE_SIZE, 0.002, TILE_SIZE).translate(0, -0.001, 0);
+  const caps = new InstancedMesh(capGeo, new MeshStandardMaterial({ roughness: 0.92 }), terrain.length);
+  caps.name = 'terrain-tiles'; // FutureSystem tints this material as the land dries
+  const earth = new Color();
   terrain.forEach((tile, i) => {
     const { x, z } = tileCenter(tile.col, tile.row);
-    const top = tile.type === TerrainType.Sea || tile.type === TerrainType.River ? 0.004 : tileTopY(tile);
+    const water = tile.type === TerrainType.Sea || tile.type === TerrainType.River;
+    const top = water ? 0.004 : tileTopY(tile);
     m.compose(p.set(x, 0, z), q, s.set(1, top, 1));
-    tiles.setMatrixAt(i, m);
-    tiles.setColorAt(i, tileColor(tile));
+    columns.setMatrixAt(i, m);
+    columns.setColorAt(i, earth.set(water ? '#b9a27a' : COLORS.earth).offsetHSL(0, 0, (tile.elevation - 1) * 0.03));
+    m.compose(p.set(x, top, z), q, s.set(1, 1, 1));
+    caps.setMatrixAt(i, m);
+    caps.setColorAt(i, tileColor(tile, terrain));
   });
-  tiles.receiveShadow = true;
-  board.add(tiles);
+  columns.receiveShadow = caps.receiveShadow = true;
+  board.add(columns, caps);
 
-  // Translucent turquoise water sheet spanning sea + river tiles.
+  // Sea and river: one translucent sheet, turquoise shallows to deep blue.
+  const waterGeo = new PlaneGeometry(width, depth, GRID_COLS * 2, GRID_ROWS * 2);
+  const shallow = new Color('#6fdad3');
+  const deep = new Color('#2a7db0');
+  const col = new Color();
+  const pos = waterGeo.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const tc = pos.getX(i) / TILE_SIZE + (GRID_COLS - 1) / 2;
+    const tr = -pos.getY(i) / TILE_SIZE + (GRID_ROWS - 1) / 2; // plane is rotated -90° about X
+    const d = Math.max(0, Math.min(1, (landDistance(terrain, tc, tr) - 0.6) / 2.6));
+    col.copy(shallow).lerp(deep, d);
+    colors.set([col.r, col.g, col.b], i * 3);
+  }
+  waterGeo.setAttribute('color', new BufferAttribute(colors, 3));
   const water = new Mesh(
-    new PlaneGeometry(width, depth),
+    waterGeo,
     new MeshStandardMaterial({
-      color: '#46d2d8',
+      vertexColors: true,
       transparent: true,
-      opacity: 0.55,
-      roughness: 0.15,
-      metalness: 0.1,
+      opacity: 0.8,
+      roughness: 0.12,
+      metalness: 0.15,
       emissive: '#2ec4d0',
-      emissiveIntensity: 0.12,
+      emissiveIntensity: 0.1,
     }),
   );
   water.rotation.x = -Math.PI / 2;
   water.position.y = WATER_LEVEL;
   water.name = 'water-surface';
+  water.raycast = () => {};
   board.add(water);
 
-  // Static decoration is baked to one mesh per material (draw-call budget).
-  board.add(mergeStatic(buildForest(terrain)));
   board.add(mergeStatic(buildTown(terrain)));
+
+  const decor = new TerrainDecor(decorPlan(terrain));
+  board.add(decor.group);
+  board.userData.decor = decor;
   return board;
 }
 
-function buildForest(terrain: TerrainMap): Group {
-  const forest = new Group();
-  forest.name = 'protected-forest';
-  const trunk = new CylinderGeometry(0.002, 0.003, 0.01, 5);
-  trunk.translate(0, 0.005, 0);
-  const crown = new ConeGeometry(0.011, 0.03, 6);
-  crown.translate(0, 0.024, 0);
-  const trunkMat = new MeshStandardMaterial({ color: '#6b4a2f' });
-  const crownMat = new MeshStandardMaterial({ color: '#2f6b3a', flatShading: true });
-  for (const tile of terrain) {
-    if (tile.type !== TerrainType.Protected) continue;
-    const { x, z } = tileCenter(tile.col, tile.row);
-    // Two pines per tile, deterministic offsets.
-    for (const [dx, dz] of [
-      [-0.012, -0.01],
-      [0.013, 0.012],
-    ]) {
-      const t = new Mesh(trunk, trunkMat);
-      const c = new Mesh(crown, crownMat);
-      t.position.set(x + dx, tileTopY(tile), z + dz);
-      c.position.copy(t.position);
-      forest.add(t, c);
-    }
-  }
-  return forest;
+/** Decoration controller attached by `buildBoard`. */
+export function boardDecor(board: { userData: Record<string, unknown> }): TerrainDecor | undefined {
+  return board.userData.decor as TerrainDecor | undefined;
 }
 
 function buildTown(terrain: TerrainMap): Group {
   const town = new Group();
   town.name = 'existing-town';
-  const wallMat = new MeshStandardMaterial({ color: '#f4efe4', roughness: 0.85 });
-  const roofMat = new MeshStandardMaterial({ color: '#c8643c', flatShading: true });
-  for (const tile of terrain) {
-    if (tile.type !== TerrainType.Town) continue;
+  const tiles = terrain.filter((t) => t.type === TerrainType.Town);
+  tiles.forEach((tile, i) => {
     const { x, z } = tileCenter(tile.col, tile.row);
-    const house = createHouseCluster(wallMat, roofMat, (tile.col + tile.row) % 2);
-    house.position.set(x, tileTopY(tile), z);
-    town.add(house);
-  }
+    const y = tileTopY(tile);
+    // The old town square with its bell tower sits on the middle tile.
+    if (i === Math.floor(tiles.length / 2)) {
+      const sq = new Group();
+      sq.add(block(TILE_SIZE * 0.92, 0.0008, TILE_SIZE * 0.92, COLORS.stone, 0, 0, 0));
+      const tower = createBellTower();
+      tower.position.set(-0.012, 0, -0.01);
+      sq.add(tower);
+      const homes = createHomes(1, hashInts(tile.col, tile.row));
+      homes.scale.setScalar(0.62);
+      homes.position.set(0.006, 0, 0.014);
+      sq.add(homes);
+      sq.position.set(x, y, z);
+      town.add(sq);
+      return;
+    }
+    const homes = createHomes(hashInts(tile.col, tile.row, 11) % HOME_VARIANTS, hashInts(tile.col, tile.row));
+    homes.position.set(x, y, z);
+    town.add(homes);
+  });
   return town;
 }
 
-const roofGeo = new ConeGeometry(0.0125, 0.008, 4);
-const wallGeos = new Map<number, BoxGeometry>();
-const wallGeo = (h: number) => {
-  let g = wallGeos.get(h);
-  if (!g) wallGeos.set(h, (g = new BoxGeometry(0.016, h, 0.016)));
-  return g;
-};
-
-/** Three small Mediterranean houses on one tile footprint (shared geometry). */
+const roofGeo = new BoxGeometry(1, 1, 1);
+/**
+ * Legacy grey-roofed cluster used for unplanned sprawl in the projections.
+ * (The time-travel layer is reworked in phase V3.)
+ */
 export function createHouseCluster(
   wallMat: MeshStandardMaterial,
   roofMat: MeshStandardMaterial,
@@ -187,13 +209,14 @@ export function createHouseCluster(
           [0.002, -0.013, 0.014],
         ];
   for (const [hx, hz, h] of spots) {
-    const wall = new Mesh(wallGeo(h), wallMat);
+    const wall = new Mesh(new BoxGeometry(0.016, h, 0.016), wallMat);
     wall.position.set(hx, h / 2, hz);
     wall.castShadow = true;
     const roof = new Mesh(roofGeo, roofMat);
-    roof.rotation.y = Math.PI / 4;
-    roof.position.set(hx, h + 0.004, hz);
+    roof.scale.set(0.017, 0.002, 0.017);
+    roof.position.set(hx, h + 0.001, hz);
     cluster.add(wall, roof);
   }
   return cluster;
 }
+

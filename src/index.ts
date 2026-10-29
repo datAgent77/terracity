@@ -16,7 +16,7 @@ World.create(
   projectOptions,
 ).then((world) => {
   // Soft key light for the diorama's miniature shadows.
-  const sun = new DirectionalLight('#fff4e0', 0.9);
+  const sun = new DirectionalLight('#ffe6c4', 1.15); // warm, low Mediterranean sun
   sun.position.set(0.6, 2.2, 0.4);
   world.createTransformEntity(sun);
 
@@ -36,6 +36,14 @@ World.create(
   const hook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
   hook.renderStats = () => {
     const { calls, triangles } = world.renderer.info.render;
-    return { calls, triangles, geometries: world.renderer.info.memory.geometries };
+    const { geometries, textures } = world.renderer.info.memory;
+    let objects = 0;
+    let meshes = 0;
+    world.scene.traverse((o) => {
+      objects++;
+      if ((o as { isMesh?: boolean }).isMesh) meshes++;
+    });
+    const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+    return { calls, triangles, geometries, textures, objects, meshes, jsHeapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : null };
   };
 });
