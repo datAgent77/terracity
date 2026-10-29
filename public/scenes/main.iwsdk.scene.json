@@ -4,24 +4,24 @@
   "components": {
     "com.iwsdk.components.IBLGradient": {
       "sky": [
-        0.78,
-        0.88,
-        0.95,
+        0.74,
+        0.86,
+        0.96,
         1
       ],
       "equator": [
-        0.93,
-        0.89,
-        0.8,
+        0.95,
+        0.9,
+        0.82,
         1
       ],
       "ground": [
-        0.82,
-        0.76,
-        0.66,
+        0.72,
+        0.64,
+        0.52,
         1
       ],
-      "intensity": 0.75
+      "intensity": 0.62
     }
   },
   "resources": {},
@@ -155,25 +155,25 @@
       },
       "transform": {
         "position": [
-          0.0,
-          1.1,
-          -0.52
+          0,
+          1.27,
+          -0.64
         ],
         "rotationDeg": [
-          -10.0,
-          0.0,
+          -2.2,
+          0,
           0
         ],
-        "scale": 0.1
+        "scale": 0.085
       },
       "components": {
         "RayInteractable": {},
         "PokeInteractable": {},
         "ScreenSpace": {
-          "top": "16%",
-          "left": "28vw",
-          "width": "44vw",
-          "height": "64%"
+          "left": "29vw",
+          "width": "42vw",
+          "height": "46%",
+          "bottom": "3%"
         }
       }
     },
@@ -201,10 +201,10 @@
         "RayInteractable": {},
         "PokeInteractable": {},
         "ScreenSpace": {
-          "bottom": "30%",
+          "bottom": "26%",
           "right": "16px",
-          "width": "23vw",
-          "height": "27%"
+          "width": "19vw",
+          "height": "26%"
         }
       }
     }

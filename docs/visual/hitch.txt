@@ -1,0 +1,14 @@
+before-prebuild: worst 450 ms, median 117 ms over 89 frames
+before-prebuild: worst 433 ms, median 117 ms over 89 frames
+after-prebuild: worst 433 ms, median 117 ms over 89 frames
+after-prebuild: worst 433 ms, median 117 ms over 89 frames
+after-prewarm: worst 1300 ms, median 117 ms over 89 frames
+after-prewarm: worst 450 ms, median 117 ms over 89 frames
+after-render-prewarm: worst 433 ms, median 117 ms over 89 frames
+after-render-prewarm: worst 417 ms, median 117 ms over 89 frames
+after-fix: worst 150 ms, median 117 ms over 89 frames
+after-fix: worst 400 ms, median 117 ms over 89 frames
+after-fix: worst 433 ms, median 117 ms over 89 frames
+after-fix: worst 300 ms, median 117 ms over 89 frames
+after-fix: worst 250 ms, median 117 ms over 89 frames
+after-fix: worst 933 ms, median 117 ms over 89 frames

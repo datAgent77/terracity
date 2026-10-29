@@ -15,3 +15,14 @@
    cover the left edge of the board.
 7. **Third-party license question**: `@drawcall/uikitml` (a dependency of the
    IWSDK) declares no license; see ATTRIBUTION.md.
+
+## Visual overhaul (branch `feature/premium-visual-overhaul`, V1–V2)
+
+8. Richer world geometry roughly triples triangle count (~35k per eye for our
+   content); draw calls rose ~10 %. Measured only in desktop/IWER software
+   rendering — **not** on a Quest.
+9. The comparison view roughly doubles triangles while open (two full-detail dioramas); unmeasured on Quest.
+10. Sea-level rise on beaches is illustrative (stylised creep), not a flood depth.
+11. The first-transition shader compile was removed (0 programs compiled on the
+    switch), but worst-frame times in software-rendered IWER stay noisy
+    (150–933 ms); no frame-time improvement is claimed and Quest is unmeasured.

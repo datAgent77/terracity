@@ -3,19 +3,20 @@
   year is highlighted at runtime.
 -->
 <style>
-  .root { flex-direction: column; align-items: center; width: 330px; padding-top: 10px; padding-bottom: 12px; }
-  .caption { font-size: 13px; font-weight: 600; color: #3b6f78; margin-bottom: 6px; }
+  .root { flex-direction: column; align-items: center; width: 372px; padding-top: 12px; padding-bottom: 14px; }
+  .caption { font-size: 15px; font-weight: 700; color: #1d5f6b; margin-bottom: 8px; }
   .caption:dark { color: #7fe3ea; }
   .row { flex-direction: row; gap: 10px; }
-  .year { width: 92px; height: 52px; border-radius: 14px; justify-content: center; align-items: center;
-          background-color: #e8eef0; border-width: 2px; border-color: #c7d6da; cursor: pointer; }
-  .label { font-size: 22px; font-weight: 700; color: #1d3f46; }
+  .year { width: 108px; height: 64px; border-radius: 16px; flex-direction: column; justify-content: center; align-items: center;
+          background-color: #eef3f4; border-width: 3px; border-color: #c7d6da; cursor: pointer; }
+  .label { font-size: 26px; font-weight: 700; color: #1d3f46; }
+  .sub { font-size: 11px; font-weight: 600; color: #5d7a80; }
 </style>
 <Panel id="root" class="root">
   <div id="time-caption" class="caption">See the future of your plan</div>
   <div class="row">
-    <div id="year-2026" class="year"><div id="year-2026-label" class="label">2026</div></div>
-    <div id="year-2035" class="year"><div id="year-2035-label" class="label">2035</div></div>
-    <div id="year-2050" class="year"><div id="year-2050-label" class="label">2050</div></div>
+    <div id="year-2026" class="year"><div id="year-2026-label" class="label">2026</div><div id="year-2026-sub" class="sub">today</div></div>
+    <div id="year-2035" class="year"><div id="year-2035-label" class="label">2035</div><div id="year-2035-sub" class="sub">projection</div></div>
+    <div id="year-2050" class="year"><div id="year-2050-label" class="label">2050</div><div id="year-2050-sub" class="sub">projection</div></div>
   </div>
 </Panel>

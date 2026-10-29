@@ -30,6 +30,7 @@ import {
 } from '@iwsdk/core';
 import {
   BOARD_CENTER,
+  GRID_COLS,
   GRID_ROWS,
   StructureType,
   TILE_BASE_HEIGHT,
@@ -40,8 +41,10 @@ import { STRUCTURE_ORDER, STRUCTURES } from '../config/structures.js';
 import * as cmd from '../core/commands.js';
 import { armedType, game, planVersion, selectedId, statusText, viewYear } from '../core/session.js';
 import { localToTile, tileCenter } from '../world/board-coords.js';
-import { buildBoard, tileTopY } from '../world/board-mesh.js';
-import { createStructureModel, setRoadArms } from '../world/structure-models.js';
+import { boardDecor, buildBoard, tileTopY } from '../world/board-mesh.js';
+import { idNumber } from '../world/rand.js';
+import { rotorSpeed } from '../world/future-system.js';
+import { createStructureModel, setRoadArms, structureLook } from '../world/structure-models.js';
 import { tileAt, type Tile } from '../world/terrain-map.js';
 import { Placeable, SupplyTray, TerrainBoard, TrayToken } from './placeable-component.js';
 
@@ -86,6 +89,7 @@ export class PlacementSystem extends createSystem({
   private adopting: Entity | null = null;
   /** Grabs refused because the plan is read-only (future year / not playing). */
   private blocked = new Set<Entity>();
+  private occupiedScratch = new Set<number>();
   private local = new Vector3();
   private world3 = new Vector3();
 
@@ -169,7 +173,8 @@ export class PlacementSystem extends createSystem({
   }
 
   update(delta: number): void {
-    for (const rotor of this.rotors) rotor.rotation.z -= delta * 2.2;
+    // Rotor speed follows projected renewable coverage (see future-visual-state).
+    for (const rotor of this.rotors) rotor.rotation.z -= delta * rotorSpeed.value;
 
     // Live hover feedback while a structure is carried by a hand/controller.
     for (const entity of this.queries.held.entities) {
@@ -270,6 +275,7 @@ export class PlacementSystem extends createSystem({
           entity = this.adopting;
           entity.setValue(Placeable, 'structureId', p.id);
           entity.object3D!.name = p.id;
+          this.applyLook(entity.object3D!, p.type, p.id);
           this.adopting = null;
         } else {
           entity = this.spawnPlaced(p.type, p.id);
@@ -310,7 +316,22 @@ export class PlacementSystem extends createSystem({
       this.entitiesById.delete(id);
       if (selectedId.peek() === id) selectedId.value = null;
     }
+    // Decoration (crops, tufts, shrubs) steps aside wherever something is built.
+    const occupied = this.occupiedScratch;
+    occupied.clear();
+    for (const p of plan) occupied.add(p.row * GRID_COLS + p.col);
+    boardDecor(this.board)?.setHiddenLayer('structures', occupied);
     if (this.queries.held.entities.size === 0) this.hideHighlight();
+  }
+
+  /** Give a carried tray piece the deterministic look of its new placement id. */
+  private applyLook(obj: Object3D, type: StructureType, id: string): void {
+    const { variant, seed } = structureLook(id, idNumber(id));
+    this.untrackRotor(obj);
+    const fresh = createStructureModel(type, id, variant, seed);
+    for (const c of [...obj.children]) obj.remove(c);
+    for (const c of [...fresh.children]) obj.add(c);
+    this.trackRotor(obj);
   }
 
   private connects(col: number, row: number): boolean {
@@ -320,7 +341,8 @@ export class PlacementSystem extends createSystem({
   }
 
   private spawnPlaced(type: StructureType, id: string): Entity {
-    const model = createStructureModel(type, id);
+    const { variant, seed } = structureLook(id, idNumber(id));
+    const model = createStructureModel(type, id, variant, seed);
     const entity = this.world.createTransformEntity(model);
     entity.addComponent(Placeable, { structureId: id, structureType: type });
     entity.addComponent(OneHandGrabbable, GRAB_OPTIONS);

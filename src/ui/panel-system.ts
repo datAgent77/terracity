@@ -11,6 +11,7 @@ import { STRUCTURE_ORDER, STRUCTURES } from '../config/structures.js';
 import * as cmd from '../core/commands.js';
 import {
   armedType,
+  compareOpen,
   game,
   paused,
   phase,
@@ -23,6 +24,7 @@ import {
 import { formatClock } from '../gameplay/challenge.js';
 import { coachText, tutorial } from '../core/session.js';
 import { largeText, prefersReducedMotion, soundOn } from './accessibility.js';
+import { onHover, pulse } from './hover.js';
 import { projectYear, type YearMetrics } from '../simulation/projection.js';
 import { sfx } from '../audio/sfx.js';
 
@@ -36,6 +38,9 @@ const ACTION_IDS = [
 ];
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
+
+/** Tray slot the current tutorial tip asks for (1 = Homes, 3 = Wind). */
+const TIP_SLOT: Partial<Record<string, number>> = { homes: 1, wind: 3 };
 
 /** Panels enlarged by the "Larger text" preference. */
 const SCALABLE_PANELS = ['hud-panel', 'actions-panel', 'time-panel', 'overlay-panel', 'compare-panel'];
@@ -72,7 +77,12 @@ export class PanelSystem extends createSystem({}) {
     this.exposeTestHooks();
   }
 
+  private clock = 0;
+  private paintTray: (() => void) | null = null;
+
   update(delta: number): void {
+    this.clock += delta;
+    if (tutorial.active && TIP_SLOT[tutorial.step] && !armedType.peek()) this.paintTray?.();
     const k = Math.min(1, delta * 6);
     for (const t of this.tweens) {
       if (t.shown === t.target) continue;
@@ -182,7 +192,11 @@ export class PanelSystem extends createSystem({}) {
     this.onClick(panel.getElementById('btn-sound') as unknown as Clickable, () => (soundOn.value = !soundOn.peek()));
     for (const id of ['btn-skip-tips', 'btn-text-size', 'btn-sound']) {
       const el = panel.getElementById(id);
-      if (el) el.name = id;
+      if (!el) continue;
+      el.name = id;
+      this.cleanupFuncs.push(
+        onHover(el, (h) => el.setProperties({ backgroundColor: h ? '#d3e7eb' : '#e8eef0', borderColor: h ? '#3b9aa5' : '#c7d6da' })),
+      );
     }
 
     const xrButton = panel.getElementById('xr-button');
@@ -255,18 +269,26 @@ export class PanelSystem extends createSystem({}) {
       const s = STRUCTURES[type];
       panel.getElementById<UIKit.Text>(`cost-${s.slot}`)?.setProperties({ text: `cost ${s.cost}` });
     }
+    this.paintTray = () => {
+      const armed = armedType.peek();
+      // Tutorial cue: the piece the current tip asks for pulses softly.
+      const cue = tutorial.active && phase.peek() === 'building' ? TIP_SLOT[tutorial.step] : undefined;
+      const glow = pulse(this.clock);
+      for (const type of STRUCTURE_ORDER) {
+        const slot = STRUCTURES[type].slot;
+        panel.getElementById(`slot-${slot}`)?.setProperties({
+          backgroundColor: armed === type ? ARMED_BG : cue === slot ? (glow > 0.5 ? '#ffe08a' : '#fff2c6') : IDLE_BG,
+        });
+      }
+    };
+    const visible = () => {
+      panel.visible = viewYear.peek() === 2026 && !compareOpen.peek();
+    };
     this.cleanupFuncs.push(
-      armedType.subscribe((armed) => {
-        for (const type of STRUCTURE_ORDER) {
-          const slot = STRUCTURES[type].slot;
-          panel
-            .getElementById(`slot-${slot}`)
-            ?.setProperties({ backgroundColor: armed === type ? ARMED_BG : IDLE_BG });
-        }
-      }),
-      viewYear.subscribe((y) => {
-        panel.visible = y === 2026;
-      }),
+      armedType.subscribe(() => this.paintTray?.()),
+      coachText.subscribe(() => this.paintTray?.()),
+      viewYear.subscribe(visible),
+      compareOpen.subscribe(visible),
     );
   }
 
