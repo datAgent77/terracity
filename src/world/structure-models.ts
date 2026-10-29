@@ -18,13 +18,14 @@ import {
   SphereGeometry,
 } from '@iwsdk/core';
 import { StructureType, TILE_SIZE } from '../config/scenario.js';
-import { addCypress, createHomes, HOME_VARIANTS } from './houses.js';
+import { addCypress, HOME_VARIANTS } from './houses.js';
+import { createVillaDistrict } from './villas.js';
 import { mergeStatic } from './merge.js';
 import { block, COLORS, painted, pick } from './palette.js';
 import { hashInts, rng } from './rand.js';
 
 /** Parts that animate or are restyled per instance stay separate meshes. */
-const DYNAMIC = /^(rotor|crown|pad|arm-[ewsn]|solar-panels)$/;
+const DYNAMIC = /^(rotor|crown|pad|arm-[ewsn]|solar-panels|era-[012])$/;
 
 const PAD = TILE_SIZE * 0.92;
 
@@ -47,12 +48,15 @@ function pad(color: string): Mesh {
   return m;
 }
 
+/** A low-rise garden district: detached villas with private gardens (3 eras). */
 function residential(variant: number, seed: number): Group {
   const g = new Group();
-  g.add(pad('#d8cba9'));
-  const homes = createHomes(variant, seed);
-  homes.position.y = 0.0016;
-  g.add(homes);
+  g.add(pad('#cbbf9c'));
+  const district = createVillaDistrict(variant, seed);
+  for (const era of [...district.children]) {
+    era.position.y = 0.0016;
+    g.add(era); // era-0/1/2 stay separate so time travel can switch them
+  }
   return g;
 }
 
@@ -189,6 +193,14 @@ function road(): Group {
     arm.add(block(w + 2 * kerb, 0.0018, armLen, COLORS.sidewalk, 0, 0, 0));
     arm.add(block(w, 0.0022, armLen + 0.0004, COLORS.asphalt, 0, 0, 0));
     arm.add(block(0.0011, 0.0006, armLen * 0.45, COLORS.marking, 0, 0.0022, 0));
+    // Street trees on both sidewalks (tree-lined streets).
+    for (const side of [-1, 1]) {
+      const t = painted(new CylinderGeometry(0.0004, 0.0005, 0.004, 4), COLORS.trunk);
+      t.position.set(side * (w / 2 + kerb * 0.5), 0.003, 0);
+      const c = painted(new IcosahedronGeometry(0.0026, 0), COLORS.leaf[2], true);
+      c.position.set(side * (w / 2 + kerb * 0.5), 0.0062, 0);
+      arm.add(t, c);
+    }
     arm.position.set(dx * (w / 2 + armLen / 2), 0, dz * (w / 2 + armLen / 2));
     if (dx !== 0) arm.rotation.y = Math.PI / 2;
     g.add(mergeStatic(arm));

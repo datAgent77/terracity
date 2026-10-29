@@ -23,6 +23,7 @@ import { tileCenter, tileTopY } from './board-coords.js';
 import { buildBase, buildTerrainTiles, buildTown, buildWater } from './board-mesh.js';
 import type { FutureVisualState } from './future-visual-state.js';
 import { createSprawl } from './houses.js';
+import { setEra } from './villas.js';
 import { mergeStatic } from './merge.js';
 import { block, paint, PAINTED, PAINTED_FLAT } from './palette.js';
 import { hashInts, idNumber } from './rand.js';
@@ -84,6 +85,12 @@ export function createMiniBoard(terrain: TerrainMap, plan: readonly Placement[],
   for (const p of plan) {
     const { variant, seed } = structureLook(p.id, idNumber(p.id));
     const model = createStructureModel(p.type, p.id, variant, seed);
+    // 2050 architecture only; drop the other eras before baking.
+    setEra(model, state.homeEra);
+    for (const n of ['era-0', 'era-1', 'era-2']) {
+      const g = model.getObjectByName(n);
+      if (g && !g.visible) g.parent?.remove(g);
+    }
     if (p.type === StructureType.Road) {
       setRoadArms(model, [
         connects(terrain, plan, p.col + 1, p.row),

@@ -25,6 +25,7 @@ import { formatClock } from '../gameplay/challenge.js';
 import { coachText, tutorial } from '../core/session.js';
 import { largeText, prefersReducedMotion, soundOn } from './accessibility.js';
 import { onHover, pulse } from './hover.js';
+import { landBudget } from '../simulation/land-budget.js';
 import { projectYear, type YearMetrics } from '../simulation/projection.js';
 import { sfx } from '../audio/sfx.js';
 
@@ -108,6 +109,7 @@ export class PanelSystem extends createSystem({}) {
     const yearLabel = text('m-year');
     const clock = text('m-clock');
     const sprawl = text('m-sprawl');
+    const land = text('m-land');
     text('t-population')?.setProperties({ text: `goal ${fmt(TARGETS.population)}` });
     text('t-environment')?.setProperties({ text: `goal ${TARGETS.environment}+` });
     text('t-budget')?.setProperties({ text: `of ${BALANCE.startBudget}` });
@@ -161,6 +163,10 @@ export class PanelSystem extends createSystem({}) {
         y.sprawlResidents ? `+${fmt(y.sprawlResidents)} in unplanned sprawl` : '',
       ].filter(Boolean);
       sprawl?.setProperties({ text: extra.join(' / ') });
+      const lb = landBudget(game.terrain, game.placements, y);
+      land?.setProperties({
+        text: `Land used ${lb.landConsumedKm2.toFixed(0)} sq km | farmland kept ${lb.farmlandKeptPct}% | near services ${lb.serviceCoveragePct}%`,
+      });
       yearLabel?.setProperties({ text: year === 2026 ? '2026 - today' : `${year} - projection` });
     };
     this.cleanupFuncs.push(

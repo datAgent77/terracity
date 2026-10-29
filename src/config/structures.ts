@@ -37,7 +37,10 @@ export const STRUCTURES: Record<StructureType, StructureSpec> = {
   residential: {
     type: StructureType.Residential, label: 'Homes', noun: 'homes', slot: 1,
     cost: 12, slopeCostPerStep: 6, population: 4000, energy: 0, environment: -3,
-    farmlandPenalty: -6, allowed: LAND, maxElevation: 2,
+    // Homes only on flat land and gentle slopes (elevation 1): steeper hills
+    // carry erosion, wildfire, drainage and emergency-access risk
+    // (horizontal-urbanism directive, 2026-10-29; see HORIZONTAL_URBANISM_DESIGN.md).
+    farmlandPenalty: -6, allowed: LAND, maxElevation: 1,
   },
   solar: {
     type: StructureType.Solar, label: 'Solar', noun: 'solar farm', slot: 2,

@@ -25,6 +25,8 @@
   .clock { font-size: 16px; font-weight: 700; color: #1d5f6b; }
   .clock:dark { color: #7fe3ea; }
   .sprawl { font-size: 12px; color: #b5651d; margin-left: 30px; }
+  .land { font-size: 12px; color: #4f6b55; margin-top: 6px; width: 100%; }
+  .land:dark { color: rgba(220, 240, 225, 0.85); }
   .coach { font-size: 15px; font-weight: 600; color: #3a2c00; background-color: #ffe9a8; border-radius: 10px;
            padding-top: 8px; padding-bottom: 8px; padding-left: 10px; padding-right: 10px; margin-top: 10px; width: 100%; }
   .prefs { flex-direction: row; gap: 8px; margin-top: 10px; }
@@ -67,6 +69,7 @@
       <div id="m-renewable" class="value">17%</div>
       <div id="t-renewable" class="target">goal 80%</div>
     </div>
+    <div id="m-land" class="land">-</div>
     <Divider></Divider>
     <div id="coach" class="coach">-</div>
     <div id="status-text" class="status">Pinch a structure from the tray and drop it on the map.</div>

@@ -31,11 +31,14 @@ describe('terrain restrictions (all structures)', () => {
 });
 
 describe('slope restrictions and costs', () => {
-  it('homes allowed up to elevation 2, rejected at 3', () => {
-    expect(canPlace(R, tile(TerrainType.Hill, 2), false).ok).toBe(true);
-    const steep = canPlace(R, tile(TerrainType.Hill, MAX_RESIDENTIAL_ELEVATION), false);
-    expect(steep.ok).toBe(false);
-    expect(!steep.ok && steep.reason).toMatch(/steep/i);
+  it('homes allowed on gentle slopes (elevation 1), rejected on steep hills (2+)', () => {
+    expect(MAX_RESIDENTIAL_ELEVATION).toBe(2);
+    expect(canPlace(R, tile(TerrainType.Hill, 1), false).ok).toBe(true);
+    for (const e of [2, 3]) {
+      const steep = canPlace(R, tile(TerrainType.Hill, e), false);
+      expect(steep.ok).toBe(false);
+      expect(!steep.ok && steep.reason).toMatch(/erosion and wildfire/i);
+    }
   });
 
   it('solar only on gentle slopes, wind and parks on any hill', () => {
@@ -51,7 +54,7 @@ describe('slope restrictions and costs', () => {
     expect(constructionCost(R, tile(TerrainType.Plain))).toBe(base);
     expect(constructionCost(R, tile(TerrainType.Hill, 1))).toBe(base + step);
     expect(constructionCost(R, tile(TerrainType.Hill, 2))).toBe(base + 2 * step);
-    const v = canPlace(R, tile(TerrainType.Hill, 2), false);
+    const v = canPlace(R, tile(TerrainType.Hill, 1), false);
     expect(v.ok && v.warning).toMatch(/hillside/i);
   });
 

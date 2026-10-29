@@ -56,6 +56,8 @@ export interface FutureVisualState {
   floodRisk: FloodRisk[];
   /** Renewable activity 0..1 (coverage / 100): panel glow, rotor speed. */
   renewableActivity: number;
+  /** Architectural era of the garden districts: 0 = 2026, 1 = 2035, 2 = 2050. */
+  homeEra: 0 | 1 | 2;
   /** Park tree size multiplier (mirrors the park-maturity rule). */
   parkGrowth: number;
   /** Every target met in this year -> the balanced look. */
@@ -65,6 +67,15 @@ export interface FutureVisualState {
 }
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+/**
+ * Villa architecture by (displayed) time-travel progress: traditional 2026
+ * houses, 2035 eco-villas, 2050 solar-roofed homes. Illustrative technology
+ * adoption — rooftop solar is NOT counted in renewable coverage (conservative).
+ */
+export function eraForProgress(progress: number): 0 | 1 | 2 {
+  return progress < 0.25 ? 0 : progress < 0.75 ? 1 : 2;
+}
 
 export function vigorFor(environment: number): number {
   return clamp01((environment - ENV_BARREN) / (ENV_PRISTINE - ENV_BARREN));
@@ -116,6 +127,7 @@ export function futureVisualState(
     seaRise: progress,
     floodRisk,
     renewableActivity: clamp01(projected.renewableCoverage / 100),
+    homeEra: eraForProgress(progress),
     parkGrowth: 1 + 0.6 * progress * (PROJECTION.parkMaturity2050 / 2),
     balanced: allMet(checks),
     missed: (Object.keys(checks) as Array<keyof TargetCheck>).filter((k) => !checks[k]),

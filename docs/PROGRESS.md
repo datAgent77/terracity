@@ -47,3 +47,11 @@ Deadline: 2026-11-18 12:00 PT.
   panels and real-hand ray accuracy remain unverified.
 - Production build ships without IWER, so desktop judges get the mouse/keyboard
   path; an emulator-enabled public build is an open decision.
+
+## 2026-10-29 — Horizontal urbanism (branch `feature/horizontal-urbanism`)
+
+Garden districts of detached 1–2 storey villas with three eras, compact 3–4 storey
+town centre, tree-lined streets, low-rise sprawl, informational land budget (HUD),
+zoning change: no homes on steep hills. Unit 122/122, e2e 25 passed / 2 skipped,
+XR hand scripts pass, build OK. See docs/HORIZONTAL_URBANISM_DESIGN.md.
+Not yet merged or deployed; demo video predates this change.

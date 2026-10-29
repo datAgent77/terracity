@@ -128,3 +128,15 @@ describe('balanced look only when every target is met', () => {
     expect(vs(planA(), 2026).renewableActivity).toBeGreaterThan(vs(planA(), 2050).renewableActivity);
   });
 });
+
+describe('garden-district architecture by year', () => {
+  it('2026 traditional, 2035 eco-villas, 2050 solar-roofed homes', () => {
+    expect(vs(reference(), 2026).homeEra).toBe(0);
+    expect(vs(reference(), 2035).homeEra).toBe(1);
+    expect(vs(reference(), 2050).homeEra).toBe(2);
+  });
+  it('switches at the middle of each transition', async () => {
+    const { eraForProgress } = await import('../../src/world/future-visual-state');
+    expect([0, 0.24, 0.26, 0.5, 0.74, 0.76, 1].map(eraForProgress)).toEqual([0, 0, 1, 1, 1, 2, 2]);
+  });
+});
