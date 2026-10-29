@@ -21,7 +21,7 @@ import {
 } from '@iwsdk/core';
 import { GRID_COLS, GRID_ROWS, TILE_SIZE, TerrainType } from '../config/scenario.js';
 import { tileCenter, tileTopY, WATER_LEVEL } from './board-coords.js';
-import { createBellTower, createHomes, HOME_VARIANTS } from './houses.js';
+import { createTownTile } from './villas.js';
 import { mergeStatic } from './merge.js';
 import { block, COLORS } from './palette.js';
 import { hashInts, rng } from './rand.js';
@@ -176,28 +176,17 @@ export function boardDecor(board: { userData: Record<string, unknown> }): Terrai
 export function buildTown(terrain: TerrainMap): Group {
   const town = new Group();
   town.name = 'existing-town';
+  // Compact, walkable centre: a plaza with the bell tower, one civic tile
+  // (school / clinic) and 3–4 storey mixed-use blocks — the only taller
+  // buildings in the region.
   const tiles = terrain.filter((t) => t.type === TerrainType.Town);
   tiles.forEach((tile, i) => {
     const { x, z } = tileCenter(tile.col, tile.row);
-    const y = tileTopY(tile);
-    // The old town square with its bell tower sits on the middle tile.
-    if (i === Math.floor(tiles.length / 2)) {
-      const sq = new Group();
-      sq.add(block(TILE_SIZE * 0.92, 0.0008, TILE_SIZE * 0.92, COLORS.stone, 0, 0, 0));
-      const tower = createBellTower();
-      tower.position.set(-0.012, 0, -0.01);
-      sq.add(tower);
-      const homes = createHomes(1, hashInts(tile.col, tile.row));
-      homes.scale.setScalar(0.62);
-      homes.position.set(0.006, 0, 0.014);
-      sq.add(homes);
-      sq.position.set(x, y, z);
-      town.add(sq);
-      return;
-    }
-    const homes = createHomes(hashInts(tile.col, tile.row, 11) % HOME_VARIANTS, hashInts(tile.col, tile.row));
-    homes.position.set(x, y, z);
-    town.add(homes);
+    const mid = Math.floor(tiles.length / 2);
+    const kind = i === mid ? 'plaza' : i === tiles.length - 1 ? 'civic' : 'block';
+    const g = createTownTile(kind, hashInts(tile.col, tile.row, 13), 3 + (hashInts(tile.col, tile.row) % 2));
+    g.position.set(x, tileTopY(tile), z);
+    town.add(g);
   });
   return town;
 }

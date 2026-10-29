@@ -1,0 +1,9 @@
+desktop start: {"calls":92,"triangles":29332,"geometries":110,"textures":9,"objects":482,"meshes":427,"jsHeapMB":133}
+desktop full plan 2026: {"calls":137,"triangles":38826,"geometries":161,"textures":9,"objects":596,"meshes":503,"jsHeapMB":133}
+desktop full plan 2050: {"calls":118,"triangles":39870,"geometries":183,"textures":9,"objects":596,"meshes":503,"jsHeapMB":133}
+xr 2026: {"calls":286,"triangles":96472,"geometries":169,"textures":15,"objects":655,"meshes":506,"jsHeapMB":150}
+xr 2050: {"calls":248,"triangles":98536,"geometries":191,"textures":15,"objects":655,"meshes":506,"jsHeapMB":150}
+xr frame time over 120 frames (desktop Chromium + IWER, NOT a Quest): median 166.6 ms, p95 216.6 ms
+desktop start: {"calls":92,"triangles":29332,"geometries":110,"textures":9,"objects":482,"meshes":427,"jsHeapMB":133}
+desktop full plan 2026: {"calls":137,"triangles":38826,"geometries":161,"textures":9,"objects":596,"meshes":503,"jsHeapMB":133}
+desktop full plan 2050: {"calls":118,"triangles":39870,"geometries":183,"textures":9,"objects":596,"meshes":503,"jsHeapMB":133}

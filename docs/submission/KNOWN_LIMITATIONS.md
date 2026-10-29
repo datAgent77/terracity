@@ -26,3 +26,12 @@
 11. The first-transition shader compile was removed (0 programs compiled on the
     switch), but worst-frame times in software-rendered IWER stay noisy
     (150–933 ms); no frame-time improvement is claimed and Quest is unmeasured.
+
+## Horizontal urbanism (illustrative)
+
+- Tile scale (2.25 km²), villa parcel (1,250 m²) and household size (2.8) are
+  illustrative assumptions; the land budget on the HUD does not affect scoring.
+- Villa eras (2026 / 2035 / 2050) show illustrative technology adoption; rooftop
+  solar, batteries and EV charging are not simulated.
+- Homes are banned on steep hills (elevation 2+); there is no finer slope or
+  wildfire model.

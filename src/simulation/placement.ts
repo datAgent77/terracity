@@ -47,7 +47,13 @@ export function canPlace(
     return { ok: false, reason: TERRAIN_REASON[tile.type] ?? `No ${spec.noun} on ${tile.type}` };
   }
   if (tile.elevation > spec.maxElevation) {
-    return { ok: false, reason: `Slope too steep for ${spec.noun}` };
+    return {
+      ok: false,
+      reason:
+        structure === StructureType.Residential
+          ? 'Steep hillside: erosion and wildfire risk - homes need flat land or a gentle slope'
+          : `Slope too steep for ${spec.noun}`,
+    };
   }
   const cost = constructionCost(structure, tile);
   if (cost > budgetLeft) {

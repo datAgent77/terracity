@@ -37,7 +37,7 @@ hillside sprawl, renewables siting).
 
 | | Cost | Slope cost / step | Max elevation | Residents | Energy | Environment | Extra on farmland |
 |---|---|---|---|---|---|---|---|
-| Homes | 12 | +6 | 2 | +4,000 (if connected) | — | −3 | −6 |
+| Homes | 12 | +6 | **1** (steep hills: erosion / wildfire / access risk) | +4,000 (if connected) | — | −3 | −6 |
 | Solar farm | 9 | +4 | 1 | — | +4 | −1 | −5 |
 | Wind turbine | 14 | 0 | 3 | — | +5 (+2 on a ridge, elevation ≥ 2) | −2 | −1 |
 | Park | 4 | 0 | 3 | — | — | +4 (+1 per adjacent homes) | −2 |
@@ -102,6 +102,12 @@ control is for. A do-nothing plan sprawls 16,000 people by 2050 and fails three 
 both to 2050 and shows, per metric, each plan's value, whether it meets the target,
 and which plan is better, plus a headline ("Plan B meets 4 of 4 targets in 2050
 (other: 1)"). Plan A is also kept in the browser's local storage when available.
+
+## Land budget (informational)
+
+See [docs/HORIZONTAL_URBANISM_DESIGN.md](docs/HORIZONTAL_URBANISM_DESIGN.md): one tile ≈ 2.25 km²,
+a homes tile ≈ 1,430 detached villas on 1,250 m² parcels; the HUD shows land used,
+farmland kept and service coverage. These numbers do not affect scoring.
 
 ## Not modelled (by design)
 

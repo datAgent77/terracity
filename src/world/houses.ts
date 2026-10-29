@@ -202,8 +202,9 @@ const CONCRETE = ['#cfc8bb', '#bdb6aa', '#d6cfbf', '#b3ab9d', '#c4bba9'];
 
 /**
  * Unplanned settlement for the projections: deliberately unlike the planned
- * homes — dusty ground, haphazard grey-beige blocks with flat roofs and water
- * tanks, no gardens or trees. `buildings` sets the density (2..7).
+ * garden districts — dusty ground, haphazard 1–2 storey grey-beige houses with
+ * flat roofs and water tanks, no street, gardens or trees. Low-rise, but
+ * land-hungry and car-dependent. `buildings` sets the density (2..7).
  */
 export function createSprawl(seed: number, buildings: number): Group {
   const g = new Group();
@@ -215,9 +216,10 @@ export function createSprawl(seed: number, buildings: number): Group {
   ];
   for (let i = 0; i < Math.min(buildings, spots.length); i++) {
     const [sx, sz] = spots[(i * 3 + Math.floor(r() * 8)) % spots.length];
-    const w = 0.008 + r() * 0.006;
-    const d = 0.008 + r() * 0.006;
-    const h = 0.007 + r() * 0.01;
+    // Scattered 1–2 storey houses (indiscriminate low-rise sprawl, never towers).
+    const w = 0.007 + r() * 0.004;
+    const d = 0.007 + r() * 0.004;
+    const h = 0.0055 * (r() < 0.6 ? 1 : 2);
     const x = sx + (r() - 0.5) * 0.004;
     const z = sz + (r() - 0.5) * 0.004;
     const rot = (r() - 0.5) * 0.6;

@@ -55,8 +55,9 @@ describe('budget constraints', () => {
   it('moving onto a costlier hill re-checks the budget with a refund of the old tile', () => {
     const g = new GameState();
     const { id } = g.add(S.Residential, 6, 4); // 12
-    expect(g.move(id!, 10, 8).ok).toBe(true); // hill 2: 12 + 12
-    expect(g.metrics.budgetSpent).toBe(24);
+    expect(g.move(id!, 10, 8).ok).toBe(false); // steep hill (2): no homes
+    expect(g.move(id!, 10, 5).ok).toBe(true); // gentle hill (1): 12 + 6
+    expect(g.metrics.budgetSpent).toBe(18);
     expect(g.move(id!, 6, 4).ok).toBe(true);
     expect(g.metrics.budgetSpent).toBe(12);
   });

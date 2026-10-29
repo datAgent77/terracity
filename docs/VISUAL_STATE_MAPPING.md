@@ -43,3 +43,15 @@ success → gold outlines on connected homes, parks, wind and solar + a short li
 burst; failure → amber problem marks and teal opportunity marks **only for missed
 targets** (see VISUAL_OVERHAUL_REPORT.md, V5). Unit-tested in
 `tests/unit/outcome-visual.test.ts`; browser-checked in `tests/e2e/outcome.spec.ts`.
+
+## Garden-district architecture era (`homeEra`)
+
+| Displayed progress | Era | Look |
+|---|---|---|
+| < 0.25 (2026) | 0 | traditional Mediterranean houses, terracotta roofs, lawns |
+| 0.25 – 0.75 (2035) | 1 | eco-villas, flat roofs with rooftop PV, timber shading, cycle lane |
+| ≥ 0.75 (2050) | 2 | integrated solar roofs, battery, EV charger, xeric gardens |
+
+Source: `eraForProgress(progress)` in `future-visual-state.ts` (unit-tested). Purely
+illustrative technology adoption: rooftop solar is not counted in renewable coverage.
+See [HORIZONTAL_URBANISM_DESIGN.md](HORIZONTAL_URBANISM_DESIGN.md).

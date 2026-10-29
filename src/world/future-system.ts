@@ -33,7 +33,7 @@ import { projectYear } from '../simulation/projection.js';
 import { prefersReducedMotion } from '../ui/accessibility.js';
 import { tileCenter, tileTopY } from './board-coords.js';
 import { boardDecor } from './board-mesh.js';
-import { futureVisualState, MAX_DRYNESS, type FutureVisualState } from './future-visual-state.js';
+import { eraForProgress, futureVisualState, MAX_DRYNESS, type FutureVisualState } from './future-visual-state.js';
 import { createSprawl } from './houses.js';
 import { mergeStatic } from './merge.js';
 import { createMiniBoard, labelPlate } from './mini-board.js';
@@ -88,6 +88,9 @@ export class FutureSystem extends createSystem({
   private rings: Mesh[] = [];
   private ringMat = new MeshBasicMaterial({ color: '#ff8a3d', transparent: true, opacity: 0.8, depthWrite: false });
   private crowns: Object3D[] = [];
+  /** Garden-district era groups (era-0/1/2) of placed homes and tray tokens. */
+  private eraGroups: Object3D[] = [];
+  private shownEra = -1;
   private crownsDirty = true;
   private clock = 0;
   private m = new Matrix4();
@@ -298,6 +301,8 @@ export class FutureSystem extends createSystem({
     const projected = projectYear(game.terrain, plan, year, game.metrics);
     this.state = futureVisualState(game.terrain, plan, projected);
     const st = this.state;
+    // Models may have been swapped (a carried tray piece adopts its look).
+    this.crownsDirty = true;
 
     // Start a transition from whatever is on screen now.
     this.from = { ...this.shown };
@@ -417,13 +422,24 @@ export class FutureSystem extends createSystem({
 
     if (this.crownsDirty) {
       this.crowns.length = 0;
+      this.eraGroups.length = 0;
       for (const e of this.queries.placeables.entities) {
-        if (e.getValue(Placeable, 'structureType') !== 'park') continue;
+        const type = e.getValue(Placeable, 'structureType');
+        if (type !== 'park' && type !== 'residential') continue;
         e.object3D!.traverse((o) => {
           if (o.name === 'crown') this.crowns.push(o);
+          if (/^era-[012]$/.test(o.name)) this.eraGroups.push(o);
         });
       }
       this.crownsDirty = false;
+      this.shownEra = -1;
+    }
+    // Villa architecture follows the displayed year (switches mid-transition).
+    // Tray tokens keep the 2026 look: they are only shown while editing 2026.
+    const era = eraForProgress(s.progress);
+    if (era !== this.shownEra) {
+      for (const g of this.eraGroups) g.visible = g.name === `era-${era}`;
+      this.shownEra = era;
     }
     for (const o of this.crowns) o.scale.setScalar((o.userData.baseScale as number) * s.parkGrowth);
   }
