@@ -6,6 +6,7 @@
  * cluster merges into one mesh. Variation is deterministic (seeded).
  */
 import { ConeGeometry, CylinderGeometry, Group, IcosahedronGeometry } from '@iwsdk/core';
+import { kitPart } from './kit.js';
 import { block, COLORS, painted, pick } from './palette.js';
 import { rng } from './rand.js';
 
@@ -206,14 +207,36 @@ const CONCRETE = ['#cfc8bb', '#bdb6aa', '#d6cfbf', '#b3ab9d', '#c4bba9'];
  * flat roofs and water tanks, no street, gardens or trees. Low-rise, but
  * land-hungry and car-dependent. `buildings` sets the density (2..7).
  */
+/** Kit sprawl: a dusty yard and raw-concrete 1–2 storey houses (4 prototypes). */
+function kitSprawl(seed: number, buildings: number): Group | null {
+  const yard = kitPart('sprawl-yard');
+  if (!yard) return null;
+  const g = new Group();
+  g.add(yard);
+  const r = rng(seed);
+  for (let i = 0; i < Math.min(buildings, SPRAWL_SPOTS.length); i++) {
+    const [sx, sz] = SPRAWL_SPOTS[(i * 3 + Math.floor(r() * 8)) % SPRAWL_SPOTS.length];
+    const house = kitPart(`sprawl-house-${Math.floor(r() * 4)}`);
+    if (!house) return null;
+    house.position.set(sx + (r() - 0.5) * 0.004, 0, sz + (r() - 0.5) * 0.004);
+    house.rotation.y = (r() - 0.5) * 0.6;
+    g.add(house);
+  }
+  return g;
+}
+
+const SPRAWL_SPOTS: Array<[number, number]> = [
+  [-0.016, -0.016], [0.004, -0.018], [0.019, -0.012], [-0.019, 0.003],
+  [0.0, 0.0], [0.017, 0.008], [-0.012, 0.018], [0.008, 0.019],
+];
+
 export function createSprawl(seed: number, buildings: number): Group {
+  const kit = kitSprawl(seed, buildings);
+  if (kit) return kit;
   const g = new Group();
   const r = rng(seed);
   g.add(block(0.054, 0.0007, 0.054, '#c9bea3', 0, 0, 0));
-  const spots: Array<[number, number]> = [
-    [-0.016, -0.016], [0.004, -0.018], [0.019, -0.012], [-0.019, 0.003],
-    [0.0, 0.0], [0.017, 0.008], [-0.012, 0.018], [0.008, 0.019],
-  ];
+  const spots = SPRAWL_SPOTS;
   for (let i = 0; i < Math.min(buildings, spots.length); i++) {
     const [sx, sz] = spots[(i * 3 + Math.floor(r() * 8)) % spots.length];
     // Scattered 1–2 storey houses (indiscriminate low-rise sprawl, never towers).

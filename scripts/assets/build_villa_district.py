@@ -746,19 +746,28 @@ def street(b, era, rnd):
             b.blob(x, y, 0.62 + 3.0 * s, 1.35 * s, 1.35 * s, 1.2 * s, "foliage", lin((0.38, 0.58, 0.30)), rnd, subdiv=1)
 
 
-def build_era(era):
+# Neighbourhood layouts: which villa stands on which parcel (slots 0-2 north
+# of the street, 3-5 south). Each villa keeps its identity (walls, garden).
+LAYOUTS = [
+    (0, 1, 2, 3, 4, 5),
+    (3, 5, 1, 4, 0, 2),
+    (2, 4, 0, 5, 1, 3),
+]
+
+
+def build_era(era, layout=0):
     b = Builder()
-    rnd = random.Random(SEED + era * 101)
+    rnd = random.Random(SEED + era * 101 + layout * 17)
     street(b, era, rnd)
-    for i, fn in enumerate(VILLAS):
+    for i, vi in enumerate(LAYOUTS[layout]):
         north = i < 3
         cx = COLS[i % 3]
         rot = 0 if north else 180
-        c = Ctx(b, era, rot, random.Random(SEED + i * 13 + era * 7))
-        c.wall_tint = WALLS[i]
+        c = Ctx(b, era, rot, random.Random(SEED + vi * 13 + era * 7))
+        c.wall_tint = WALLS[vi]
         m = b.mark()
-        parcel_ground(c, GARDEN_MIX[i])
-        fn(c)
+        parcel_ground(c, GARDEN_MIX[vi])
+        VILLAS[vi](c)
         if north:
             b.transform(m, lambda p, cx=cx: Vector((cx + p.x, FRONT + p.y, p.z)))
         else:
@@ -871,8 +880,8 @@ def make_material(atlas, rough):
 def to_object(b, name, mat):
     ao = bake_ao(b)
     # Merge coincident positions (the exporter splits by normal/uv/colour).
-    index, verts, faces = {}, [], []
-    for f in b.faces:
+    index, verts, faces, keep, seen = {}, [], [], [], set()
+    for fi, f in enumerate(b.faces):
         ids = []
         for i in f["idx"]:
             p = b.verts[i]
@@ -881,15 +890,24 @@ def to_object(b, name, mat):
                 index[k] = len(verts)
                 verts.append((p.x * 0.001, p.y * 0.001, p.z * 0.001))
             ids.append(index[k])
+        # Skip faces that collapse after welding, and exact duplicates
+        # (Blender's validate() would drop them and shift face indices).
+        key = frozenset(ids)
+        if len(key) < 3 or len(key) != len(ids) or key in seen:
+            continue
+        seen.add(key)
         faces.append(ids)
+        keep.append(fi)
     me = bpy.data.meshes.new(name)
     me.from_pydata(verts, [], faces)
-    me.validate(clean_customdata=False)
+    assert not me.validate(clean_customdata=False), f"{name}: mesh needed repairs"
+    assert len(me.polygons) == len(keep)
     uv = me.uv_layers.new(name="UVMap")
     col = me.color_attributes.new("Col", "FLOAT_COLOR", "CORNER")
     me.color_attributes.active_color = col
     li = 0
-    for fi, poly in enumerate(me.polygons):
+    for pi, poly in enumerate(me.polygons):
+        fi = keep[pi]
         f = b.faces[fi]
         pts = [b.verts[i] for i in f["idx"]]
         uvs = face_uvs(f, pts)
@@ -903,7 +921,7 @@ def to_object(b, name, mat):
         p.use_smooth = False
     obj = bpy.data.objects.new(name, me)
     bpy.context.scene.collection.objects.link(obj)
-    return obj, len(faces)
+    return obj, len(faces)  # faces actually exported
 
 
 def main():
@@ -939,4 +957,5 @@ def main():
     print(f"wrote {out} ({os.path.getsize(out)} bytes)")
 
 
-main()
+if __name__ == "__main__":
+    main()

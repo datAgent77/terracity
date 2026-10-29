@@ -46,9 +46,13 @@ external models, textures or HDRIs, so there is nothing third-party to license.
 
 ```bash
 /Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup \
-  -P scripts/assets/build_villa_district.py -- public/models
-node scripts/assets/inspect-glb.mjs public/models/villa-district.glb
+  -P scripts/assets/build_city_kit.py -- public/models
+node scripts/assets/quantize-glb.mjs public/models/city-kit.glb
+node scripts/assets/inspect-glb.mjs public/models/city-kit.glb
 ```
+
+(Milestone 1 shipped `villa-district.glb` from `build_villa_district.py`; since
+milestone 2 that script is the shared library and the runtime loads `city-kit.glb`.)
 
 What the script does (fixed seed, same output every run):
 
@@ -189,3 +193,60 @@ decoder is fetched from a CDN by the IWSDK loader, so it was not used.
   the solar transition is the story), at the cost of some terracotta warmth.
 - The desktop camera is closer (≈ 1.27×); XR framing is unchanged.
 - Not tested on a physical Quest; all XR evidence is IWER.
+
+
+## 9. Milestone 2 — the rest of the city (approved direction, same pipeline)
+
+After visual approval of the showcase district, every city element was moved to
+the same pipeline. One **city kit** GLB (`public/models/city-kit.glb`,
+`scripts/assets/build_city_kit.py`) holds all parts with one shared atlas and
+material and baked AO:
+
+| Part(s) | Content | Runtime behaviour kept |
+|---|---|---|
+| `district-L{0,1,2}-era-{0,1,2}` | 3 parcel layouts of the six villas × 3 eras (placement variant picks the layout) | era switching, pad tint when unconnected |
+| `town-plaza`, `town-block-3/4`, `town-civic` | stone chapel + bell tower, fountain, market stalls, café parasols, plane trees; perimeter blocks of individual 3–4 storey buildings (shopfronts + awnings, shuttered windows, hip roofs or roof terraces, courtyard garden); L-plan school with PV roof, clinic, sports court | blocks get a quarter turn per tile for variety |
+| `solar-base`, `solar-panels` | fenced agrivoltaic farm: three south-facing table rows on steel legs, inverter cabin, grazing sheep, wildflower margin | panels use the shared `SOLAR_GLASS` (now with the atlas' PV cells + AO), so the renewable glow still follows the projection |
+| `wind-base`, `wind-rotor` | dry-grass ridge pad, foundation, tapered tower, nacelle, transformer, crane-pad track; rotor with tapered blades and red tips | `rotor` group spins at the projected rate |
+| `park-base`, `park-crown` | paths, fountain plaza, pond with reeds, flower beds, benches, lamps, playground, olives, cypress; lobed crowns | crowns keep `LEAF_CROWN` (dries with the environment) and grow by 2050 |
+| `road-centre`, `road-arm` | junction with a planted mini roundabout; arms with kerbs, lane markings, cycle lane, street trees, a lamp | arms still toggle per connected neighbour |
+| `sprawl-yard`, `sprawl-house-0..3` | dusty unplanned plot, dirt tracks; raw-concrete 1–2 storey houses with water tanks, rebar stubs, lean-to, AC units | number of houses still follows the projected sprawl density |
+
+Runtime: `src/world/kit.ts` (`kitPart`, dequantizes once, wraps each clone in a
+Group); every builder keeps its procedural fallback (`?procedural-city`, plus
+`?procedural-villas` for districts). `SOLAR_GLASS` / `LEAF_CROWN` moved to
+`src/world/shared-materials.ts`. The GLB is shrunk with KHR_mesh_quantization
+(`scripts/assets/quantize-glb.mjs`, glTF-Transform 4.5, read natively by three.js).
+Not converted: the terrain itself (tiles, fields, orchards, forest, hills, sea)
+and the boats — they are landscape, not city.
+
+**Evidence** (`docs/visual/city-*`): `city-before-*` = same plan with
+`?procedural-city&procedural-villas` and the old desktop camera; `city-after-*`
+= kit. Comparisons: `city-compare-2050.png` (whole board, 2050),
+`city-compare-town.png`, `city-compare-energy.png` (park + solar + district),
+`city-compare-wind.png`, eras `city-after-eras.png`; full desktop flow with
+compare dioramas and result: `city-desktop-*.png`.
+
+Observations: town, sprawl, parks and energy now share the villas' materials,
+scale and lighting. The old town buildings used 6.2 mm storeys and were much
+taller than the villas; the kit town uses the villas' 3.7 mm storeys, so it is
+in scale with the homes but less dominant from the gameplay camera.
+
+**Tests**: typecheck OK; unit 122 / 122; Playwright 24 passed, 3 skipped
+(env-gated), `VISUAL_TAG=city` evidence run passed; IWER hand scripts
+`xr-phase1/2/3` exit 0; `npm run build` OK. No simulation or gameplay change.
+
+**Cost** (same plan incl. one wind turbine; desktop Chromium + IWER, not a Quest):
+
+| Measure | Procedural | City kit |
+|---|---|---|
+| Asset download | — | `city-kit.glb` 2,730 KB (quantized from 5,032 KB; 1.14 MB gzipped) |
+| Kit triangles (all parts) | — | ≈ 59 k in the file (44 k are the 9 district variants); per placed part 0.1–5.7 k |
+| IWER stereo seated — calls / tris | 244 / 86.9 k | **206 / 136.4 k** (−16 % calls, +57 % tris) |
+| Desktop 2050 close-up — calls / tris | — | 62 / 43.1 k |
+| Production build | 3.6 MB | 6.2 MB |
+| Time to app ready, 10 Mbit/s + 40 ms, cache off | 1.15–1.46 s | 3.34–3.55 s (`vite preview`, GLB uncompressed on the wire) |
+
+The triangle increase is the main Quest risk (unmeasured on device). Levers if
+needed: coarser AO ground grids in the districts (they dominate the count),
+fewer window quads on courtyard façades, or a lower-detail far LOD.

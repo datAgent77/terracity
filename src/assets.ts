@@ -29,12 +29,13 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Intro and Result',
   },
-  // Authored showcase neighbourhood (scripts/assets/build_villa_district.py).
-  'villa-district': {
-    url: publicAssetUrl('models/villa-district.glb'),
+  // Authored city kit (scripts/assets/build_city_kit.py): districts, town,
+  // solar, wind, park, road and sprawl parts sharing one atlas material.
+  'city-kit': {
+    url: publicAssetUrl('models/city-kit.glb'),
     type: AssetType.GLTF,
     priority: 'critical',
-    name: 'Garden district (3 eras)',
+    name: 'City kit',
   },
   'compare-panel': {
     url: publicAssetUrl('ui/compare.uikitml'),

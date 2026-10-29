@@ -1,0 +1,9 @@
+time to interactive hook: 1728 ms (dev server, cold browser cache)
+glb requests: [{"name":"structure-models.ts?t=1793299921398","ms":68,"bytes":35957},{"name":"city-kit.glb","ms":135,"bytes":2729804}]
+desktop normal view: {"calls":116,"triangles":33932,"geometries":144,"textures":9,"objects":560,"meshes":479,"jsHeapMB":159}
+desktop close-up 2026: {"calls":71,"triangles":25338,"geometries":144,"textures":9,"objects":560,"meshes":479,"jsHeapMB":159}
+desktop close-up 2035: {"calls":68,"triangles":25790,"geometries":148,"textures":9,"objects":560,"meshes":479,"jsHeapMB":159}
+desktop close-up 2050: {"calls":68,"triangles":27804,"geometries":156,"textures":9,"objects":560,"meshes":479,"jsHeapMB":159}
+IWER seated (stereo): {"calls":244,"triangles":86864,"geometries":168,"textures":15,"objects":621,"meshes":483,"jsHeapMB":159}
+IWER district tile centre (world): -0.030, 0.800, -0.530
+IWER frame time over 120 frames (desktop Chromium software/ANGLE + IWER, NOT a Quest): median 316.6 ms, p95 499.9 ms

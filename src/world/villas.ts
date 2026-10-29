@@ -8,7 +8,8 @@
  * switched by the time-travel layer. One villa model stands for a few hundred
  * real homes (see HORIZONTAL_URBANISM_DESIGN.md for the scale assumptions).
  */
-import { AssetManager, ConeGeometry, CylinderGeometry, Group, IcosahedronGeometry, type Mesh, type MeshStandardMaterial } from '@iwsdk/core';
+import { ConeGeometry, CylinderGeometry, Group, IcosahedronGeometry } from '@iwsdk/core';
+import { kitPart } from './kit.js';
 import { createBellTower } from './houses.js';
 import { mergeStatic } from './merge.js';
 import { block, COLORS, painted, pick } from './palette.js';
@@ -198,39 +199,21 @@ function street(g: Group, era: Era): void {
   }
 }
 
-/** Asset key of the authored garden district (public/models/villa-district.glb). */
-export const VILLA_DISTRICT_ASSET = 'villa-district';
+/** Neighbourhood layouts authored in the city kit (district-L{n}-era-{e}). */
+export const KIT_LAYOUTS = 3;
 
 /**
- * The authored GLB neighbourhood: six villas on hedged parcels, three eras as
- * nodes era-0/1/2 (one mesh + one atlas material each, baked AO in the vertex
- * colours). Clones share geometry and material. Null when not loaded.
+ * The authored garden district from the city kit: six villas on hedged parcels,
+ * three eras as groups era-0/1/2 (one mesh + the shared atlas material each,
+ * baked AO in the vertex colours). Null when the kit is not loaded.
  */
-function authoredDistrict(): Group | null {
-  // Visual review: ?procedural-villas forces the old procedural model (A/B shots).
+function authoredDistrict(variant: number): Group | null {
   if (typeof location !== 'undefined' && location.search.includes('procedural-villas')) return null;
-  let gltf;
-  try {
-    gltf = AssetManager.getGLTF(VILLA_DISTRICT_ASSET);
-  } catch {
-    return null;
-  }
-  if (!gltf) return null;
+  const layout = variant % KIT_LAYOUTS;
   const root = new Group();
   for (const era of ERAS) {
-    const src = gltf.scene.getObjectByName(`era-${era}`);
-    if (!src) return null;
-    const g = new Group();
-    const m = src.clone();
-    m.traverse((o) => {
-      const mesh = o as Mesh;
-      if (!mesh.isMesh) return;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      const mat = mesh.material as MeshStandardMaterial;
-      if (mat.map) mat.map.anisotropy = 4;
-    });
-    g.add(m);
+    const g = kitPart(`district-L${layout}-era-${era}`);
+    if (!g) return null;
     g.name = `era-${era}`;
     g.visible = era === 0;
     root.add(g);
@@ -244,7 +227,7 @@ function authoredDistrict(): Group | null {
  * into its own group `era-N`; only one is visible at a time (era 0 by default).
  */
 export function createVillaDistrict(variant: number, seed: number): Group {
-  const authored = authoredDistrict();
+  const authored = authoredDistrict(variant);
   if (authored) return authored;
   const root = new Group();
   const villas = villasFor(seed, variant);
@@ -348,6 +331,12 @@ function plazaTile(g: Group, r: () => number): void {
 
 /** The compact, walkable town centre: plaza, mixed-use blocks, civic buildings. */
 export function createTownTile(kind: 'plaza' | 'block' | 'civic', seed: number, storeys = 3): Group {
+  const kit = kitPart(kind === 'block' ? `town-block-${storeys >= 4 ? 4 : 3}` : `town-${kind}`);
+  if (kit) {
+    // Perimeter blocks are symmetric: a quarter turn per seed varies the street fronts.
+    if (kind === 'block') kit.rotation.y = (seed % 4) * (Math.PI / 2);
+    return kit;
+  }
   const g = new Group();
   const r = rng(seed);
   if (kind === 'plaza') plazaTile(g, r);

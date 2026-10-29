@@ -27,7 +27,7 @@ const key = async (k) => { await page.keyboard.press(k); await frames(); };
 const tile = async (c, r) => { const p = await page.evaluate(([c, r]) => window.__terracity.tileToScreen(c, r), [c, r]); await page.mouse.click(p.x, p.y); await frames(); };
 const st = () => page.evaluate(() => window.__terracity.renderStats());
 await key('Enter'); await key('KeyH');
-for (const [s, c, r] of [[1,6,4],[5,6,3],[5,7,3],[1,8,3],[4,9,3],[2,9,4]]) { await key(`Digit${s}`); await tile(c, r); }
+for (const [s, c, r] of [[1,6,4],[5,6,3],[5,7,3],[1,8,3],[4,9,3],[2,9,4],[3,11,8]]) { await key(`Digit${s}`); await tile(c, r); }
 await key('Escape');
 // OLD_CAM=1: the pre-milestone desktop framing, for before/after pairs.
 if (process.env.OLD_CAM) await page.evaluate(() => window.__terracity.setCamera([0, 1.46, 0.46], [0, 0.7, -0.52]));
@@ -46,6 +46,18 @@ for (const [i, y] of [[5, 2026], [6, 2035], [7, 2050]]) {
   await page.screenshot({ path: out(`${i}-district-${y}`) });
   stats.push(`desktop close-up ${y}: ${JSON.stringify(await st())}`);
 }
+// 2050 close-ups of the other kit parts (still in 2050 here).
+const town = await page.evaluate(() => { const t = window.__terracity.game.terrain.filter((x) => x.type === 'town'); return t.map((x) => [x.col, x.row]); });
+for (const [name, c, r] of [['town', ...town[Math.floor(town.length / 2)]], ['energy', 9, 4], ['wind', 11, 8]]) {
+  const f = await page.evaluate(([c, r]) => window.__terracity.tileWorld(c, r), [c, r]);
+  const lift = name === 'wind' ? 0.2 : 0.1;
+  await page.evaluate(([f, lift]) => window.__terracity.setCamera([f[0] + 0.01, f[1] + lift, f[2] + lift * 1.1], [f[0], f[1] + (lift > 0.1 ? 0.04 : 0), f[2]]), [f, lift]);
+  await frames(8);
+  await page.screenshot({ path: out(`8-${name}-2050`) });
+}
+await page.evaluate(() => window.__terracity.setCamera([0, 1.3, 0.34], [0, 0.7, -0.5]));
+await frames(8);
+await page.screenshot({ path: out('9-desktop-2050') });
 await key('KeyT'); // back to 2026
 await page.waitForTimeout(2600);
 

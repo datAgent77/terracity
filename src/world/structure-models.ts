@@ -19,6 +19,8 @@ import {
 } from '@iwsdk/core';
 import { StructureType, TILE_SIZE } from '../config/scenario.js';
 import { addCypress, HOME_VARIANTS } from './houses.js';
+import { kitPart } from './kit.js';
+import { LEAF_CROWN, SOLAR_GLASS } from './shared-materials.js';
 import { createVillaDistrict } from './villas.js';
 import { mergeStatic } from './merge.js';
 import { block, COLORS, painted, pick } from './palette.js';
@@ -29,16 +31,7 @@ const DYNAMIC = /^(rotor|crown|pad|arm-[ewsn]|solar-panels|era-[012])$/;
 
 const PAD = TILE_SIZE * 0.92;
 
-/** Reflective photovoltaic glass, shared by every solar farm. */
-export const SOLAR_GLASS = new MeshStandardMaterial({
-  color: '#132f63',
-  roughness: 0.18,
-  metalness: 0.4,
-  emissive: '#1f56b8',
-  emissiveIntensity: 0.12,
-});
-/** Park tree crowns (shared; time travel tints them with the environment). */
-export const LEAF_CROWN = new MeshStandardMaterial({ color: '#5a9b45', flatShading: true, roughness: 0.9 });
+export { LEAF_CROWN, SOLAR_GLASS } from './shared-materials.js';
 
 function pad(color: string): Mesh {
   const m = new Mesh(new BoxGeometry(PAD, 0.0016, PAD), new MeshStandardMaterial({ color, roughness: 0.92 }));
@@ -60,7 +53,24 @@ function residential(variant: number, seed: number): Group {
   return g;
 }
 
+/** Kit solar farm: base (fence, cabin, frames, grazing sheep) + restyled panels. */
+function kitSolar(): Group | null {
+  const base = kitPart('solar-base');
+  const glass = kitPart('solar-panels');
+  if (!base || !glass) return null;
+  const g = new Group();
+  g.add(pad('#c9bd93'), base);
+  glass.name = 'solar-panels';
+  glass.traverse((o) => {
+    if ((o as Mesh).isMesh) (o as Mesh).material = SOLAR_GLASS;
+  });
+  g.add(glass);
+  return g;
+}
+
 function solar(_v: number, seed: number): Group {
+  const kit = kitSolar();
+  if (kit) return kit;
   const g = new Group();
   g.add(pad('#c9bd93'));
   const r = rng(seed);
@@ -92,7 +102,26 @@ function solar(_v: number, seed: number): Group {
   return g;
 }
 
+/** Hub height and rotor offset shared by the kit and procedural turbines. */
+const HUB: [number, number, number] = [0, 0.003 + 0.074 + 0.0006, 0.0048];
+
+function kitWind(): Group | null {
+  const base = kitPart('wind-base');
+  const blades = kitPart('wind-rotor');
+  if (!base || !blades) return null;
+  const g = new Group();
+  g.add(pad('#a9bf86'), base);
+  const rotor = new Group();
+  rotor.name = 'rotor';
+  rotor.position.set(...HUB);
+  rotor.add(blades);
+  g.add(rotor);
+  return g;
+}
+
 function wind(_v: number, seed: number): Group {
+  const kit = kitWind();
+  if (kit) return kit;
   const g = new Group();
   g.add(pad('#a9bf86'));
   const r = rng(seed);
@@ -108,7 +137,7 @@ function wind(_v: number, seed: number): Group {
   // Three slender tapered blades on a hub (spins as one mesh).
   const rotor = new Group();
   rotor.name = 'rotor';
-  rotor.position.set(0, 0.003 + towerH + 0.0006, 0.0048);
+  rotor.position.set(...HUB);
   const hub = painted(new SphereGeometry(0.0022, 10, 8).scale(1, 1, 1.3), COLORS.white);
   rotor.add(hub);
   for (let i = 0; i < 3; i++) {
@@ -129,7 +158,32 @@ function wind(_v: number, seed: number): Group {
   return g;
 }
 
+/** Park crowns (they mature by 2050): x, z, scale — kit trunks stand here too. */
+const PARK_CROWNS = [[-0.016, -0.008, 1.1], [0.017, -0.017, 0.95], [-0.008, 0.02, 0.85]] as const;
+
+function crown(x: number, z: number, s: number): Object3D {
+  const kit = kitPart('park-crown');
+  const c: Object3D = kit ?? new Mesh(new IcosahedronGeometry(0.0075, 1), LEAF_CROWN);
+  c.traverse((o) => {
+    if ((o as Mesh).isMesh) (o as Mesh).material = LEAF_CROWN;
+  });
+  c.name = 'crown';
+  c.userData.baseScale = s;
+  // The kit crown is a smaller, lobed canopy sitting on the kit trunks.
+  c.position.set(x, 0.0016 + (kit ? 0.0098 : 0.0125) * s, z);
+  c.scale.setScalar(s);
+  c.castShadow = true;
+  return c;
+}
+
 function park(_v: number, seed: number): Group {
+  const base = kitPart('park-base');
+  if (base) {
+    const g = new Group();
+    g.add(pad('#83c160'), base);
+    for (const [x, z, s] of PARK_CROWNS) g.add(crown(x, z, s));
+    return g;
+  }
   const g = new Group();
   g.add(pad('#83c160'));
   const r = rng(seed);
@@ -153,17 +207,10 @@ function park(_v: number, seed: number): Group {
   g.add(block(0.0018, 0.0016, 0.0018, '#ffe9a8', -0.004, 0.0106, 0.012));
   // Trees: two round crowns (they mature by 2050) and a cypress.
   const trunkGeo = new CylinderGeometry(0.0009, 0.0013, 0.008, 5);
-  for (const [x, z, s] of [[-0.016, -0.008, 1.1], [0.017, -0.017, 0.95], [-0.008, 0.02, 0.85]] as const) {
+  for (const [x, z, s] of PARK_CROWNS) {
     const t = painted(trunkGeo.clone(), COLORS.trunk, true);
     t.position.set(x, 0.0016 + 0.004, z);
-    g.add(t);
-    const c = new Mesh(new IcosahedronGeometry(0.0075, 1), LEAF_CROWN);
-    c.name = 'crown';
-    c.userData.baseScale = s;
-    c.position.set(x, 0.0016 + 0.0125 * s, z);
-    c.scale.setScalar(s);
-    c.castShadow = true;
-    g.add(c);
+    g.add(t, crown(x, z, s));
   }
   addCypress(g, 0.022, 0.006, 0.8, 0.0016);
   return g;
@@ -174,10 +221,14 @@ function road(): Group {
   const g = new Group();
   const w = TILE_SIZE * 0.42;
   const kerb = 0.0035;
+  const kitCentre = kitPart('road-centre');
   const centre = new Group();
   centre.name = 'pad';
-  centre.add(block(w + 2 * kerb, 0.0018, w + 2 * kerb, COLORS.sidewalk, 0, 0, 0));
-  centre.add(block(w, 0.0022, w, COLORS.asphalt, 0, 0, 0));
+  if (kitCentre) centre.add(kitCentre);
+  else {
+    centre.add(block(w + 2 * kerb, 0.0018, w + 2 * kerb, COLORS.sidewalk, 0, 0, 0));
+    centre.add(block(w, 0.0022, w, COLORS.asphalt, 0, 0, 0));
+  }
   g.add(mergeStatic(centre));
   const armLen = (TILE_SIZE - w) / 2;
   // Order matches the neighbour order used in placement-system: +x, -x, +z, -z.
@@ -190,6 +241,14 @@ function road(): Group {
   for (const [dx, dz, name] of dirs) {
     const arm = new Group();
     arm.name = name;
+    const kitArm = kitPart('road-arm');
+    if (kitArm) {
+      arm.add(kitArm);
+      arm.position.set(dx * (w / 2 + armLen / 2), 0, dz * (w / 2 + armLen / 2));
+      if (dx !== 0) arm.rotation.y = Math.PI / 2;
+      g.add(mergeStatic(arm));
+      continue;
+    }
     arm.add(block(w + 2 * kerb, 0.0018, armLen, COLORS.sidewalk, 0, 0, 0));
     arm.add(block(w, 0.0022, armLen + 0.0004, COLORS.asphalt, 0, 0, 0));
     arm.add(block(0.0011, 0.0006, armLen * 0.45, COLORS.marking, 0, 0.0022, 0));
