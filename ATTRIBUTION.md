@@ -20,3 +20,10 @@ Runtime libraries bundled into the build (versions from `package-lock.json`):
 
 Development-only tools (not shipped): TypeScript, Vite, Vitest, Playwright,
 `@iwsdk/cli`, `@iwsdk/vite-plugin-dev`, `@iwsdk/reference`, `@meta-quest/metavr`.
+
+## 3D assets
+
+`public/models/villa-district.glb` (geometry, texture atlas, baked occlusion) is
+generated in this repository by `scripts/assets/build_villa_district.py` and is
+covered by the project's MIT license. No third-party models, textures or HDRIs
+are used. Blender 5.2 (GPL) is a development tool only; its output is not GPL.

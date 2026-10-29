@@ -517,6 +517,12 @@ export class PlacementSystem extends createSystem({
         probe.set(x, tileTopY(t), z);
         return toScreen(this.board.localToWorld(probe));
       },
+      /** World position of a tile centre (visual review camera framing). */
+      tileWorld: (col: number, row: number) => {
+        const t = tileAt(game.terrain, col, row)!;
+        const { x, z } = tileCenter(col, row);
+        return this.board.localToWorld(probe.set(x, tileTopY(t), z)).toArray();
+      },
       /** Tile under the piece currently held by a hand/controller (or null). */
       heldTile: () => {
         for (const e of this.queries.held.entities) return this.tileUnder(e.object3D!);

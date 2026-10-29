@@ -8,7 +8,7 @@
  * switched by the time-travel layer. One villa model stands for a few hundred
  * real homes (see HORIZONTAL_URBANISM_DESIGN.md for the scale assumptions).
  */
-import { ConeGeometry, CylinderGeometry, Group, IcosahedronGeometry } from '@iwsdk/core';
+import { AssetManager, ConeGeometry, CylinderGeometry, Group, IcosahedronGeometry, type Mesh, type MeshStandardMaterial } from '@iwsdk/core';
 import { createBellTower } from './houses.js';
 import { mergeStatic } from './merge.js';
 import { block, COLORS, painted, pick } from './palette.js';
@@ -198,11 +198,54 @@ function street(g: Group, era: Era): void {
   }
 }
 
+/** Asset key of the authored garden district (public/models/villa-district.glb). */
+export const VILLA_DISTRICT_ASSET = 'villa-district';
+
 /**
- * A garden district for one homes tile with all three eras. Each era is merged
+ * The authored GLB neighbourhood: six villas on hedged parcels, three eras as
+ * nodes era-0/1/2 (one mesh + one atlas material each, baked AO in the vertex
+ * colours). Clones share geometry and material. Null when not loaded.
+ */
+function authoredDistrict(): Group | null {
+  // Visual review: ?procedural-villas forces the old procedural model (A/B shots).
+  if (typeof location !== 'undefined' && location.search.includes('procedural-villas')) return null;
+  let gltf;
+  try {
+    gltf = AssetManager.getGLTF(VILLA_DISTRICT_ASSET);
+  } catch {
+    return null;
+  }
+  if (!gltf) return null;
+  const root = new Group();
+  for (const era of ERAS) {
+    const src = gltf.scene.getObjectByName(`era-${era}`);
+    if (!src) return null;
+    const g = new Group();
+    const m = src.clone();
+    m.traverse((o) => {
+      const mesh = o as Mesh;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      const mat = mesh.material as MeshStandardMaterial;
+      if (mat.map) mat.map.anisotropy = 4;
+    });
+    g.add(m);
+    g.name = `era-${era}`;
+    g.visible = era === 0;
+    root.add(g);
+  }
+  return root;
+}
+
+/**
+ * A garden district for one homes tile with all three eras: the authored GLB
+ * when loaded, else the procedural fallback below. Each era is merged
  * into its own group `era-N`; only one is visible at a time (era 0 by default).
  */
 export function createVillaDistrict(variant: number, seed: number): Group {
+  const authored = authoredDistrict();
+  if (authored) return authored;
   const root = new Group();
   const villas = villasFor(seed, variant);
   for (const era of ERAS) {

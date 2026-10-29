@@ -1,0 +1,3 @@
+desktop start: {"calls":91,"triangles":31742,"geometries":109,"textures":11,"objects":479,"meshes":424,"jsHeapMB":133}
+desktop full plan 2026: {"calls":132,"triangles":50820,"geometries":152,"textures":11,"objects":581,"meshes":488,"jsHeapMB":133}
+desktop full plan 2050: {"calls":114,"triangles":52054,"geometries":160,"textures":11,"objects":581,"meshes":488,"jsHeapMB":133}

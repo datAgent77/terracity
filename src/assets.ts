@@ -29,6 +29,13 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Intro and Result',
   },
+  // Authored showcase neighbourhood (scripts/assets/build_villa_district.py).
+  'villa-district': {
+    url: publicAssetUrl('models/villa-district.glb'),
+    type: AssetType.GLTF,
+    priority: 'critical',
+    name: 'Garden district (3 eras)',
+  },
   'compare-panel': {
     url: publicAssetUrl('ui/compare.uikitml'),
     type: AssetType.UIKitML,

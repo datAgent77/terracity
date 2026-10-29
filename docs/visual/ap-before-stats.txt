@@ -1,0 +1,8 @@
+time to interactive hook: 1707 ms (dev server, cold browser cache)
+glb requests: [{"name":"structure-models.ts","ms":53,"bytes":30339}]
+desktop normal view: {"calls":112,"triangles":33564,"geometries":140,"textures":9,"objects":554,"meshes":475,"jsHeapMB":150}
+desktop close-up 2026: {"calls":71,"triangles":25314,"geometries":140,"textures":9,"objects":554,"meshes":475,"jsHeapMB":150}
+desktop close-up 2035: {"calls":67,"triangles":25758,"geometries":144,"textures":9,"objects":554,"meshes":475,"jsHeapMB":150}
+desktop close-up 2050: {"calls":68,"triangles":27804,"geometries":152,"textures":9,"objects":554,"meshes":475,"jsHeapMB":150}
+IWER seated (stereo): {"calls":236,"triangles":86176,"geometries":164,"textures":15,"objects":615,"meshes":479,"jsHeapMB":150}
+IWER frame time over 120 frames (desktop Chromium software/ANGLE + IWER, NOT a Quest): median 316.6 ms, p95 500.0 ms
