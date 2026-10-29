@@ -30,10 +30,10 @@ const PAD = TILE_SIZE * 0.92;
 
 /** Reflective photovoltaic glass, shared by every solar farm. */
 export const SOLAR_GLASS = new MeshStandardMaterial({
-  color: '#1d3f78',
-  roughness: 0.22,
-  metalness: 0.55,
-  emissive: '#1a4a9a',
+  color: '#132f63',
+  roughness: 0.18,
+  metalness: 0.4,
+  emissive: '#1f56b8',
   emissiveIntensity: 0.12,
 });
 /** Park tree crowns (shared; time travel tints them with the environment). */

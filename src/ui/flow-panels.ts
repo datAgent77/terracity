@@ -168,7 +168,20 @@ export class FlowPanelSystem extends createSystem({}) {
         body?.setProperties({
           text: `${r.timedOut ? "Time's up. " : ''}Your 2050 projection: ${fmt(m.population)} housed, environment ${m.environment}, ${m.renewableCoverage}% renewable, budget ${m.budgetLeft}.`,
         });
-        setLines(r.success ? ['Every target met. Try a bolder Plan B, or replay to beat your margin.'] : r.hints);
+        if (r.success) {
+          setLines([
+            `Housed ${fmt(m.population)} - goal ${fmt(TARGETS.population)} met`,
+            `Environment ${m.environment} - goal ${TARGETS.environment}+ met`,
+            `Renewable ${m.renewableCoverage}% - goal ${TARGETS.renewableCoverage}% met`,
+            `Budget left ${m.budgetLeft} - not overspent`,
+            'Gold outlines on the map: the homes, parks and clean energy that made it work.',
+          ]);
+        } else {
+          setLines([
+            ...r.hints.slice(0, 4),
+            'On the map: amber marks the problem areas, teal marks where a fix could go.',
+          ]);
+        }
         primaryLabel?.setProperties({ text: 'Play again' });
         primaryAction = cmd.playAgain;
         const hasA = !!planA.value;

@@ -113,6 +113,11 @@ export class FutureSystem extends createSystem({
       minis: this.minis.children.map((c) => c.name),
     });
 
+    // Compile the shaders of everything that first appears on time travel or at
+    // the end of a session (shore sheets, walls, outlines, sprawl, motes) now,
+    // instead of on the first 2035/2050 frame.
+    setTimeout(() => this.prewarmShaders(), 300);
+
     this.minis.name = 'plan-comparison-minis';
     this.world.scene.add(this.minis);
 
@@ -203,6 +208,90 @@ export class FutureSystem extends createSystem({
     }
   }
 
+  /**
+   * Render everything that first appears on time travel or at the end of a
+   * session for two real frames (shrunk to near-zero size, so nothing visibly
+   * flashes). Programs are then linked under the exact render state instead of
+   * on the first 2035/2050 frame.
+   */
+  private prewarming = false;
+
+  private prewarmShaders(): void {
+    this.prewarming = true;
+    const sample = this.sprawlGroup(0, 0, 0, 2);
+    const objs: Object3D[] = [this.shore, this.walls[0], this.rings[0], sample];
+    for (const name of ['outcome-mark-0', 'celebration-motes', 'tutorial-beacon']) {
+      const o = this.world.scene.getObjectByName(name);
+      if (o) objs.push(o);
+    }
+    const saved = objs.map((o) => ({ visible: o.visible, scale: o.scale.clone() }));
+    objs.forEach((o) => {
+      o.visible = true;
+      o.scale.setScalar(1e-4);
+    });
+    let frames = 0;
+    const restore = () => {
+      if (++frames < 3) return requestAnimationFrame(restore);
+      objs.forEach((o, i) => {
+        o.visible = saved[i].visible;
+        o.scale.copy(saved[i].scale);
+      });
+      this.prewarming = false;
+      this.layoutShore(this.shown.progress);
+    };
+    requestAnimationFrame(restore);
+  }
+
+  /** Built sprawl meshes by `tile:buildings` (hidden until used). */
+  private sprawlCache = new Map<string, Group>();
+  private prebuildQueue: Array<[number, number, number, number]> = [];
+  private prebuildScheduled = false;
+
+  private sprawlGroup(idx: number, col: number, row: number, buildings: number): Group {
+    const key = `${idx}:${buildings}`;
+    let group = this.sprawlCache.get(key);
+    if (!group) {
+      group = mergeStatic(createSprawl(hashInts(col, row, 5), buildings));
+      const { x, z } = tileCenter(col, row);
+      group.position.set(x, tileTopY(game.terrain[idx]), z);
+      group.name = `sprawl-${col}-${row}`;
+      group.traverse((o) => (o.raycast = () => {}));
+      group.visible = false;
+      this.board.add(group);
+      this.sprawlCache.set(key, group);
+    }
+    return group;
+  }
+
+  /**
+   * Build the sprawl the 2035 / 2050 projections will need while the player is
+   * still in 2026, one mesh per idle slice, so the first time-travel transition
+   * does not stall on geometry building.
+   */
+  private schedulePrebuild(): void {
+    this.prebuildQueue = [];
+    for (const year of [2035, 2050] as const) {
+      const st = futureVisualState(game.terrain, game.placements, projectYear(game.terrain, game.placements, year, game.metrics));
+      for (const t of st.sprawl) this.prebuildQueue.push([t.row * GRID_COLS + t.col, t.col, t.row, t.buildings]);
+    }
+    if (this.prebuildScheduled) return;
+    this.prebuildScheduled = true;
+    const idle = (cb: () => void) =>
+      'requestIdleCallback' in window
+        ? (window as unknown as { requestIdleCallback(f: () => void, o?: object): void }).requestIdleCallback(cb, { timeout: 500 })
+        : setTimeout(cb, 30);
+    const step = () => {
+      const next = this.prebuildQueue.shift();
+      if (!next) {
+        this.prebuildScheduled = false;
+        return;
+      }
+      this.sprawlGroup(...next);
+      idle(step);
+    };
+    idle(step);
+  }
+
   private recompute(): void {
     const plan = game.placements;
     const year = viewYear.peek();
@@ -225,22 +314,14 @@ export class FutureSystem extends createSystem({
       }
     }
     for (const [idx, { s, i }] of wanted) {
-      const key = `${s.buildings}`;
+      const key = `${idx}:${s.buildings}`;
       let e = this.sprawl.get(idx);
       if (e && e.key !== key) {
-        this.board.remove(e.group);
+        e.group.visible = false; // stays cached for later
         e = undefined;
       }
       if (!e) {
-        const group = mergeStatic(createSprawl(hashInts(s.col, s.row, 5), s.buildings));
-        const tile = game.terrain[idx];
-        const { x, z } = tileCenter(s.col, s.row);
-        group.position.set(x, tileTopY(tile), z);
-        group.name = `sprawl-${s.col}-${s.row}`;
-        group.traverse((o) => (o.raycast = () => {}));
-        group.visible = false;
-        this.board.add(group);
-        e = { group, key, from: 0, to: 0, reveal: 0, delay: 0 };
+        e = { group: this.sprawlGroup(idx, s.col, s.row, s.buildings), key, from: 0, to: 0, reveal: 0, delay: 0 };
         this.sprawl.set(idx, e);
       }
       e.from = e.reveal;
@@ -269,6 +350,8 @@ export class FutureSystem extends createSystem({
     for (; w < this.walls.length; w++) this.walls[w].userData.active = false;
     for (let i = st.floodRisk.length; i < this.rings.length; i++) this.rings[i].userData.active = false;
 
+    if (year === 2026) this.schedulePrebuild();
+
     // Tray tokens only while editing 2026 (and not while comparing plans).
     const editable = year === 2026 && phase.peek() === 'building' && !compareOpen.peek();
     for (const e of this.queries.tokens.entities) e.object3D!.visible = editable;
@@ -288,7 +371,7 @@ export class FutureSystem extends createSystem({
     };
     const s = this.shown;
 
-    if (animating || this.t === 1) {
+    if ((animating || this.t === 1) && !this.prewarming) {
       // Sprawl reveal, staggered; fields under visible sprawl give way.
       let hiddenChanged = false;
       for (const [idx, e] of this.sprawl) {
@@ -302,7 +385,7 @@ export class FutureSystem extends createSystem({
           if (wasShown !== r > 0.35) hiddenChanged = true;
         }
         if (this.t >= 1 && e.to === 0 && e.reveal <= 0.01) {
-          this.board.remove(e.group);
+          e.group.visible = false; // kept in the cache, not rebuilt next time
           this.sprawl.delete(idx);
         }
       }
@@ -328,7 +411,7 @@ export class FutureSystem extends createSystem({
     }
 
     // Calm pulse on at-risk sites (only in projection years).
-    const ringsOn = s.progress > 0.25;
+    const ringsOn = s.progress > 0.25 || this.prewarming;
     for (const ring of this.rings) ring.visible = ringsOn && !!ring.userData.active;
     if (ringsOn) this.ringMat.opacity = prefersReducedMotion() ? 0.8 : 0.6 + 0.25 * Math.sin(this.clock * 2.4);
 

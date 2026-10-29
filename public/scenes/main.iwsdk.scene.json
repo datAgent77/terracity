@@ -170,10 +170,10 @@
         "RayInteractable": {},
         "PokeInteractable": {},
         "ScreenSpace": {
-          "top": "16%",
-          "left": "28vw",
-          "width": "44vw",
-          "height": "64%"
+          "left": "29vw",
+          "width": "42vw",
+          "height": "46%",
+          "bottom": "3%"
         }
       }
     },
@@ -201,10 +201,10 @@
         "RayInteractable": {},
         "PokeInteractable": {},
         "ScreenSpace": {
-          "bottom": "30%",
+          "bottom": "26%",
           "right": "16px",
-          "width": "23vw",
-          "height": "27%"
+          "width": "19vw",
+          "height": "26%"
         }
       }
     }

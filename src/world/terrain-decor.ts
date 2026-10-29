@@ -165,7 +165,7 @@ const at = (x: number, y: number, z: number) => new Matrix4().makeTranslation(x,
 /** Unit prototypes (sizes in metres at scale 1; base at y = 0). */
 function prototypes(): Record<DecorKind, BufferGeometry> {
   return {
-    crop: proto([[new BoxGeometry(TILE_SIZE * 0.86, 0.0032, 0.0056), '#ffffff', at(0, 0.0016, 0)]]),
+    crop: proto([[new BoxGeometry(TILE_SIZE * 0.84, 0.0022, 0.0046), '#ffffff', at(0, 0.0011, 0)]]),
     olive: proto([
       [new CylinderGeometry(0.0007, 0.001, 0.005, 5), COLORS.trunk, at(0, 0.0025, 0)],
       [new IcosahedronGeometry(0.0048, 0).scale(1, 0.8, 1), '#ffffff', at(0, 0.0072, 0)],

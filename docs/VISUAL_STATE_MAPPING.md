@@ -35,3 +35,11 @@ scene matches the state: visible sprawl groups = `sprawl.length`, walls/outlines
 visible only in projection years and only for at-risk sites, displayed dryness
 converges to the mapped dryness, and the transition is observably in progress
 mid-way.
+
+## End of session (`src/world/outcome-visual.ts`)
+
+The judged 2050 projection (`checkTargets`) drives the end-of-session marks:
+success → gold outlines on connected homes, parks, wind and solar + a short light
+burst; failure → amber problem marks and teal opportunity marks **only for missed
+targets** (see VISUAL_OVERHAUL_REPORT.md, V5). Unit-tested in
+`tests/unit/outcome-visual.test.ts`; browser-checked in `tests/e2e/outcome.spec.ts`.

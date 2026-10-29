@@ -46,7 +46,9 @@ await remote('set_transform', { device: 'hand-right', position: { x: 0.3, y: 0.6
 // Leave XR, build the reference plan with the mouse, come back, finish.
 await remote('end_session', {});
 await page.waitForTimeout(1500);
-const PLAN = [[1,6,4],[3,12,8],[5,6,3],[5,7,3],[1,6,2],[1,2,4],[1,8,3],[3,10,8],[3,11,8],[4,9,3],[4,1,4],[2,9,4]];
+const FULL = [[1,6,4],[3,12,8],[5,6,3],[5,7,3],[1,6,2],[1,2,4],[1,8,3],[3,10,8],[3,11,8],[4,9,3],[4,1,4],[2,9,4]];
+// FAIL=1: stop before parks + solar, so the 2050 renewables target is missed.
+const PLAN = process.env.FAIL ? FULL.slice(0, 9) : FULL;
 for (const [s, c, r] of PLAN) { await key(`Digit${s}`); await tile(c, r); }
 await key('Escape'); await key('KeyF');
 await page.waitForTimeout(800);
@@ -58,6 +60,11 @@ await remote('set_transform', { device: 'hand-right', position: { x: 0.3, y: 0.6
 await remote('set_transform', { device: 'hand-left', position: { x: -0.3, y: 0.6, z: 0.1 } });
 await seat([0, 0.95, -0.55]);
 await page.waitForTimeout(1500);
-await page.screenshot({ path: `${OUT}/${TAG}-xr-result.png` });
+await page.screenshot({ path: `${OUT}/${TAG}-xr-result${process.env.FAIL ? '-failure' : ''}.png` });
+// Close-up of the board's highlights.
+await remote('set_transform', { device: 'headset', position: { x: 0.0, y: 1.02, z: -0.2 } });
+await remote('look_at', { device: 'headset', target: { x: 0.02, y: 0.8, z: -0.55 } });
+await page.waitForTimeout(700);
+await page.screenshot({ path: `${OUT}/${TAG}-xr-result${process.env.FAIL ? '-failure' : ''}-board.png` });
 console.log('result', JSON.stringify(await page.evaluate(() => window.__terracity.result.value?.success)));
 await browser.close();

@@ -1,6 +1,6 @@
 # TerraCity — Premium Visual Overhaul (branch `feature/premium-visual-overhaul`)
 
-Status: **V1–V4 complete and verified. V5 not started** (phase-gated). All screenshots below are real captures of
+Status: **V1–V5 complete and verified** on branch `feature/premium-visual-overhaul` (not merged, not deployed). All screenshots below are real captures of
 the running app — desktop Chromium, or Meta's IWER emulator (Quest 3 profile).
 **No physical headset was used.**
 
@@ -186,11 +186,87 @@ Cost of the comparison view (IWER stereo, both dioramas open): 330 draw calls /
 174k triangles, vs 276 / 88k with it closed. It is a temporary mode; Quest cost
 unmeasured.
 
-## Remaining (V5, not started)
+## V5 — Success / failure moments and final validation
 
-- Victory / failure moments (use `balanced` / `missed` from the mapping).
-- Pre-build sprawl meshes to avoid the first-transition hitch.
-- Final validation, documentation, known-limitations pass.
-- Known visual issues: crop rows slightly chunky at very close range; PV glass pale
-  under the warm key light; the desktop comparison table overlaps the board's right
-  edge (ScreenSpace).
+**Outcome mapping.** `outcomeVisual()` (`src/world/outcome-visual.ts`, pure, 6 unit
+tests) turns the judged 2050 projection into map marks:
+
+| Result | Marks | Extra |
+|---|---|---|
+| All four targets met | gold outlines on connected homes, parks, wind and solar | a 3.6 s burst of warm light motes rising from them (skipped with reduce-motion) |
+| Population missed | amber on homes without road access and on sprawl tiles | — |
+| Environment missed | amber on structures built on farmland (and sprawl) | — |
+| Renewables missed | teal on free windy-ridge tiles (where a turbine would help) | — |
+| Budget missed | amber on sites needing sea defences, hillside and bridge pieces | — |
+
+Guarantees: a failing plan never celebrates and never shows success marks; every
+problem mark explains a target that was actually missed. The result card lists the
+four results against their goals (win) or one concrete hint per missed target plus
+a legend for the colours (no red; calm amber / teal). Replay clears everything.
+
+**Overlap fixes.** Desktop: the result card covered the year buttons and the whole
+board — it now sits at the bottom so the years and the highlighted city stay
+visible. The desktop comparison table no longer covers the board edge. Crop rows
+are slimmer; PV glass is darker and more reflective.
+
+**First-transition hitch.** Profiling (Chrome DevTools via CDP) showed JavaScript
+time on the first 2050 switch is negligible; the cost was **a shader program
+linked on that frame** for the shoreline sheet. Root cause: the per-frame update
+re-hid objects during the warm-up. Now the shoreline, walls, outlines, a sprawl
+sample, outcome marks, motes and the tutorial beacon are rendered for two frames at
+near-zero size at start-up, and the switch compiles **0** programs (was 1;
+`tests/e2e/profile.spec.ts`). Sprawl meshes are also cached and pre-built in idle
+time while in 2026. The worst-frame time in software-rendered Chromium stayed too
+noisy to show an improvement (150–933 ms across runs, median 117 ms in all runs;
+`docs/visual/hitch.txt`) — **no frame-time improvement is claimed.**
+
+## Final validation (2026-10-29)
+
+```
+npm run typecheck                      0 errors
+npm test                               115 / 115 (11 files)
+npx playwright test                    24 / 24 passed, 3 skipped (measurement-only specs)
+scripts/xr-phase1-test.sh              5 / 5  hands + controller: tray pinch, wrist rotate, remove, ray Undo, squeeze
+scripts/xr-phase2-test.sh              5 / 5  start, 2050 via hand ray, grab refused in the future, save A, finish
+scripts/xr-phase3-test.sh              all    hover ×1.12, larger text, skip tips
+npm run build                          succeeds — main chunk 2,466 kB (687 kB gzip)
+```
+
+Gameplay preserved: five structures, deterministic simulation, 2026/2035/2050,
+Plan A/B, undo/redo, 7-minute loop, tutorial, hands-first paths; the simulation and
+its tests were not changed by the overhaul.
+
+### Performance (measured in desktop Chromium / IWER — not on a Quest)
+
+| Scene | Before overhaul | After V5 |
+|---|---|---|
+| Desktop, full plan 2050 — draw calls / triangles | 100 / 11.8k | 115 / 32.9k |
+| IWER stereo 2026 — draw calls / triangles | 252 / 43k | 276 / 88k |
+| IWER stereo 2050 | 212 / 42k | 242 / 85k |
+| IWER, comparison open | — | 330 / 174k |
+| JS heap | 125–133 MB | 125–150 MB |
+| IWER frame time (software rendering) | median 100 ms | median 150 ms |
+
+Triangles roughly doubled–tripled (richer geometry) while draw calls rose ~10–15 %
+thanks to vertex-colour painting, merging and instancing. The software-rendered
+frame time scales with triangles and says nothing reliable about Quest; **the
+60 fps requirement on Quest hardware remains unverified.**
+
+### Evidence index (`docs/visual/`)
+
+- Before/after: `compare-xr-closeup.png`, `compare-xr-2026.png`, `compare-desktop-3-plan-b-2026.png`, `compare-desktop-4-plan-b-2050.png`
+- Time travel: `v3-sheet-underhoused.png`, `v3-xr-sheet.png`, `v3-plan-a-coast-zoom.png`, `final-tt-*.png`
+- Comparison: `v4-xr-compare-seated.png`, `final-desktop-5-compare.png`
+- UX: `v4-sheet-cues-hover.png`, `final-xr-tip1-cues.png`, `final-xr-hover-2035.png`
+- Outcomes: `final-sheet-outcomes.png` (IWER win vs fail + board close-ups), `final-outcome-victory.png` (desktop, motes mid-burst), `final-outcome-failure.png`
+- Final views: `final-desktop-*.png`, `final-xr-*.png`
+
+## Known limitations after the overhaul
+
+- No physical Quest testing; Quest frame rate, hand-tracking comfort and fingertip
+  poke remain unverified.
+- Richer geometry: ~35–45k triangles per eye for our content (more with the
+  comparison open); one 1024² shadow map.
+- Sea-level rise and sprawl placement are stylised game visuals, not forecasts.
+- The comparison temporarily hides the supply tray and covers the front half of
+  the main board (by design, to keep every panel visible from a seated eye).
