@@ -25,6 +25,9 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { GRID_COLS, TILE_SIZE, TerrainType } from '../config/scenario.js';
 import { tileCenter, tileTopY } from './board-coords.js';
 import { COLORS, PAINTED_FLAT, paint, pick } from './palette.js';
+
+/** Decoration material (own instance so time travel can dry the vegetation). */
+export const DECOR_MATERIAL = PAINTED_FLAT.clone();
 import { hashInts, rng } from './rand.js';
 import { tileAt, type TerrainMap } from './terrain-map.js';
 
@@ -202,7 +205,7 @@ export class TerrainDecor {
     for (const it of items) (byKind.get(it.kind) ?? byKind.set(it.kind, []).get(it.kind)!).push(it);
     const c = new Color();
     for (const [kind, list] of byKind) {
-      const mesh = new InstancedMesh(protos[kind], PAINTED_FLAT, list.length);
+      const mesh = new InstancedMesh(protos[kind], DECOR_MATERIAL, list.length);
       mesh.name = `decor-${kind}`;
       mesh.castShadow = kind !== 'crop' && kind !== 'foam' && kind !== 'tuft' && kind !== 'flower';
       mesh.receiveShadow = true;
@@ -214,7 +217,21 @@ export class TerrainDecor {
     this.setHidden(new Set());
   }
 
-  /** Hide decoration on the given tile indices (e.g. tiles with structures). */
+  private layers = new Map<string, ReadonlySet<number>>();
+  private union = new Set<number>();
+
+  /**
+   * Hide decoration on tiles, per named layer (e.g. 'structures' from the plan,
+   * 'sprawl' from the projection); the union of all layers is hidden.
+   */
+  setHiddenLayer(layer: string, tiles: ReadonlySet<number>): void {
+    this.layers.set(layer, new Set(tiles));
+    this.union.clear();
+    for (const set of this.layers.values()) for (const t of set) this.union.add(t);
+    this.setHidden(this.union);
+  }
+
+  /** Hide decoration on the given tile indices. */
   setHidden(hidden: ReadonlySet<number>): void {
     for (const { mesh, items } of this.meshes.values()) {
       items.forEach((it, i) => {

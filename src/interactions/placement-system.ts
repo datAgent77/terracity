@@ -43,6 +43,7 @@ import { armedType, game, planVersion, selectedId, statusText, viewYear } from '
 import { localToTile, tileCenter } from '../world/board-coords.js';
 import { boardDecor, buildBoard, tileTopY } from '../world/board-mesh.js';
 import { idNumber } from '../world/rand.js';
+import { rotorSpeed } from '../world/future-system.js';
 import { createStructureModel, setRoadArms, structureLook } from '../world/structure-models.js';
 import { tileAt, type Tile } from '../world/terrain-map.js';
 import { Placeable, SupplyTray, TerrainBoard, TrayToken } from './placeable-component.js';
@@ -172,7 +173,8 @@ export class PlacementSystem extends createSystem({
   }
 
   update(delta: number): void {
-    for (const rotor of this.rotors) rotor.rotation.z -= delta * 2.2;
+    // Rotor speed follows projected renewable coverage (see future-visual-state).
+    for (const rotor of this.rotors) rotor.rotation.z -= delta * rotorSpeed.value;
 
     // Live hover feedback while a structure is carried by a hand/controller.
     for (const entity of this.queries.held.entities) {
@@ -318,7 +320,7 @@ export class PlacementSystem extends createSystem({
     const occupied = this.occupiedScratch;
     occupied.clear();
     for (const p of plan) occupied.add(p.row * GRID_COLS + p.col);
-    boardDecor(this.board)?.setHidden(occupied);
+    boardDecor(this.board)?.setHiddenLayer('structures', occupied);
     if (this.queries.held.entities.size === 0) this.hideHighlight();
   }
 

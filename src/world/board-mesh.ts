@@ -184,39 +184,3 @@ function buildTown(terrain: TerrainMap): Group {
   });
   return town;
 }
-
-const roofGeo = new BoxGeometry(1, 1, 1);
-/**
- * Legacy grey-roofed cluster used for unplanned sprawl in the projections.
- * (The time-travel layer is reworked in phase V3.)
- */
-export function createHouseCluster(
-  wallMat: MeshStandardMaterial,
-  roofMat: MeshStandardMaterial,
-  variant = 0,
-): Group {
-  const cluster = new Group();
-  const spots: Array<[number, number, number]> =
-    variant === 0
-      ? [
-          [-0.012, -0.01, 0.018],
-          [0.013, -0.008, 0.014],
-          [0, 0.013, 0.022],
-        ]
-      : [
-          [-0.013, 0.01, 0.02],
-          [0.012, 0.012, 0.016],
-          [0.002, -0.013, 0.014],
-        ];
-  for (const [hx, hz, h] of spots) {
-    const wall = new Mesh(new BoxGeometry(0.016, h, 0.016), wallMat);
-    wall.position.set(hx, h / 2, hz);
-    wall.castShadow = true;
-    const roof = new Mesh(roofGeo, roofMat);
-    roof.scale.set(0.017, 0.002, 0.017);
-    roof.position.set(hx, h + 0.001, hz);
-    cluster.add(wall, roof);
-  }
-  return cluster;
-}
-

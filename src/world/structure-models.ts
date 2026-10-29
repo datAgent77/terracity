@@ -36,7 +36,8 @@ export const SOLAR_GLASS = new MeshStandardMaterial({
   emissive: '#1a4a9a',
   emissiveIntensity: 0.12,
 });
-const LEAF_CROWN = new MeshStandardMaterial({ color: '#5a9b45', flatShading: true, roughness: 0.9 });
+/** Park tree crowns (shared; time travel tints them with the environment). */
+export const LEAF_CROWN = new MeshStandardMaterial({ color: '#5a9b45', flatShading: true, roughness: 0.9 });
 
 function pad(color: string): Mesh {
   const m = new Mesh(new BoxGeometry(PAD, 0.0016, PAD), new MeshStandardMaterial({ color, roughness: 0.92 }));

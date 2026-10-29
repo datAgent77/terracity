@@ -197,3 +197,34 @@ export function createBellTower(): Group {
   g.add(roof);
   return g;
 }
+
+const CONCRETE = ['#cfc8bb', '#bdb6aa', '#d6cfbf', '#b3ab9d', '#c4bba9'];
+
+/**
+ * Unplanned settlement for the projections: deliberately unlike the planned
+ * homes — dusty ground, haphazard grey-beige blocks with flat roofs and water
+ * tanks, no gardens or trees. `buildings` sets the density (2..7).
+ */
+export function createSprawl(seed: number, buildings: number): Group {
+  const g = new Group();
+  const r = rng(seed);
+  g.add(block(0.054, 0.0007, 0.054, '#c9bea3', 0, 0, 0));
+  const spots: Array<[number, number]> = [
+    [-0.016, -0.016], [0.004, -0.018], [0.019, -0.012], [-0.019, 0.003],
+    [0.0, 0.0], [0.017, 0.008], [-0.012, 0.018], [0.008, 0.019],
+  ];
+  for (let i = 0; i < Math.min(buildings, spots.length); i++) {
+    const [sx, sz] = spots[(i * 3 + Math.floor(r() * 8)) % spots.length];
+    const w = 0.008 + r() * 0.006;
+    const d = 0.008 + r() * 0.006;
+    const h = 0.007 + r() * 0.01;
+    const x = sx + (r() - 0.5) * 0.004;
+    const z = sz + (r() - 0.5) * 0.004;
+    const rot = (r() - 0.5) * 0.6;
+    g.add(block(w, h, d, pick(CONCRETE, r()), x, 0, z, rot));
+    g.add(block(w * 0.96, 0.0008, d * 0.96, '#8f8a82', x, h, z, rot));
+    if (r() < 0.6) g.add(block(0.0026, 0.0026, 0.0026, '#5b5f63', x + w * 0.2, h + 0.0008, z - d * 0.15, rot));
+    g.add(block(0.0022, 0.0028, 0.0005, COLORS.window, x, 0.003, z + d / 2 + 0.0003, rot));
+  }
+  return g;
+}

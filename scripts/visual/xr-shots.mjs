@@ -24,7 +24,8 @@ const tile = async (c, r) => {
 };
 await key('Enter'); // Start
 const PLAN = [[5,6,3],[5,7,3],[1,6,2],[1,6,4],[1,2,4],[1,8,3],[3,10,8],[3,11,8],[3,12,8],[4,9,3],[4,1,4],[2,9,4]];
-for (const [s, c, r] of PLAN.slice(0, Number(process.env.PIECES ?? PLAN.length))) { await key(`Digit${s}`); await tile(c, r); }
+const pieces = process.env.PLAN ? JSON.parse(process.env.PLAN) : PLAN.slice(0, Number(process.env.PIECES ?? PLAN.length));
+for (const [s, c, r] of pieces) { await key(`Digit${s}`); await tile(c, r); }
 await key('Escape');
 const remote = (m, p) => page.evaluate(([m, p]) => window.IWER_DEVICE.remote.dispatch(m, p), [m, p]);
 const btn = await page.evaluate(() => window.__terracity.uiToScreen('hud-panel', 'xr-button'));

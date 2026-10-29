@@ -1,3 +1,0 @@
-xr 2026: {"calls":276,"triangles":88120,"geometries":158,"textures":15,"objects":576,"meshes":437,"jsHeapMB":150}
-xr 2050: {"calls":234,"triangles":84120,"geometries":162,"textures":15,"objects":576,"meshes":437,"jsHeapMB":150}
-xr frame time over 120 frames (desktop Chromium + IWER, NOT a Quest): median 166.6 ms, p95 266.6 ms

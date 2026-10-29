@@ -1,7 +1,6 @@
 # TerraCity — Premium Visual Overhaul (branch `feature/premium-visual-overhaul`)
 
-Status: **V1 and V2 complete and verified. V3–V5 not started** (by instruction:
-do not proceed until V2 is verified). All screenshots below are real captures of
+Status: **V1, V2 and V3 complete and verified. V4–V5 not started** (phase-gated). All screenshots below are real captures of
 the running app — desktop Chromium, or Meta's IWER emulator (Quest 3 profile).
 **No physical headset was used.**
 
@@ -95,12 +94,49 @@ in **headless Chromium with software rendering (no GPU)**, where cost scales wit
 rasterised triangles; it says nothing reliable about Quest frame rate. JS heap
 ~125–141 MB in both states. **Quest performance remains unmeasured.**
 
-## Remaining (V3–V5, not started)
+## V3 — Visually meaningful time travel
 
-- V3: rework the 2035/2050 layer (sprawl currently still uses the old grey
-  boxes; flood overlay is the old cyan boxes), animated transitions, visual-state
-  mapping document + tests.
+One pure mapping, `futureVisualState()` (`src/world/future-visual-state.ts`),
+turns the projection of the current plan into every visual parameter; the
+renderer (`future-system.ts`) only animates toward it. Full table and guarantees:
+[`docs/VISUAL_STATE_MAPPING.md`](VISUAL_STATE_MAPPING.md).
+
+| Effect | Driven by | Replaces |
+|---|---|---|
+| Unplanned settlement: informal grey-beige blocks with water tanks, no gardens, rising staggered from the town outward; crops under them give way | projected sprawl tiles + residents (density) | 10 identical grey boxes |
+| Vegetation / fields / park trees fade toward dry ochre (max 0.7, restrained) | projected environment | a global tint of tile tops only |
+| Shoreline creeps onto each beach from its seaward edge (½ in 2035, all in 2050, illustrative) | projection progress | cyan boxes covering every beach |
+| Sea walls on the seaward edges of at-risk sites + calm pulsing orange outline | projected `floodRiskIds` | walls always on the north edge |
+| PV glow and rotor speed | projected renewable coverage | constant |
+| Park trees grow | park-maturity rule | (kept) |
+| ~1.4 s eased transition, staggered reveals, instant with reduce-motion | — | ~0.8 s ease |
+
+Evidence: `docs/visual/v3-sheet-underhoused.png` (2026 / 2035 / mid-transition /
+2050), `v3-xr-sheet.png` (IWER: under-housed 2026 & 2050, plan A 2050, balanced
+2050), `v3-plan-a-coast-zoom.png` (walls + orange outlines on at-risk homes),
+`v3-tt-*.png` (desktop).
+
+Verification:
+
+```
+npm test                    109 / 109 (+11 visual-state mapping tests)
+npx playwright test         22 / 22  (+2: rendered scene matches the mapped state,
+                                       mid-transition observed, walls/outlines only when at risk)
+scripts/xr-phase2-test.sh   5 / 5   (2050 via hand ray, grab refused in the future view)
+npm run build               succeeds
+```
+
+Stats with the V3 layer (IWER stereo, full plan): 2026 276 calls / 88k tris,
+2050 242 calls / 84k tris — unchanged from V2. Frame time in software-rendered
+IWER: median 167 ms, p95 400 ms; the p95 spike is likely the first build of
+sprawl meshes on entering a year (built synchronously, then cached). Not a Quest
+measurement; flagged for V5.
+
+## Remaining (V4–V5, not started)
+
 - V4: A/B mini dioramas still use simple coloured blocks; XR panel polish; tray.
-- V5: victory/failure moments, final validation, docs.
-- Known visual issues seen in V2 screenshots: crop rows read slightly chunky at
-  very close range; PV glass looks pale under the warm key light.
+- V5: victory/failure moments (`balanced` / `missed` from the mapping are ready
+  for this), pre-building sprawl meshes to avoid the first-transition hitch, final
+  validation, docs.
+- Known visual issues: crop rows read slightly chunky at very close range; PV
+  glass looks pale under the warm key light.
