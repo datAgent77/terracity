@@ -14,9 +14,7 @@
  */
 import {
   BoxGeometry,
-  CanvasTexture,
   MeshBasicMaterial,
-  PlaneGeometry,
   Color,
   createSystem,
   Group,
@@ -38,14 +36,17 @@ import { boardDecor } from './board-mesh.js';
 import { futureVisualState, MAX_DRYNESS, type FutureVisualState } from './future-visual-state.js';
 import { createSprawl } from './houses.js';
 import { mergeStatic } from './merge.js';
-import { createMiniBoard } from './mini-board.js';
+import { createMiniBoard, labelPlate } from './mini-board.js';
+import { comparePlans, type MetricKey } from '../simulation/compare.js';
 import { hashInts } from './rand.js';
 import { LEAF_CROWN, SOLAR_GLASS } from './structure-models.js';
 import { DECOR_MATERIAL } from './terrain-decor.js';
 import { tileAt } from './terrain-map.js';
 
 const DURATION = 1.4; // seconds per time-travel transition
-const MINI_SCALE = 0.36;
+const MINI_SCALE = 0.27;
+/** Half the distance between the two dioramas' centres (clear gap between bases). */
+const MINI_GAP = 0.15;
 const HALF = TILE_SIZE / 2;
 const WHITE = new Color('#ffffff');
 const DRY_LAND = new Color('#d6b979');
@@ -109,6 +110,7 @@ export class FutureSystem extends createSystem({
       wallsVisible: this.walls.filter((w) => w.visible).length,
       ringsVisible: this.rings.filter((r) => r.visible).length,
       transitionDone: this.t >= 1,
+      minis: this.minis.children.map((c) => c.name),
     });
 
     this.minis.name = 'plan-comparison-minis';
@@ -126,7 +128,10 @@ export class FutureSystem extends createSystem({
       viewYear.subscribe(refresh),
       planVersion.subscribe(refresh),
       phase.subscribe(refresh),
-      compareOpen.subscribe(() => this.rebuildMinis()),
+      compareOpen.subscribe(() => {
+        this.rebuildMinis();
+        this.recompute();
+      }),
       planA.subscribe(() => this.rebuildMinis()),
       planVersion.subscribe(() => this.rebuildMinis()),
     );
@@ -264,8 +269,8 @@ export class FutureSystem extends createSystem({
     for (; w < this.walls.length; w++) this.walls[w].userData.active = false;
     for (let i = st.floodRisk.length; i < this.rings.length; i++) this.rings[i].userData.active = false;
 
-    // Tray tokens only while editing 2026.
-    const editable = year === 2026 && phase.peek() === 'building';
+    // Tray tokens only while editing 2026 (and not while comparing plans).
+    const editable = year === 2026 && phase.peek() === 'building' && !compareOpen.peek();
     for (const e of this.queries.tokens.entities) e.object3D!.visible = editable;
   }
 
@@ -348,52 +353,58 @@ export class FutureSystem extends createSystem({
   private rebuildMinis(): void {
     for (const c of [...this.minis.children]) {
       this.minis.remove(c);
+      // Dispose per-diorama geometry and label textures; shared materials stay.
       c.traverse((o) => {
         const mesh = o as Mesh;
         mesh.geometry?.dispose();
-        (mesh.material as MeshStandardMaterial | undefined)?.dispose?.();
+        const mat = mesh.material as MeshBasicMaterial | undefined;
+        if (mat?.map) {
+          mat.map.dispose();
+          mat.dispose();
+        }
       });
     }
     const a = planA.peek();
     if (!compareOpen.peek() || !a) return;
     const b = game.placements;
-    const place = (plan: readonly typeof b[number][], x: number, label: string) => {
-      const mini = createMiniBoard(game.terrain, plan, projectYear(game.terrain, plan, 2050));
+    const cmp = comparePlans(game.terrain, a, b, 2050);
+    const metricRows = (side: 'a' | 'b') => {
+      const y = cmp[side];
+      const t = side === 'a' ? cmp.aTargets : cmp.bTargets;
+      const better = (k: MetricKey) => cmp.better[k] === side.toUpperCase();
+      return [
+        { label: 'Housed', value: y.population.toLocaleString('en-US'), ok: t.population, better: better('population') },
+        { label: 'Nature', value: String(y.environment), ok: t.environment, better: better('environment') },
+        { label: 'Renewable', value: `${y.renewableCoverage}%`, ok: t.renewableCoverage, better: better('renewableCoverage') },
+        { label: 'Budget', value: String(y.budgetLeft), ok: t.budget, better: better('budgetLeft') },
+      ];
+    };
+    const met = (t: typeof cmp.aTargets) => [t.population, t.environment, t.renewableCoverage, t.budget].filter(Boolean).length;
+    const place = (plan: readonly typeof b[number][], side: 'a' | 'b', x: number) => {
+      const projected = side === 'a' ? cmp.a : cmp.b;
+      const mini = createMiniBoard(game.terrain, plan, futureVisualState(game.terrain, plan, projected));
+      mini.name = `mini-plan-${side}`;
       mini.scale.setScalar(MINI_SCALE);
-      // Float the two 2050 cities over the front of the table, between the side
-      // panels and inside a comfortable field of view, tilted to the seated eye.
-      mini.position.set(BOARD_CENTER[0] + x, BOARD_CENTER[1] + 0.17, BOARD_CENTER[2] + 0.06);
-      mini.rotation.x = 0.7;
-      mini.add(labelPlate(label));
+      // Two separate dioramas held low over the front of the table: below the
+      // sight lines to the HUD, Plan pad and year buttons, in front of (never
+      // through) the main board's turbines, ±35° of a seated gaze, tilted to the eye.
+      mini.position.set(BOARD_CENTER[0] + x, BOARD_CENTER[1] + 0.1, BOARD_CENTER[2] + 0.38);
+      mini.rotation.x = 0.95;
+      const n = met(side === 'a' ? cmp.aTargets : cmp.bTargets);
+      const other = met(side === 'a' ? cmp.bTargets : cmp.aTargets);
+      const plate = labelPlate({
+        title: `PLAN ${side.toUpperCase()} — 2050`,
+        verdict: `${n} of 4 targets`,
+        winner: n === 4 || (n > other && n > 0),
+        metrics: metricRows(side),
+      });
+      // A sign standing on the diorama's far edge, upright and facing the player.
+      plate.position.set(0, 0.17, -0.42);
+      plate.rotation.x = -0.95;
+      mini.add(plate);
       this.minis.add(mini);
     };
-    place(a, -0.165, 'Plan A - 2050');
-    place(b, 0.165, 'Plan B - 2050');
+    place(a, 'a', -MINI_GAP);
+    place(b, 'b', MINI_GAP);
   }
-}
-
-
-/** Flat text plate in front of a mini board (canvas texture; ASCII only). */
-function labelPlate(text: string): Mesh {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 96;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#1d5f6b';
-  ctx.beginPath();
-  ctx.roundRect(0, 0, 512, 96, 40);
-  ctx.fill();
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 56px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, 256, 50);
-  const plate = new Mesh(
-    new PlaneGeometry(0.42, 0.079),
-    new MeshBasicMaterial({ map: new CanvasTexture(canvas), transparent: true }),
-  );
-  plate.position.set(0, 0.06, 0.36); // just in front of the mini board (board-local metres)
-  plate.rotation.x = -0.3;
-  plate.raycast = () => {};
-  return plate;
 }

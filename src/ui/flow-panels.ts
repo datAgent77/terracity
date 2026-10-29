@@ -6,7 +6,8 @@ import { createSystem, UIKit, UIKitMLAsset } from '@iwsdk/core';
 import { TARGETS } from '../config/balance.js';
 import { YEARS } from '../config/projection.js';
 import * as cmd from '../core/commands.js';
-import { compareOpen, game, paused, phase, planA, planVersion, result, viewYear } from '../core/session.js';
+import { coachText, compareOpen, game, paused, phase, planA, planVersion, result, tutorial, viewYear } from '../core/session.js';
+import { onHover, pulse } from './hover.js';
 import { SESSION_SECONDS } from '../gameplay/challenge.js';
 import { comparePlans, METRIC_KEYS, type MetricKey } from '../simulation/compare.js';
 import type { TargetCheck } from '../simulation/projection.js';
@@ -15,8 +16,6 @@ import { sfx } from '../audio/sfx.js';
 
 const MET = '#1f8a4c';
 const UNMET = '#b5651d';
-const YEAR_ON = { backgroundColor: '#1d5f6b', borderColor: '#1d5f6b' };
-const YEAR_OFF = { backgroundColor: '#e8eef0', borderColor: '#c7d6da' };
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
 const FORMAT: Record<MetricKey, (n: number) => string> = {
@@ -56,24 +55,54 @@ export class FlowPanelSystem extends createSystem({}) {
     this.cleanupFuncs.push(() => el.removeEventListener('click', fn));
   }
 
+  private yearHover = new Set<number>();
+  private paintYears: (() => void) | null = null;
+  private clock = 0;
+
   private bindTime(): void {
     const panel = this.world.getSceneObject<UIKitMLAsset>('time-panel');
     if (!panel) return;
     const caption = panel.getElementById<UIKit.Text>('time-caption');
     for (const y of YEARS) {
-      this.click(panel.getElementById(`year-${y}`), `year-${y}`, () => cmd.setYear(y));
+      const el = panel.getElementById(`year-${y}`);
+      this.click(el, `year-${y}`, () => cmd.setYear(y));
+      this.cleanupFuncs.push(
+        onHover(el, (h) => {
+          if (h) this.yearHover.add(y);
+          else this.yearHover.delete(y);
+          this.paintYears?.();
+        }),
+      );
     }
-    const paint = () => {
+    this.paintYears = () => {
+      // Tutorial cue: pulse the year the current tip asks for.
+      const cue = tutorial.active && phase.peek() === 'building' ? (tutorial.step === 'future' ? 2050 : tutorial.step === 'back' ? 2026 : null) : null;
       for (const y of YEARS) {
-        const on = viewYear.value === y;
-        panel.getElementById(`year-${y}`)?.setProperties(on ? YEAR_ON : YEAR_OFF);
+        const on = viewYear.peek() === y;
+        const hover = this.yearHover.has(y);
+        const glow = cue === y ? pulse(this.clock) : 0;
+        panel.getElementById(`year-${y}`)?.setProperties({
+          backgroundColor: on ? '#1d5f6b' : hover ? '#dcecef' : '#eef3f4',
+          borderColor: on ? '#1d5f6b' : glow > 0 ? (glow > 0.5 ? '#f2b33d' : '#ffd36b') : hover ? '#3b9aa5' : '#c7d6da',
+        });
         panel.getElementById<UIKit.Text>(`year-${y}-label`)?.setProperties({ color: on ? '#ffffff' : '#1d3f46' });
+        panel.getElementById<UIKit.Text>(`year-${y}-sub`)?.setProperties({ color: on ? '#d6f2f4' : '#5d7a80' });
       }
       caption?.setProperties({
-        text: viewYear.value === 2026 ? 'See the future of your plan' : `Viewing ${viewYear.value} - tap 2026 to edit`,
+        text: viewYear.peek() === 2026 ? 'See the future of your plan' : `Viewing ${viewYear.peek()} - tap 2026 to edit`,
       });
     };
-    this.cleanupFuncs.push(viewYear.subscribe(paint), phase.subscribe((p) => setPanelVisible(this.world, 'time-panel', p !== 'intro')));
+    this.cleanupFuncs.push(
+      viewYear.subscribe(() => this.paintYears?.()),
+      coachText.subscribe(() => this.paintYears?.()),
+      phase.subscribe((p) => setPanelVisible(this.world, 'time-panel', p !== 'intro')),
+    );
+  }
+
+  update(delta: number): void {
+    this.clock += delta;
+    // Only repaint while a tutorial cue is pulsing (a few properties, cheap).
+    if (tutorial.active && (tutorial.step === 'future' || tutorial.step === 'back')) this.paintYears?.();
   }
 
   private bindOverlay(): void {

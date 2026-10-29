@@ -15,6 +15,7 @@ export function mergeStatic(root: Group, keep: (o: Object3D) => boolean = () => 
 
   const visit = (o: Object3D) => {
     if (o !== root && keep(o)) return; // keep this subtree as-is
+    if ((o as { isInstancedMesh?: boolean }).isInstancedMesh) return; // already one draw call
     const mesh = o as Mesh;
     if (mesh.isMesh && !Array.isArray(mesh.material)) {
       const m = new Matrix4().multiplyMatrices(inverseRoot, mesh.matrixWorld);

@@ -21,7 +21,7 @@
 8. Richer world geometry roughly triples triangle count (~35k per eye for our
    content); draw calls rose ~10 %. Measured only in desktop/IWER software
    rendering — **not** on a Quest.
-9. The A/B mini dioramas have not yet been restyled to match the new world (V4).
+9. The comparison view roughly doubles triangles while open (two full-detail dioramas); unmeasured on Quest.
 10. Sea-level rise on beaches is illustrative (stylised creep), not a flood depth.
 11. The first switch into a year with new sprawl builds its meshes synchronously;
     a frame-time spike was observed in software-rendered IWER (not measured on Quest).

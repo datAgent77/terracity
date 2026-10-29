@@ -1,6 +1,6 @@
 # TerraCity — Premium Visual Overhaul (branch `feature/premium-visual-overhaul`)
 
-Status: **V1, V2 and V3 complete and verified. V4–V5 not started** (phase-gated). All screenshots below are real captures of
+Status: **V1–V4 complete and verified. V5 not started** (phase-gated). All screenshots below are real captures of
 the running app — desktop Chromium, or Meta's IWER emulator (Quest 3 profile).
 **No physical headset was used.**
 
@@ -132,11 +132,65 @@ IWER: median 167 ms, p95 400 ms; the p95 spike is likely the first build of
 sprawl meshes on entering a year (built synchronously, then cached). Not a Quest
 measurement; flagged for V5.
 
-## Remaining (V4–V5, not started)
+## V4 — Comparison and UX
 
-- V4: A/B mini dioramas still use simple coloured blocks; XR panel polish; tray.
-- V5: victory/failure moments (`balanced` / `missed` from the mapping are ready
-  for this), pre-building sprawl meshes to avoid the first-transition hitch, final
-  validation, docs.
-- Known visual issues: crop rows read slightly chunky at very close range; PV
-  glass looks pale under the warm key light.
+**Plan A vs Plan B.** The mini dioramas (`src/world/mini-board.ts`) are now the
+real world in small — same terrain, town, fields, forest and structure models —
+and take sprawl, drying, shoreline creep and at-risk sites from the same
+`futureVisualState()` mapping as the main board, with values from the existing
+`comparePlans()` (no second simulation). Each sits on its own base with a clear
+gap and carries an upright sign facing the player: **PLAN A — 2050** /
+**PLAN B — 2050**, "n of 4 targets" (green frame for the better plan), and the four
+metrics with ✓ / ✗ and colour. While comparing, the dioramas are held low over
+the front of the table — below the sight lines to the HUD, Plan pad, year buttons
+and comparison table, in front of (never through) the main board's turbines, and
+within ±35° of a seated gaze — and the supply tray steps aside. All static parts
+are baked into painted meshes; fine decoration that is invisible at mini scale is
+omitted.
+
+**XR panels.** Year buttons are larger (108 × 64, 26 px) with "today /
+projection" sub-labels, a strong active state and hover feedback; HUD values,
+status and preference chips are larger, chips have hover feedback; tray labels
+are larger. Hover uses `pointerenter/leave` on UIKit elements, so it works for hand
+rays, controller rays, fingertips and the mouse. The intro/result card moved to
+(0, 1.27, −0.64), scale 0.085: above the sight line to the year buttons and clear
+of both side panels (it previously hid the year buttons from a seated eye); while
+comparing after the game the card steps aside.
+
+**First placement.** Tip 1 now pulses the Homes slot in the tray, glows the
+suggested tiles and floats a bobbing amber marker over the first one; tip 2 does
+the same for Wind and the ridge; tips 3 / 4 pulse the 2050 / 2026 button. (Tutorial
+logic unchanged.) Reduce-motion disables the bob.
+
+Evidence (IWER, seated eye): `v4-xr-compare-seated.png` (both futures, every panel
+visible), `v4-xr-compare-compare.png`, `v4-sheet-cues-hover.png` (tip-1 cues; hand ray
+hovering 2035), `v4-xr-result.png` (result card clear of year buttons and side
+panels), `v4-xr-intro.png`; desktop `after-v4-desktop-*.png`.
+
+Issues found and fixed while verifying: the minis first intersected the main
+board's wind turbines, then hid the year buttons and side-panel buttons; the
+labels were below the seated field of view; the tray showed between the dioramas;
+closing the comparison disposed the shared painted materials (forcing shader
+recompiles) — now only per-diorama geometry and label textures are disposed.
+
+Verification:
+
+```
+npm test                    109 / 109
+npx playwright test         22 / 22
+scripts/xr-phase1..3        all scenarios pass (Start now on the moved card)
+npm run build               succeeds (main chunk 2,459 kB / 685 kB gzip)
+```
+
+Cost of the comparison view (IWER stereo, both dioramas open): 330 draw calls /
+174k triangles, vs 276 / 88k with it closed. It is a temporary mode; Quest cost
+unmeasured.
+
+## Remaining (V5, not started)
+
+- Victory / failure moments (use `balanced` / `missed` from the mapping).
+- Pre-build sprawl meshes to avoid the first-transition hitch.
+- Final validation, documentation, known-limitations pass.
+- Known visual issues: crop rows slightly chunky at very close range; PV glass pale
+  under the warm key light; the desktop comparison table overlaps the board's right
+  edge (ScreenSpace).

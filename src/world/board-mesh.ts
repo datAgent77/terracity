@@ -66,13 +66,10 @@ export function tileColor(tile: Tile, terrain?: TerrainMap): Color {
   return c;
 }
 
-export function buildBoard(terrain: TerrainMap): Group {
-  const board = new Group();
-  board.name = 'terrain-board';
+/** Layered earth base in a wooden frame (one merged mesh). */
+export function buildBase(): Group {
   const width = GRID_COLS * TILE_SIZE;
   const depth = GRID_ROWS * TILE_SIZE;
-
-  // Diorama base: layered earth in a wooden frame (one merged mesh).
   const base = new Group();
   base.add(block(width + 0.004, 0.012, depth + 0.004, COLORS.earthDark, 0, -0.03, 0));
   base.add(block(width + 0.004, 0.018, depth + 0.004, COLORS.earth, 0, -0.018, 0));
@@ -82,9 +79,17 @@ export function buildBoard(terrain: TerrainMap): Group {
   base.add(block(rim, 0.034, depth, COLORS.wood, -(width + rim) / 2, -0.032, 0));
   base.add(block(rim, 0.034, depth, COLORS.wood, (width + rim) / 2, -0.032, 0));
   base.name = 'table-slab';
-  board.add(mergeStatic(base));
+  return mergeStatic(base);
+}
 
-  // Seamless terrain: earth-coloured columns + a coloured cap on each tile.
+/**
+ * Seamless terrain: earth-coloured columns + a coloured cap on each tile.
+ * `tint` may adjust a tile's cap colour (used by the 2050 mini dioramas).
+ */
+export function buildTerrainTiles(
+  terrain: TerrainMap,
+  tint?: (tile: Tile, color: Color) => void,
+): [InstancedMesh, InstancedMesh] {
   const m = new Matrix4();
   const q = new Quaternion();
   const s = new Vector3();
@@ -105,12 +110,18 @@ export function buildBoard(terrain: TerrainMap): Group {
     columns.setColorAt(i, earth.set(water ? '#b9a27a' : COLORS.earth).offsetHSL(0, 0, (tile.elevation - 1) * 0.03));
     m.compose(p.set(x, top, z), q, s.set(1, 1, 1));
     caps.setMatrixAt(i, m);
-    caps.setColorAt(i, tileColor(tile, terrain));
+    const c = tileColor(tile, terrain);
+    tint?.(tile, c);
+    caps.setColorAt(i, c);
   });
   columns.receiveShadow = caps.receiveShadow = true;
-  board.add(columns, caps);
+  return [columns, caps];
+}
 
-  // Sea and river: one translucent sheet, turquoise shallows to deep blue.
+/** Sea and river: one translucent sheet, turquoise shallows to deep blue. */
+export function buildWater(terrain: TerrainMap): Mesh {
+  const width = GRID_COLS * TILE_SIZE;
+  const depth = GRID_ROWS * TILE_SIZE;
   const waterGeo = new PlaneGeometry(width, depth, GRID_COLS * 2, GRID_ROWS * 2);
   const shallow = new Color('#6fdad3');
   const deep = new Color('#2a7db0');
@@ -141,10 +152,16 @@ export function buildBoard(terrain: TerrainMap): Group {
   water.position.y = WATER_LEVEL;
   water.name = 'water-surface';
   water.raycast = () => {};
-  board.add(water);
+  return water;
+}
 
+export function buildBoard(terrain: TerrainMap): Group {
+  const board = new Group();
+  board.name = 'terrain-board';
+  board.add(buildBase());
+  board.add(...buildTerrainTiles(terrain));
+  board.add(buildWater(terrain));
   board.add(mergeStatic(buildTown(terrain)));
-
   const decor = new TerrainDecor(decorPlan(terrain));
   board.add(decor.group);
   board.userData.decor = decor;
@@ -156,7 +173,7 @@ export function boardDecor(board: { userData: Record<string, unknown> }): Terrai
   return board.userData.decor as TerrainDecor | undefined;
 }
 
-function buildTown(terrain: TerrainMap): Group {
+export function buildTown(terrain: TerrainMap): Group {
   const town = new Group();
   town.name = 'existing-town';
   const tiles = terrain.filter((t) => t.type === TerrainType.Town);

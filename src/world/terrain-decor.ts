@@ -198,14 +198,14 @@ export class TerrainDecor {
   private s = new Vector3();
   private up = new Vector3(0, 1, 0);
 
-  constructor(readonly items: readonly DecorItem[]) {
+  constructor(readonly items: readonly DecorItem[], material = DECOR_MATERIAL) {
     this.group.name = 'terrain-decor';
     const protos = prototypes();
     const byKind = new Map<DecorKind, DecorItem[]>();
     for (const it of items) (byKind.get(it.kind) ?? byKind.set(it.kind, []).get(it.kind)!).push(it);
     const c = new Color();
     for (const [kind, list] of byKind) {
-      const mesh = new InstancedMesh(protos[kind], DECOR_MATERIAL, list.length);
+      const mesh = new InstancedMesh(protos[kind], material, list.length);
       mesh.name = `decor-${kind}`;
       mesh.castShadow = kind !== 'crop' && kind !== 'foam' && kind !== 'tuft' && kind !== 'flower';
       mesh.receiveShadow = true;

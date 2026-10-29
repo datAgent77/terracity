@@ -155,16 +155,16 @@
       },
       "transform": {
         "position": [
-          0.0,
-          1.1,
-          -0.52
+          0,
+          1.27,
+          -0.64
         ],
         "rotationDeg": [
-          -10.0,
-          0.0,
+          -2.2,
+          0,
           0
         ],
-        "scale": 0.1
+        "scale": 0.085
       },
       "components": {
         "RayInteractable": {},
