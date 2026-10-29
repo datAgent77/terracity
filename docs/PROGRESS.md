@@ -36,6 +36,12 @@ Deadline: 2026-11-18 12:00 PT.
   - FoV-aware layout, judge docs, 2:01 silent emulator video + voice-over script,
     screenshots. Remaining: voice-over, video upload, launch date, Devpost form.
 
+- **Visual overhaul V1–V5** (2026-10-29, merged to main). See
+  [VISUAL_OVERHAUL_REPORT.md](VISUAL_OVERHAUL_REPORT.md): Mediterranean world and
+  assets, simulation-driven time-travel visuals, two-futures comparison, XR UX
+  polish, success/failure moments. 115 unit, 24 e2e, IWER hand scripts pass.
+  The demo video in `video/` predates the overhaul and needs re-recording.
+
 ## Open blockers / risks
 - No physical Quest: all XR evidence is IWER emulation only. Finger poke on
   panels and real-hand ray accuracy remain unverified.
