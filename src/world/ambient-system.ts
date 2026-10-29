@@ -70,14 +70,16 @@ export class AmbientSystem extends createSystem({}) {
     });
     if (!sun) return;
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
+    // 2048² over a 1.1 m frustum: ~0.54 mm per texel, fine enough for villa-scale
+    // eaves and trees (was 1024² over 1.2 m, ~1.2 mm).
+    sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.bias = -0.0005;
     sun.shadow.normalBias = 0.002;
     const cam = sun.shadow.camera;
-    cam.left = -0.6;
-    cam.right = 0.6;
-    cam.top = 0.6;
-    cam.bottom = -0.6;
+    cam.left = -0.55;
+    cam.right = 0.55;
+    cam.top = 0.55;
+    cam.bottom = -0.55;
     cam.near = 0.5;
     cam.far = 4;
     sun.target.position.set(...BOARD_CENTER);

@@ -1,0 +1,9 @@
+time to interactive hook: 1842 ms (dev server, cold browser cache)
+glb requests: [{"name":"structure-models.ts","ms":80,"bytes":30339},{"name":"villa-district.glb","ms":6,"bytes":1334404}]
+desktop normal view: {"calls":109,"triangles":40790,"geometries":135,"textures":11,"objects":545,"meshes":466,"jsHeapMB":133}
+desktop close-up 2026: {"calls":69,"triangles":30130,"geometries":135,"textures":11,"objects":545,"meshes":466,"jsHeapMB":133}
+desktop close-up 2035: {"calls":65,"triangles":32222,"geometries":136,"textures":11,"objects":545,"meshes":466,"jsHeapMB":133}
+desktop close-up 2050: {"calls":66,"triangles":33860,"geometries":141,"textures":11,"objects":545,"meshes":466,"jsHeapMB":133}
+IWER seated (stereo): {"calls":230,"triangles":100628,"geometries":149,"textures":17,"objects":606,"meshes":470,"jsHeapMB":133}
+IWER district tile centre (world): -0.030, 0.800, -0.530
+IWER frame time over 120 frames (desktop Chromium software/ANGLE + IWER, NOT a Quest): median 366.6 ms, p95 616.6 ms

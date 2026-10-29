@@ -1,4 +1,4 @@
-import { DirectionalLight, World } from '@iwsdk/core';
+import { DirectionalLight, Vector3, World } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { AudioSystem } from './audio/audio-system.js';
 import { FlowSystem } from './gameplay/flow-system.js';
@@ -51,6 +51,12 @@ World.create(
     });
     return out;
   };
+  /** Debug (visual review): place the desktop camera (player-local coords). */
+  hook.setCamera = (pos: [number, number, number], target: [number, number, number]) => {
+    world.camera.position.set(...pos);
+    world.camera.lookAt(...target);
+  };
+  hook.cameraWorld = () => world.camera.getWorldPosition(new Vector3()).toArray();
   hook.renderStats = () => {
     const { calls, triangles } = world.renderer.info.render;
     const { geometries, textures } = world.renderer.info.memory;

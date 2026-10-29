@@ -18,5 +18,14 @@ Runtime libraries bundled into the build (versions from `package-lock.json`):
 | `elics`, `three-mesh-bvh`, `yoga-layout`, `zod` | 3.4.2 / 0.9.16 / 3.2.1 / 4.6.7 | MIT | IWSDK internals |
 | `@drawcall/uikitml` | 0.1.8 | **Not declared** in its package (no license field or file) | Transitive dependency of `@iwsdk/core` (UIKitML parser). Open question; to be confirmed before submission. |
 
-Development-only tools (not shipped): TypeScript, Vite, Vitest, Playwright,
+Development-only tools (not shipped): TypeScript, Vite, Vitest, Playwright, glTF-Transform,
 `@iwsdk/cli`, `@iwsdk/vite-plugin-dev`, `@iwsdk/reference`, `@meta-quest/metavr`.
+
+## 3D assets
+
+`public/models/city-kit.glb` (geometry, texture atlas, baked occlusion) is
+generated in this repository by `scripts/assets/build_city_kit.py` (with
+`build_villa_district.py`) and shrunk by `scripts/assets/quantize-glb.mjs`; it is
+covered by the project's MIT license. No third-party models, textures or HDRIs
+are used. Blender 5.2 (GPL) and glTF-Transform 4.5 (`@gltf-transform/*`, MIT) are
+development tools only; their output is not under their licenses.

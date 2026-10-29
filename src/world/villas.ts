@@ -9,6 +9,7 @@
  * real homes (see HORIZONTAL_URBANISM_DESIGN.md for the scale assumptions).
  */
 import { ConeGeometry, CylinderGeometry, Group, IcosahedronGeometry } from '@iwsdk/core';
+import { kitPart } from './kit.js';
 import { createBellTower } from './houses.js';
 import { mergeStatic } from './merge.js';
 import { block, COLORS, painted, pick } from './palette.js';
@@ -198,11 +199,36 @@ function street(g: Group, era: Era): void {
   }
 }
 
+/** Neighbourhood layouts authored in the city kit (district-L{n}-era-{e}). */
+export const KIT_LAYOUTS = 3;
+
 /**
- * A garden district for one homes tile with all three eras. Each era is merged
+ * The authored garden district from the city kit: six villas on hedged parcels,
+ * three eras as groups era-0/1/2 (one mesh + the shared atlas material each,
+ * baked AO in the vertex colours). Null when the kit is not loaded.
+ */
+function authoredDistrict(variant: number): Group | null {
+  if (typeof location !== 'undefined' && location.search.includes('procedural-villas')) return null;
+  const layout = variant % KIT_LAYOUTS;
+  const root = new Group();
+  for (const era of ERAS) {
+    const g = kitPart(`district-L${layout}-era-${era}`);
+    if (!g) return null;
+    g.name = `era-${era}`;
+    g.visible = era === 0;
+    root.add(g);
+  }
+  return root;
+}
+
+/**
+ * A garden district for one homes tile with all three eras: the authored GLB
+ * when loaded, else the procedural fallback below. Each era is merged
  * into its own group `era-N`; only one is visible at a time (era 0 by default).
  */
 export function createVillaDistrict(variant: number, seed: number): Group {
+  const authored = authoredDistrict(variant);
+  if (authored) return authored;
   const root = new Group();
   const villas = villasFor(seed, variant);
   for (const era of ERAS) {
@@ -305,6 +331,12 @@ function plazaTile(g: Group, r: () => number): void {
 
 /** The compact, walkable town centre: plaza, mixed-use blocks, civic buildings. */
 export function createTownTile(kind: 'plaza' | 'block' | 'civic', seed: number, storeys = 3): Group {
+  const kit = kitPart(kind === 'block' ? `town-block-${storeys >= 4 ? 4 : 3}` : `town-${kind}`);
+  if (kit) {
+    // Perimeter blocks are symmetric: a quarter turn per seed varies the street fronts.
+    if (kind === 'block') kit.rotation.y = (seed % 4) * (Math.PI / 2);
+    return kit;
+  }
   const g = new Group();
   const r = rng(seed);
   if (kind === 'plaza') plazaTile(g, r);

@@ -41,7 +41,7 @@ function bakeMaterials(root: Object3D): void {
     const mesh = o as Mesh;
     if (!mesh.isMesh || (o as { isInstancedMesh?: boolean }).isInstancedMesh) return;
     const mat = mesh.material as MeshStandardMaterial;
-    if (mat === PAINTED || mat === PAINTED_FLAT || !mat?.color) return;
+    if (mat === PAINTED || mat === PAINTED_FLAT || !mat?.color || mat.map) return; // textured assets keep their material
     mesh.geometry = paint(mesh.geometry.clone(), `#${mat.color.getHexString()}`);
     mesh.material = mat.flatShading ? PAINTED_FLAT : PAINTED;
   });

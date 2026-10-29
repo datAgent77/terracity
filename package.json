@@ -24,6 +24,9 @@
     "three": "npm:super-three@0.181.0"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
     "@iwsdk/cli": "1.0.1",
     "@iwsdk/reference": "1.0.1",
     "@iwsdk/vite-plugin-dev": "1.0.1",

@@ -49,3 +49,4 @@ test-results/
 playwright-report/
 opencode.json
 /video/
+__pycache__/
