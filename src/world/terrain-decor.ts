@@ -58,6 +58,15 @@ export interface DecorItem {
 }
 
 const HALF = TILE_SIZE / 2;
+
+/** Kinds that can be lost to drought / fire / sprawl pressure (time travel). */
+export const LOSABLE: ReadonlySet<DecorKind> = new Set<DecorKind>(['crop', 'olive', 'pine', 'round', 'cypress', 'shrub', 'flower']);
+export const TREE_KINDS: ReadonlySet<DecorKind> = new Set<DecorKind>(['olive', 'pine', 'round', 'cypress']);
+
+/** Stable per-item value in [0, 1): an item is lost when its value < the loss share. */
+export function decorHash(it: DecorItem): number {
+  return (hashInts(Math.round(it.x * 1e4), Math.round(it.z * 1e4), 7) % 1000) / 1000;
+}
 const CROPS = [
   { p: 0.32, color: '#d8b545' }, // wheat
   { p: 0.5, color: '#c9a13a' }, // ripe barley
@@ -189,6 +198,32 @@ function prototypes(): Record<DecorKind, BufferGeometry> {
   };
 }
 
+/**
+ * Reforestation layer (pure, deterministic): young woodland and wildflowers on
+ * plains and hills, revealed by time travel only when the projected environment
+ * meets its target (`greening`). Farmland stays farmland.
+ */
+export function regrowPlan(terrain: TerrainMap): DecorItem[] {
+  const items: DecorItem[] = [];
+  for (const t of terrain) {
+    if (t.type !== TerrainType.Plain && t.type !== TerrainType.Hill) continue;
+    const idx = t.row * GRID_COLS + t.col;
+    const { x, z } = tileCenter(t.col, t.row);
+    const y = tileTopY(t);
+    const r = rng(hashInts(t.col, t.row, 41));
+    const jitter = (m: number) => (r() * 2 - 1) * m;
+    const n = 4 + Math.floor(r() * 3);
+    for (let k = 0; k < n; k++) {
+      const roll = r();
+      const kind: DecorKind = t.type === TerrainType.Hill ? (roll < 0.5 ? 'pine' : roll < 0.8 ? 'olive' : 'cypress') : roll < 0.5 ? 'round' : roll < 0.8 ? 'olive' : 'cypress';
+      const color = kind === 'pine' ? pick(COLORS.pine, r()) : kind === 'round' ? pick(COLORS.leaf, r()) : kind === 'olive' ? pick(COLORS.olive, r()) : COLORS.cypress;
+      items.push({ kind, tile: idx, x: x + jitter(0.023), y, z: z + jitter(0.023), rotY: r() * Math.PI * 2, scale: 0.55 + r() * 0.4, color });
+    }
+    for (let k = 0; k < 2; k++) items.push({ kind: 'flower', tile: idx, x: x + jitter(0.024), y, z: z + jitter(0.024), rotY: r() * Math.PI * 2, scale: 1.1, color: pick(COLORS.flowers, r()) });
+  }
+  return items;
+}
+
 export class TerrainDecor {
   readonly group = new Group();
   private meshes = new Map<DecorKind, { mesh: InstancedMesh; items: DecorItem[] }>();
@@ -219,6 +254,30 @@ export class TerrainDecor {
 
   private layers = new Map<string, ReadonlySet<number>>();
   private union = new Set<number>();
+  private loss = 0;
+  private lossKinds: ReadonlySet<DecorKind> = LOSABLE;
+
+  /** True when decoration on this tile is hidden by a layer (structure, sprawl). */
+  isTileHidden(tile: number): boolean {
+    return this.union.has(tile);
+  }
+
+  /** True when this item is lost at the current loss share. */
+  isLost(it: DecorItem): boolean {
+    return this.lossKinds.has(it.kind) && decorHash(it) < this.loss;
+  }
+
+  /**
+   * Hide a stable share of the losable items (0..1). `kinds` overrides which
+   * kinds count (a regrowth layer passes all of its kinds and 1 - growth).
+   */
+  setLoss(share: number, kinds?: ReadonlySet<DecorKind>): void {
+    const q = Math.round(share * 50) / 50; // coarse steps: rebuild matrices rarely
+    if (q === this.loss && !kinds) return;
+    this.loss = q;
+    if (kinds) this.lossKinds = kinds;
+    this.setHidden(this.union);
+  }
 
   /**
    * Hide decoration on tiles, per named layer (e.g. 'structures' from the plan,
@@ -235,7 +294,7 @@ export class TerrainDecor {
   setHidden(hidden: ReadonlySet<number>): void {
     for (const { mesh, items } of this.meshes.values()) {
       items.forEach((it, i) => {
-        const sc = hidden.has(it.tile) ? 0 : it.scale;
+        const sc = hidden.has(it.tile) || this.isLost(it) ? 0 : it.scale;
         if (Array.isArray(sc)) this.s.set(...sc);
         else this.s.setScalar(sc);
         this.q.setFromAxisAngle(this.up, it.rotY);

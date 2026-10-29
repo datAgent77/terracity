@@ -1,0 +1,6 @@
+decline 2026: env 67 haze 0.00 treeLoss 0.00 greening 0.00 dryness 0.11 sprawl 0 scars 0 smog 0 balanced false
+decline 2035: env 67 haze 0.15 treeLoss 0.11 greening 0.00 dryness 0.35 sprawl 4 scars 9 smog 2 balanced false
+decline 2050: env 67 haze 0.66 treeLoss 0.49 greening 0.00 dryness 0.59 sprawl 8 scars 41 smog 2 balanced false
+balanced 2026: env 61 haze 0.00 treeLoss 0.00 greening 0.00 dryness 0.24 sprawl 0 scars 0 smog 0 balanced true
+balanced 2035: env 61 haze 0.00 treeLoss 0.00 greening 0.26 dryness 0.20 sprawl 0 scars 0 smog 0 balanced true
+balanced 2050: env 61 haze 0.00 treeLoss 0.00 greening 0.62 dryness 0.15 sprawl 0 scars 0 smog 0 balanced true

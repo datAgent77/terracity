@@ -161,7 +161,9 @@ export function buildBoard(terrain: TerrainMap): Group {
   board.add(buildBase());
   board.add(...buildTerrainTiles(terrain));
   board.add(buildWater(terrain));
-  board.add(mergeStatic(buildTown(terrain)));
+  const town = buildTown(terrain);
+  for (const g of [...town.children]) mergeStatic(g as Group); // one draw call per era
+  board.add(town);
   const decor = new TerrainDecor(decorPlan(terrain));
   board.add(decor.group);
   board.userData.decor = decor;
@@ -173,9 +175,24 @@ export function boardDecor(board: { userData: Record<string, unknown> }): Terrai
   return board.userData.decor as TerrainDecor | undefined;
 }
 
+/**
+ * The town as groups `era-0/1/2` (each holding every town tile's version for
+ * that era) plus `town-static` for procedural tiles without eras. Unmerged:
+ * callers merge each group.
+ */
 export function buildTown(terrain: TerrainMap): Group {
   const town = new Group();
   town.name = 'existing-town';
+  const eras = [0, 1, 2].map((e) => {
+    const g = new Group();
+    g.name = `era-${e}`;
+    g.visible = e === 0;
+    town.add(g);
+    return g;
+  });
+  const statics = new Group();
+  statics.name = 'town-static';
+  town.add(statics);
   // Compact, walkable centre: a plaza with the bell tower, one civic tile
   // (school / clinic) and 3–4 storey mixed-use blocks — the only taller
   // buildings in the region.
@@ -186,7 +203,16 @@ export function buildTown(terrain: TerrainMap): Group {
     const kind = i === mid ? 'plaza' : i === tiles.length - 1 ? 'civic' : 'block';
     const g = createTownTile(kind, hashInts(tile.col, tile.row, 13), 3 + (hashInts(tile.col, tile.row) % 2));
     g.position.set(x, tileTopY(tile), z);
-    town.add(g);
+    g.updateMatrix();
+    const parts = [0, 1, 2].map((e) => g.getObjectByName(`era-${e}`));
+    if (parts.every((p) => p)) {
+      parts.forEach((p, e) => {
+        p!.applyMatrix4(g.matrix);
+        p!.visible = true;
+        p!.name = `town-${i}-era-${e}`;
+        eras[e].add(p!);
+      });
+    } else statics.add(g);
   });
   return town;
 }

@@ -95,7 +95,9 @@ test('lose: a farmland-heavy plan fails with hints; timer expiry also ends the g
   await key(page, 'Enter'); // start
   expect((await snap(page)).phase).toBe('building');
   await page.evaluate(() => window.__terracity.challenge.tick(7 * 60 - 1));
-  await page.waitForTimeout(1500);
+  // The last second runs on frame time (clamped per frame), so on a slow,
+  // software-rendered browser it can take several wall-clock seconds.
+  await expect.poll(async () => (await snap(page)).phase, { timeout: 15000 }).toBe('finished');
   s = await snap(page);
   expect(s.phase).toBe('finished');
   expect(s.result!.timedOut).toBe(true);
