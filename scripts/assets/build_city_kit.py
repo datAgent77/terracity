@@ -43,6 +43,7 @@ CONCRETE = [lin(c) for c in ((0.74, 0.72, 0.68), (0.80, 0.77, 0.71), (0.68, 0.67
 
 def ctx(b, seed, tint=WHITE):
     c = Ctx(b, 0, 0, random.Random(seed))
+    c.trim = False  # town and other kit parts: plain openings (triangle budget)
     c.wall_tint = tint
     c.wall_cell = "stucco"
     return c
@@ -491,6 +492,37 @@ def road_arm(seed):
     return b
 
 
+def district_link(seed):
+    """Bell-mouth junction from a district street (local +x end) to the tile edge.
+
+    The district street (6 mm carriageway, sidewalks to +-4.6) ends at x = 26.6;
+    this piece continues it to the tile edge (x = 30) and widens it to the road
+    width (carriageway +-12.6, kerbs to +-16.1). Solid down to the tile surface.
+    """
+    b = Builder()
+    z_road, z_walk, z_base = 0.34, 0.64, -1.6
+    hw0, hw1, kw0, kw1 = 3.0, ROAD_W / 2, 4.6, ROAD_W / 2 + KERB
+    xa, xb, xe = 26.4, 27.6, 30.0
+
+    def slab(pts, z, cell, tint=WHITE):
+        b.poly([(x, y, z) for x, y in pts], cell, tint)
+        for i in range(len(pts)):
+            (x0, y0), (x1, y1) = pts[i], pts[(i + 1) % len(pts)]
+            b.poly([(x0, y0, z_base), (x1, y1, z_base), (x1, y1, z), (x0, y0, z)], cell, tint)
+
+    slab([(xa, -hw0), (xb, -hw0), (xe, -hw1), (xe, hw1), (xb, hw0), (xa, hw0)], z_road, "asphalt")
+    for sgn in (-1, 1):
+        pts = [(xa, sgn * hw0), (xb, sgn * hw0), (xe, sgn * hw1), (xe, sgn * kw1), (xb, sgn * kw0), (xa, sgn * kw0)]
+        if sgn < 0:
+            pts = list(reversed(pts))
+        slab(pts, z_walk, "paving")
+    # Zebra crossing at the mouth.
+    for k in range(-2, 3):
+        y = k * 1.1
+        b.box(xb - 0.1, xb + 1.2, y - 0.35, y + 0.35, z_road, z_road + 0.03, "plain", sides=False)
+    return b
+
+
 # ------------------------------------------------------------- sprawl --
 
 SPRAWL_GROUND = 0.7
@@ -556,7 +588,7 @@ def main():
     sb, sp = solar_parts(21)
     wb, wr = wind_parts(22)
     parts += [("solar-base", sb), ("solar-panels", sp), ("wind-base", wb), ("wind-rotor", wr), ("park-base", park_base(23)), ("park-crown", park_crown(27)),
-              ("road-centre", road_centre(24)), ("road-arm", road_arm(25)), ("sprawl-yard", sprawl_yard(26))]
+              ("road-centre", road_centre(24)), ("road-arm", road_arm(25)), ("district-link", district_link(28)), ("sprawl-yard", sprawl_yard(26))]
     parts += [(f"sprawl-house-{k}", sprawl_house(k)) for k in range(4)]
     lines = []
     for name, b in parts:

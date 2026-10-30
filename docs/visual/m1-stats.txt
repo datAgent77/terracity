@@ -1,0 +1,12 @@
+time to interactive hook: 2010 ms (dev server, cold browser cache)
+glb requests: [{"name":"structure-models.ts?t=1793337089099","ms":114,"bytes":37869},{"name":"city-kit.glb","ms":121,"bytes":4492912}]
+desktop normal view: {"calls":104,"triangles":76920,"geometries":119,"textures":13,"objects":588,"meshes":467,"jsHeapMB":179}
+desktop close-up 2026: {"calls":70,"triangles":51994,"geometries":119,"textures":13,"objects":588,"meshes":467,"jsHeapMB":179}
+desktop close-up 2035: {"calls":69,"triangles":57888,"geometries":122,"textures":13,"objects":588,"meshes":467,"jsHeapMB":179}
+desktop close-up 2050: {"calls":73,"triangles":61608,"geometries":128,"textures":13,"objects":588,"meshes":467,"jsHeapMB":179}
+IWER seated (stereo): {"calls":220,"triangles":172840,"geometries":136,"textures":19,"objects":649,"meshes":471,"jsHeapMB":179}
+IWER district tile centre (world): -0.030, 0.800, -0.530
+IWER frame time over 120 frames (desktop Chromium software/ANGLE + IWER, NOT a Quest): median 366.7 ms, p95 583.3 ms
+desktop start: {"calls":88,"triangles":58574,"geometries":109,"textures":13,"objects":504,"meshes":430,"jsHeapMB":150}
+desktop full plan 2026: {"calls":122,"triangles":93710,"geometries":122,"textures":13,"objects":631,"meshes":486,"jsHeapMB":150}
+desktop full plan 2050: {"calls":113,"triangles":91894,"geometries":135,"textures":13,"objects":631,"meshes":486,"jsHeapMB":150}

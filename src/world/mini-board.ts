@@ -27,7 +27,8 @@ import { setEra } from './villas.js';
 import { mergeStatic } from './merge.js';
 import { block, paint, PAINTED, PAINTED_FLAT } from './palette.js';
 import { hashInts, idNumber } from './rand.js';
-import { createStructureModel, setRoadArms, structureLook } from './structure-models.js';
+import { districtOrientation } from './district-links.js';
+import { createStructureModel, setDistrictLinks, setRoadArms, structureLook } from './structure-models.js';
 import { decorHash, decorPlan, LOSABLE, regrowPlan, TerrainDecor } from './terrain-decor.js';
 import { tileAt, type TerrainMap } from './terrain-map.js';
 
@@ -112,11 +113,21 @@ export function createMiniBoard(terrain: TerrainMap, plan: readonly Placement[],
         if (arm && !arm.visible) arm.parent?.remove(arm);
       }
     }
+    let quarter = p.type === StructureType.Road ? 0 : p.rotation;
+    if (p.type === StructureType.Residential) {
+      const o = districtOrientation(terrain, plan, p);
+      quarter = o.quarter;
+      setDistrictLinks(model, o.linkEast, o.linkWest);
+      for (const n of ['link-e', 'link-w']) {
+        const l = model.getObjectByName(n);
+        if (l && !l.visible) l.parent?.remove(l);
+      }
+    }
     const tile = tileAt(terrain, p.col, p.row)!;
     const { x, z } = tileCenter(p.col, p.row);
     const y = tile.type === TerrainType.River ? TILE_BASE_HEIGHT : tileTopY(tile);
     model.position.set(x, y, z);
-    model.rotation.y = p.type === StructureType.Road ? 0 : p.rotation * (Math.PI / 2);
+    model.rotation.y = quarter * (Math.PI / 2);
     statics.add(model);
   }
   for (const s of state.sprawl) {
