@@ -94,9 +94,15 @@ test('lose: a farmland-heavy plan fails with hints; timer expiry also ends the g
   await key(page, 'Enter'); // play again -> intro
   await key(page, 'Enter'); // start
   expect((await snap(page)).phase).toBe('building');
-  await page.evaluate(() => window.__terracity.challenge.tick(7 * 60 - 1));
-  // The last second runs on frame time (clamped per frame), so on a slow,
-  // software-rendered browser it can take several wall-clock seconds.
+  // Leave exactly half a second for the frame clock (a fixed 7*60-1 could hit 0
+  // directly when more than a second already elapsed on a slow machine, which
+  // bypasses the command layer that ends the session).
+  await page.evaluate(() => {
+    const c = window.__terracity.challenge;
+    c.tick(c.timeLeft - 0.5);
+  });
+  // The last half second runs on frame time (clamped per frame), so on a slow,
+  // software-rendered browser it can take a few wall-clock seconds.
   await expect.poll(async () => (await snap(page)).phase, { timeout: 15000 }).toBe('finished');
   s = await snap(page);
   expect(s.phase).toBe('finished');
