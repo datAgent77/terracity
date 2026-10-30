@@ -50,9 +50,10 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { GRID_COLS, StructureType, TerrainType, TILE_SIZE } from '../config/scenario.js';
 import { projectYear } from '../simulation/projection.js';
 import * as cmd from '../core/commands.js';
-import { game, planA, planVersion, streetView, viewYear } from '../core/session.js';
+import { coachText, game, planA, planVersion, streetView, tutorial, viewYear } from '../core/session.js';
 import { Placeable } from '../interactions/placeable-component.js';
-import { prefersReducedMotion } from '../ui/accessibility.js';
+import { sfx, streetAmbience } from '../audio/sfx.js';
+import { prefersReducedMotion, soundOn } from '../ui/accessibility.js';
 import { setPanelVisible } from '../ui/panel-visibility.js';
 import { tileTopY, WATER_LEVEL } from './board-coords.js';
 import { TERRAIN_COLORS } from './board-mesh.js';
@@ -61,6 +62,8 @@ import { futureVisualState, type FutureVisualState } from './future-visual-state
 import { createSprawl } from './houses.js';
 import { hashInts, idNumber, rng } from './rand.js';
 import { LEAF_CROWN, SOLAR_GLASS } from './shared-materials.js';
+import { isKitResource } from './kit.js';
+import { PAINTED, PAINTED_FLAT } from './palette.js';
 import { compareRows } from './street-compare.js';
 import { streetStory } from './street-story.js';
 import { streetPose, STREET_SCALE, VIEWPOINTS } from './street-view.js';
@@ -79,6 +82,8 @@ const SMOG_AIR = new Color('#a8957a');
 const SMOG_SKY = new Color('#c9b48f');
 const WHITE = new Color('#ffffff');
 const BIRDS = 14;
+/** Module-level materials shared by procedural models (never disposed). */
+const SHARED_PAINT = new Set<object>([PAINTED, PAINTED_FLAT]);
 
 export class StreetSystem extends createSystem({ placeables: { required: [Placeable] } }) {
   private root = new Group();
@@ -147,6 +152,13 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
           this.place(v.viewpoint);
         }, '#fff4d6');
       }),
+      soundOn.subscribe((on) => {
+        if (!on) streetAmbience.stop();
+        else if (this.root.visible) {
+          streetAmbience.start();
+          this.applyAtmosphere();
+        }
+      }),
       this.world.visibilityState.subscribe(() => {
         // Leaving XR while visiting: come back to the tabletop.
         if (streetView.peek() && this.saved) cmd.exitCity();
@@ -164,6 +176,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       year: viewYear.peek(),
       plan: streetView.peek()?.plan ?? null,
       districtHere: this.districtHere,
+      geometries: this.world.renderer.info.memory.geometries,
       story: [...this.story],
       haze: this.state?.haze ?? 0,
       greening: this.state?.greening ?? 0,
@@ -194,6 +207,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const title = panel.getElementById<UIKit.Text>('st-title');
     const sub = panel.getElementById<UIKit.Text>('st-view');
     const lines = [0, 1, 2, 3].map((i) => panel.getElementById<UIKit.Text>(`st-line-${i}`));
+    const tipEl = panel.getElementById<UIKit.Text>('st-tip');
     const refresh = () => {
       const v = streetView.peek();
       if (!v) return;
@@ -205,6 +219,12 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
         panel.getElementById<UIKit.Text>(`st-${y}-label`)?.setProperties({ color: on ? '#ffffff' : '#1d3f46' });
       }
       lines.forEach((el, i) => el?.setProperties({ text: this.story[i] ?? '', display: this.story[i] ? 'flex' : 'none' }));
+      // Guided tips follow the player into the street; the next target glows amber.
+      const tip = coachText.peek();
+      tipEl?.setProperties({ text: tip || '-', display: tip ? 'flex' : 'none' });
+      const cue = tutorial.active ? tutorial.step : null;
+      if (cue === 'future') panel.getElementById('st-2050')?.setProperties({ borderColor: '#f2b33d' });
+      panel.getElementById('st-return')?.setProperties({ backgroundColor: cue === 'back' ? '#b87500' : undefined });
       // Compare futures (only with a saved Plan A): the four differences that matter here.
       const a = planA.peek();
       compare?.setProperties({ display: a ? 'flex' : 'none' });
@@ -228,7 +248,13 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       }
     };
     this.paintPanel = refresh;
-    this.cleanupFuncs.push(streetView.subscribe(refresh), viewYear.subscribe(refresh), planA.subscribe(refresh), planVersion.subscribe(refresh));
+    this.cleanupFuncs.push(
+      streetView.subscribe(refresh),
+      viewYear.subscribe(refresh),
+      planA.subscribe(refresh),
+      planVersion.subscribe(refresh),
+      coachText.subscribe(refresh),
+    );
   }
 
   // ------------------------------------------------------- transitions --
@@ -237,18 +263,23 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     if (v && !this.wasActive) {
       this.wasActive = true;
       this.shownPlan = v.plan;
+      sfx.enter();
       this.fadeThen(() => this.enter(v.id, v.viewpoint));
     } else if (v && this.wasActive && v.plan !== this.shownPlan) {
       // Compare futures: the same place, camera and light under the other plan.
       this.shownPlan = v.plan;
+      sfx.teleport();
       this.fadeThen(() => {
         this.build(this.visit.col, this.visit.row);
         this.place(v.viewpoint);
       }, '#e8f1ff');
     } else if (v && this.wasActive) {
+      sfx.teleport();
       this.fadeThen(() => this.place(v.viewpoint));
     } else if (!v && this.wasActive) {
       this.wasActive = false;
+      sfx.exit();
+      streetAmbience.stop();
       this.fadeThen(() => this.leave());
     }
   }
@@ -299,6 +330,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     };
     this.world.scene.fog = new FogExp2('#dce8ec', 0.006);
     this.root.visible = true;
+    streetAmbience.start();
     this.applyAtmosphere();
     setPanelVisible(this.world, 'street-panel', true);
     this.place(viewpoint);
@@ -387,7 +419,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const key = `${tag}|${col},${row}|${year}|${plan.map((p) => `${p.id}:${p.col},${p.row},${p.rotation}`).join(';')}`;
     if (key === this.builtKey) return;
     this.builtKey = key;
-    for (const c of [...this.hood.children]) this.hood.remove(c);
+    this.disposeHood();
 
     // Everything below follows the projection of the current plan for this year.
     // game.metrics belongs to the current map (Plan B); Plan A computes its own.
@@ -516,6 +548,26 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     mat.needsUpdate = true;
   }
 
+  /**
+   * Free what the previous street build created (ground, trees, merged model
+   * geometry, per-build materials). Kit geometry/materials and the shared
+   * time-travel materials are kept: they are shared with the tabletop.
+   */
+  private disposeHood(): void {
+    const keep = new Set<object>([SOLAR_GLASS, LEAF_CROWN]);
+    if (this.streetMat) keep.add(this.streetMat);
+    for (const c of [...this.hood.children]) {
+      c.traverse((o) => {
+        const mesh = o as Mesh;
+        if (!mesh.isMesh) return;
+        if (!isKitResource(mesh.geometry)) mesh.geometry.dispose();
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const m of mats) if (m && !keep.has(m) && !isKitResource(m) && !SHARED_PAINT.has(m)) m.dispose();
+      });
+      this.hood.remove(c);
+    }
+  }
+
   /** Smog and sky follow the projected haze; birds follow greening. */
   private applyAtmosphere(): void {
     const st = this.state;
@@ -528,6 +580,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     }
     (this.sky.material as MeshBasicMaterial).color.copy(WHITE).lerp(SMOG_SKY, st.haze * 0.85);
     this.birds.count = Math.round(BIRDS * Math.min(1, st.greening * 1.6));
+    if (this.root.visible) streetAmbience.set({ birds: this.birds.count, haze: st.haze });
     this.paintPanel?.();
   }
 

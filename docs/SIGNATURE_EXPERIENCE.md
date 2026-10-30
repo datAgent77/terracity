@@ -9,8 +9,8 @@ Milestones are reviewed one at a time; this file records each one.
 | 1 — Beautiful neighbourhood | approved (2026-10-30) |
 | 2 — Enter Your City (tabletop → human scale) | approved (2026-10-30) |
 | 3 — Time travel in the neighbourhood | approved (2026-10-30) |
-| 4 — Compare futures in the neighbourhood | **implemented, awaiting review** |
-| 5 — Experience polish | not started |
+| 4 — Compare futures in the neighbourhood | approved (2026-10-30) |
+| 5 — Experience polish | **implemented, awaiting review** |
 
 ## Milestone 1 — Beautiful neighbourhood
 
@@ -207,3 +207,42 @@ otherwise have shown Plan B's environment). Guarded by the new e2e test
 Evidence: `docs/visual/m4-vp{1,3}-plan-{a,b}-2050.png` (desktop),
 `m4-xr-panel-plan-a.png`, `m4-xr-street-plan-{a,b}.png` (IWER, hands only: hand
 ray on *Enter your city*, pinch *Plan A*, pinch *Plan B*), `m4-log.txt`.
+
+
+## Milestone 5 — Experience polish
+
+Branch `feature/signature-vr-m5`.
+
+- **Onboarding follows the signature flow** (`src/gameplay/tutorial.ts`, pure +
+  unit-tested): five tips — *place homes* → *add wind* → **Enter your city** →
+  **see 2050 there** → *return and keep building / compare Plan A and B in the
+  street*. Each step needs its own fresh action (entering, the year, returning).
+  The tip line follows the player into the street (amber, top of the street
+  panel) and the next target glows amber: the *Enter your city* button, then the
+  *2050* button, then *Return to tabletop*.
+- **Spatial audio (procedural WebAudio, no files)**: enter / exit whooshes and a
+  teleport swish; a street ambience while visiting — a wind bed, a low muffled
+  city hum that grows with smog, and bird chirps panned left/right whose rate
+  follows the number of birds (greening). Respects *Sound on/off*; stops on
+  return. Stereo panning, not head-tracked HRTF.
+- **Readability**: *Larger text* now also scales the street panel (1.3×).
+- **Stability / performance**: each street rebuild (year, plan) now disposes the
+  previous build's geometry and materials (kit and shared materials kept).
+  Measured: renderer geometry count stays 167–171 over eight year switches
+  (it grew before this fix).
+
+### Acceptance criteria (brief) — status
+
+| # | Criterion | Status (evidence) |
+|---|---|---|
+| 1 | Place a villa with their hands | IWER hand pinch-and-drop (`xr-phase1-test.sh`); M1 placement animation |
+| 2 | Recognise it as a detached house with a garden | M1 (`m1-villa-zoom.png`, `m1-2-desktop-closeup.png`) |
+| 3 | Enter the neighbourhood at human scale | M2, IWER hands (`m2-log.txt`) |
+| 4 | Recognise the same villa they placed | M2 (`m2-0-tabletop-district.png` vs `m2-1..4`) |
+| 5 | View the neighbourhood in 2050 | M3, IWER hands (`m3-xr-street-2050.png`) |
+| 6 | Understand at least one consequence | M3 story lines + smog/parching/sprawl; M4 Plan A vs B |
+| 7 | Return to the tabletop safely | M2–M5 (`street.spec.ts`, IWER *Return to tabletop*) |
+
+All of this is verified in desktop Chromium and the IWER emulator only. **Not
+validated on a physical Quest** (comfort of the teleports, frame rate, text
+legibility and audio there are untested).

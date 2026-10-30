@@ -6,7 +6,7 @@ import { ConeGeometry, createSystem, Mesh, MeshBasicMaterial, MeshStandardMateri
 import { prefersReducedMotion } from '../ui/accessibility.js';
 import { TILE_SIZE } from '../config/scenario.js';
 import * as cmd from '../core/commands.js';
-import { coachText, game, phase, planVersion, tutorial, viewYear } from '../core/session.js';
+import { coachText, game, phase, planVersion, streetView, tutorial, viewYear } from '../core/session.js';
 import { tileCenter } from '../world/board-coords.js';
 import { tileTopY } from '../world/board-mesh.js';
 
@@ -46,7 +46,7 @@ export class TutorialSystem extends createSystem({}) {
       if (phase.peek() !== 'building') coachText.value = '';
       this.placeGlows();
     };
-    for (const s of [planVersion, viewYear, phase] as const) {
+    for (const s of [planVersion, viewYear, phase, streetView] as const) {
       this.cleanupFuncs.push((s as { subscribe(f: () => void): () => void }).subscribe(refresh));
     }
     this.cleanupFuncs.push(coachText.subscribe(() => this.placeGlows()));

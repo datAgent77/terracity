@@ -24,6 +24,13 @@ import { LEAF_CROWN, SOLAR_GLASS } from './shared-materials.js';
 export const CITY_KIT_ASSET = 'city-kit';
 
 let prepared: Object3D | null | undefined;
+/** Geometries and materials owned by the loaded kit (shared by every clone). */
+const shared = new WeakSet<object>();
+
+/** True for kit-owned geometry / material, which callers must never dispose. */
+export function isKitResource(r: object | null | undefined): boolean {
+  return !!r && shared.has(r);
+}
 
 /** Quantized (KHR_mesh_quantization) attributes -> Float32 once, so merging stays exact. */
 function dequantize(geo: BufferGeometry): void {
@@ -52,6 +59,8 @@ function kitScene(): Object3D | null {
     if (!mesh.isMesh) return;
     dequantize(mesh.geometry);
     mat = mesh.material as MeshStandardMaterial;
+    shared.add(mesh.geometry);
+    shared.add(mat);
   });
   const m = mat as MeshStandardMaterial | null;
   if (m?.map) {

@@ -1,0 +1,5 @@
+tabletop: Tip 3/5: Tap Enter your city on the Plan pad and stand in the neighbourhood you built.
+street: Tip 4/5: Tap 2050 to see what your plan does to this place.
+street 2050: Tip 5/5: Return to the tabletop and tap 2026 to keep building. Save Plan A, try a Plan B, then compare them in the street.
+after 2026: ""
+page errors: 0 

@@ -44,7 +44,7 @@ const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
 const TIP_SLOT: Partial<Record<string, number>> = { homes: 1, wind: 3 };
 
 /** Panels enlarged by the "Larger text" preference. */
-const SCALABLE_PANELS = ['hud-panel', 'actions-panel', 'time-panel', 'overlay-panel', 'compare-panel'];
+const SCALABLE_PANELS = ['hud-panel', 'actions-panel', 'time-panel', 'overlay-panel', 'compare-panel', 'street-panel'];
 const LARGE = 1.3;
 
 type Settable = { setProperties(p: Record<string, unknown>): void };
@@ -263,9 +263,11 @@ export class PanelSystem extends createSystem({}) {
       dim('btn-pause', phase.value === 'building');
       dim('btn-finish', phase.value === 'building');
       dim('btn-enter', game.placements.some((p) => p.type === 'residential'));
+      // Tutorial cue: the Enter button glows amber on its step.
+      buttons.get('btn-enter')?.setProperties({ backgroundColor: tutorial.active && tutorial.step === 'enter' ? '#b87500' : undefined });
       pauseLabel?.setProperties({ text: paused.value ? 'Resume' : 'Pause' });
     };
-    for (const s of [planVersion, phase, viewYear, paused, planA] as const) {
+    for (const s of [planVersion, phase, viewYear, paused, planA, coachText] as const) {
       this.cleanupFuncs.push((s as { subscribe(f: () => void): () => void }).subscribe(refresh));
     }
   }

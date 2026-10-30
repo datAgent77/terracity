@@ -6,17 +6,22 @@ const sig = (page: Page, name: string) =>
 
 test('guided tips walk the first minute and then get out of the way', async ({ page }) => {
   await open(page);
-  expect(await sig(page, 'coachText')).toMatch(/Tip 1\/4/);
+  expect(await sig(page, 'coachText')).toMatch(/Tip 1\/5/);
   await key(page, 'Digit1');
   await tile(page, 6, 4);
-  expect(await sig(page, 'coachText')).toMatch(/Tip 2\/4/);
+  expect(await sig(page, 'coachText')).toMatch(/Tip 2\/5/);
   await page.screenshot({ path: 'docs/evidence/phase3-e2e-tip2-glow.png' });
   await key(page, 'Digit3');
   await tile(page, 12, 8);
   await key(page, 'Escape');
-  expect(await sig(page, 'coachText')).toMatch(/Tip 3\/4/);
-  await ui(page, 'time-panel', 'year-2050');
-  expect(await sig(page, 'coachText')).toMatch(/Tip 4\/4/);
+  expect(await sig(page, 'coachText')).toMatch(/Tip 3\/5/);
+  await ui(page, 'actions-panel', 'btn-enter');
+  await page.waitForFunction(() => !(window.__terracity as unknown as { street(): { fading: boolean } }).street().fading);
+  expect(await sig(page, 'coachText')).toMatch(/Tip 4\/5/);
+  await ui(page, 'street-panel', 'st-2050');
+  expect(await sig(page, 'coachText')).toMatch(/Tip 5\/5/);
+  await ui(page, 'street-panel', 'st-return');
+  await page.waitForFunction(() => !(window.__terracity as unknown as { street(): { active: boolean; fading: boolean } }).street().fading);
   await ui(page, 'time-panel', 'year-2026');
   expect(await sig(page, 'coachText')).toBe('');
 });
@@ -26,7 +31,7 @@ test('tips can be skipped from the HUD chip (and turned back on with H)', async 
   await ui(page, 'hud-panel', 'btn-skip-tips');
   expect(await sig(page, 'coachText')).toBe('');
   await key(page, 'KeyH');
-  expect(await sig(page, 'coachText')).toMatch(/Tip 1\/4/);
+  expect(await sig(page, 'coachText')).toMatch(/Tip 1\/5/);
 });
 
 test('larger text enlarges the panels; sound toggles', async ({ page }) => {

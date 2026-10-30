@@ -1,28 +1,32 @@
 /**
- * Guided first minute: four short steps that teach build → consequence →
- * time travel → plan comparison. Pure (no IWSDK) so it is unit-testable.
+ * Guided first minutes: five short steps that follow the signature experience —
+ * build → power → enter your city → see 2050 there → back to the tabletop (and
+ * the Plan A/B comparison). Pure (no IWSDK) so it is unit-testable.
  */
 import type { Year } from '../config/projection.js';
 import { StructureType, TerrainType } from '../config/scenario.js';
 import type { Placement } from '../simulation/metrics.js';
 import type { TerrainMap } from '../world/terrain-map.js';
 
-export type TutorialStep = 'homes' | 'wind' | 'future' | 'back' | 'done';
+export type TutorialStep = 'homes' | 'wind' | 'enter' | 'future' | 'back' | 'done';
 
 export interface TutorialContext {
   placements: readonly Placement[];
   servedIds: ReadonlySet<string>;
   viewYear: Year;
+  /** Visiting a neighbourhood at street level ("Enter your city"). */
+  inStreet?: boolean;
 }
 
 export const TUTORIAL_TEXT: Record<Exclude<TutorialStep, 'done'>, string> = {
-  homes: 'Tip 1/4: Pinch the Homes piece in the tray and drop it on a glowing tile next to the town.',
-  wind: 'Tip 2/4: Your homes need clean power. Put a Wind turbine on a glowing ridge tile - higher is windier.',
-  future: 'Tip 3/4: Tap 2050 to see what your plan does to the future.',
-  back: 'Tip 4/4: Tap 2026 to keep building. Save Plan A when you like it, then try a Plan B and Compare.',
+  homes: 'Tip 1/5: Pinch the Homes piece in the tray and drop it on a glowing tile next to the town.',
+  wind: 'Tip 2/5: Your homes need clean power. Put a Wind turbine on a glowing ridge tile - higher is windier.',
+  enter: 'Tip 3/5: Tap Enter your city on the Plan pad and stand in the neighbourhood you built.',
+  future: 'Tip 4/5: Tap 2050 to see what your plan does to this place.',
+  back: 'Tip 5/5: Return to the tabletop and tap 2026 to keep building. Save Plan A, try a Plan B, then compare them in the street.',
 };
 
-const ORDER: TutorialStep[] = ['homes', 'wind', 'future', 'back', 'done'];
+const ORDER: TutorialStep[] = ['homes', 'wind', 'enter', 'future', 'back', 'done'];
 
 export class Tutorial {
   step: TutorialStep = 'homes';
@@ -50,11 +54,13 @@ export class Tutorial {
       const done =
         (this.step === 'homes' && ctx.placements.some((p) => p.type === StructureType.Residential && ctx.servedIds.has(p.id))) ||
         (this.step === 'wind' && ctx.placements.some((p) => p.type === StructureType.Wind)) ||
+        (this.step === 'enter' && !!ctx.inStreet) ||
         (this.step === 'future' && ctx.viewYear === 2050) ||
-        (this.step === 'back' && ctx.viewYear === 2026);
+        (this.step === 'back' && !ctx.inStreet && ctx.viewYear === 2026);
       if (!done || this.step === 'done') break;
       this.step = ORDER[ORDER.indexOf(this.step) + 1];
-      if (this.step === 'back' || this.step === 'future') break; // year steps need a fresh action each
+      // Steps that need a fresh action each: entering, the year, coming back.
+      if (this.step === 'enter' || this.step === 'back' || this.step === 'future') break;
     }
     return this.step !== before;
   }
