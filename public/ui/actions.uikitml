@@ -29,5 +29,6 @@
       <Button id="btn-finish" class="button"><ButtonIcon><Flag></Flag></ButtonIcon><ButtonLabel>Finish plan</ButtonLabel></Button>
     </div>
   </div>
+  <Button id="btn-split" class="enter"><ButtonIcon><Split></Split></ButtonIcon><ButtonLabel id="split-label">Split into two futures</ButtonLabel></Button>
   <Button id="btn-enter" class="enter"><ButtonIcon><DoorOpen></DoorOpen></ButtonIcon><ButtonLabel>Enter your city</ButtonLabel></Button>
 </Panel>

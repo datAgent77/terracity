@@ -20,6 +20,7 @@ import {
   result,
   selectedId,
   statusText,
+  futuresOpen,
   streetView,
   timeLeft,
   tutorial,
@@ -40,6 +41,10 @@ export function canEdit(): boolean {
   }
   if (streetView.peek()) {
     statusText.value = 'Return to the tabletop to change the plan.';
+    return false;
+  }
+  if (futuresOpen.peek()) {
+    statusText.value = 'Merge the two futures to change the plan.';
     return false;
   }
   return true;
@@ -235,7 +240,7 @@ export function togglePause(): void {
 
 /** Called every frame by the flow system. The clock stops while visiting a street. */
 export function tickClock(seconds: number): void {
-  if (phase.peek() !== 'building' || paused.peek() || streetView.peek()) return;
+  if (phase.peek() !== 'building' || paused.peek() || streetView.peek() || futuresOpen.peek()) return;
   const ended = challenge.tick(seconds);
   const whole = Math.ceil(challenge.timeLeft);
   if (whole !== timeLeft.peek()) timeLeft.value = whole;
@@ -294,4 +299,33 @@ export function setStreetPlan(plan: 'A' | 'B'): void {
   if (viewYear.peek() === 2026) viewYear.value = 2050;
   streetView.value = { ...v, plan };
   statusText.value = plan === 'A' ? 'Plan A in the same place.' : 'Plan B (your current map) in the same place.';
+}
+
+// ---------------------------------------------------------- split reality --
+
+/** Pull the world apart into two futures (two-hand gesture, button or V). */
+export function openFutures(): void {
+  if (futuresOpen.peek() || streetView.peek() || phase.peek() === 'intro') return;
+  clearSelection();
+  compareOpen.value = false;
+  futuresOpen.value = { selected: null };
+  statusText.value = planA.peek()
+    ? 'Two futures: Plan A in your left hand, Plan B (now) in your right. Bring your hands together to merge.'
+    : 'Two futures: your plan on the left, the same coast if nobody plans on the right. Bring your hands together to merge.';
+}
+
+export function closeFutures(): void {
+  if (!futuresOpen.peek()) return;
+  futuresOpen.value = null;
+  statusText.value = 'One world again. Your plan is unchanged.';
+}
+
+export function toggleFutures(): void {
+  (futuresOpen.peek() ? closeFutures : openFutures)();
+}
+
+export function selectFuture(side: 'A' | 'B'): void {
+  const f = futuresOpen.peek();
+  if (!f) return;
+  futuresOpen.value = { selected: f.selected === side ? null : side };
 }

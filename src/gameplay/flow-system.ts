@@ -53,6 +53,7 @@ export class FlowSystem extends createSystem({}) {
       if (kb.getKeyDown('Escape')) cmd.exitCity();
       return; // tabletop shortcuts are off while visiting the street
     }
+    if (kb.getKeyDown('KeyV')) cmd.toggleFutures();
     if (kb.getKeyDown('KeyT')) cmd.nextYear();
     if (kb.getKeyDown('KeyS')) cmd.savePlanA();
     if (kb.getKeyDown('KeyC')) cmd.toggleCompare();

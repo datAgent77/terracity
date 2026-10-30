@@ -149,6 +149,16 @@ export function createMiniBoard(terrain: TerrainMap, plan: readonly Placement[],
   }
   bakeMaterials(statics);
   g.add(mergeStatic(statics));
+  // Smog over a region whose environment misses its target (same `haze` as the board).
+  if (state.haze > 0.01) {
+    const smog = new Mesh(
+      new PlaneGeometry(GRID_COLS * TILE_SIZE * 0.98, 10 * TILE_SIZE * 0.98).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ color: '#8a7559', transparent: true, opacity: Math.min(0.55, 0.6 * state.haze), depthWrite: false }),
+    );
+    smog.position.y = 0.05;
+    smog.name = 'mini-smog';
+    g.add(smog);
+  }
   g.traverse((o) => {
     o.raycast = () => {};
   });

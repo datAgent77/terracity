@@ -11,6 +11,7 @@ import { AmbientSystem } from './world/ambient-system.js';
 import { FeedbackSystem } from './world/feedback-system.js';
 import { FutureSystem } from './world/future-system.js';
 import { OutcomeSystem } from './world/outcome-system.js';
+import { SplitSystem } from './world/split-system.js';
 import { StreetSystem } from './world/street-system.js';
 
 World.create(
@@ -32,6 +33,7 @@ World.create(
   world.registerSystem(PanelSystem);
   world.registerSystem(FlowPanelSystem);
   world.registerSystem(StreetSystem);
+  world.registerSystem(SplitSystem);
   world.registerSystem(FlowSystem);
   world.registerSystem(AudioSystem);
   world.registerSystem(TutorialSystem);

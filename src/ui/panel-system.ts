@@ -22,7 +22,7 @@ import {
   viewYear,
 } from '../core/session.js';
 import { formatClock } from '../gameplay/challenge.js';
-import { coachText, tutorial } from '../core/session.js';
+import { coachText, futuresOpen, tutorial } from '../core/session.js';
 import { largeText, prefersReducedMotion, soundOn } from './accessibility.js';
 import { onHover, pulse } from './hover.js';
 import { landBudget } from '../simulation/land-budget.js';
@@ -35,7 +35,7 @@ const ARMED_BG = '#ffd36b';
 const IDLE_BG = 'rgba(0,0,0,0)';
 const ACTION_IDS = [
   'btn-undo', 'btn-redo', 'btn-rotate', 'btn-remove', 'btn-restart',
-  'btn-save-a', 'btn-restore-a', 'btn-compare', 'btn-pause', 'btn-finish', 'btn-enter',
+  'btn-save-a', 'btn-restore-a', 'btn-compare', 'btn-pause', 'btn-finish', 'btn-split', 'btn-enter',
 ];
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
@@ -241,6 +241,7 @@ export class PanelSystem extends createSystem({}) {
       'btn-pause': cmd.togglePause,
       'btn-finish': () => cmd.finishGame(),
       'btn-enter': cmd.enterCity,
+      'btn-split': cmd.toggleFutures,
     };
     const buttons = new Map<string, Settable>();
     for (const id of ACTION_IDS) {
@@ -251,6 +252,7 @@ export class PanelSystem extends createSystem({}) {
       this.onClick(el, fns[id]);
     }
     const pauseLabel = panel.getElementById<UIKit.Text>('pause-label');
+    const splitLabel = panel.getElementById<UIKit.Text>('split-label');
     const dim = (id: string, on: boolean) => buttons.get(id)?.setProperties({ opacity: on ? 1 : 0.4 });
     const refresh = () => {
       const editing = phase.value === 'building' && viewYear.value === 2026 && !paused.value;
@@ -262,12 +264,14 @@ export class PanelSystem extends createSystem({}) {
       dim('btn-compare', !!planA.value);
       dim('btn-pause', phase.value === 'building');
       dim('btn-finish', phase.value === 'building');
-      dim('btn-enter', game.placements.some((p) => p.type === 'residential'));
       // Tutorial cue: the Enter button glows amber on its step.
       buttons.get('btn-enter')?.setProperties({ backgroundColor: tutorial.active && tutorial.step === 'enter' ? '#b87500' : undefined });
       pauseLabel?.setProperties({ text: paused.value ? 'Resume' : 'Pause' });
+      splitLabel?.setProperties({ text: futuresOpen.value ? 'Merge the futures' : 'Split into two futures' });
+      dim('btn-split', phase.value !== 'intro');
+      dim('btn-enter', !futuresOpen.value && game.placements.some((p) => p.type === 'residential'));
     };
-    for (const s of [planVersion, phase, viewYear, paused, planA, coachText] as const) {
+    for (const s of [planVersion, phase, viewYear, paused, planA, coachText, futuresOpen] as const) {
       this.cleanupFuncs.push((s as { subscribe(f: () => void): () => void }).subscribe(refresh));
     }
   }

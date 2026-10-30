@@ -111,6 +111,21 @@ export const sfx = {
   },
   /** Teleport between viewpoints / switching plans. */
   teleport: () => noise(0, 0.28, 1800, 900, 0.12),
+  /** Split reality: the fracture appears (hands held together). */
+  fracture: () => {
+    tone(880, 0, 0.5, 'sine', 0.12, 1320);
+    tone(1760, 0.05, 0.4, 'sine', 0.05, 2640);
+  },
+  /** The world splits into two futures: a crystalline shimmer and a wide whoosh. */
+  split: () => {
+    noise(0, 0.9, 600, 5000, 0.25);
+    [1047, 1319, 1568, 2093].forEach((f, i) => tone(f, 0.08 + i * 0.06, 0.6, 'sine', 0.08));
+  },
+  /** The two futures merge back into one world. */
+  merge: () => {
+    noise(0, 0.7, 5000, 600, 0.22);
+    tone(784, 0.3, 0.5, 'sine', 0.14, 523);
+  },
   win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.12, 0.35, 'sine', 0.3)),
   lose: () => {
     tone(392, 0, 0.3, 'triangle', 0.25);
