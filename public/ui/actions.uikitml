@@ -9,6 +9,7 @@
   .cols { flex-direction: row; }
   .col { flex-direction: column; width: 200px; }
   .button { justify-content: flex-start; margin-left: 14px; margin-right: 8px; margin-top: 8px; }
+  .enter { justify-content: center; margin-left: 14px; margin-right: 14px; margin-top: 12px; }
 </style>
 <Panel id="root" class="panel-root">
   <div class="heading">Plan</div>
@@ -28,4 +29,5 @@
       <Button id="btn-finish" class="button"><ButtonIcon><Flag></Flag></ButtonIcon><ButtonLabel>Finish plan</ButtonLabel></Button>
     </div>
   </div>
+  <Button id="btn-enter" class="enter"><ButtonIcon><DoorOpen></DoorOpen></ButtonIcon><ButtonLabel>Enter your city</ButtonLabel></Button>
 </Panel>

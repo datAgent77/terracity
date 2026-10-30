@@ -4,9 +4,10 @@
  * challenge transition.
  */
 import { YEARS, type Year } from '../config/projection.js';
-import type { StructureType } from '../config/scenario.js';
+import { StructureType } from '../config/scenario.js';
 import { STRUCTURES } from '../config/structures.js';
 import { projectYear } from '../simulation/projection.js';
+import { nextViewpoint } from '../world/street-view.js';
 import {
   armedType,
   challenge,
@@ -19,6 +20,7 @@ import {
   result,
   selectedId,
   statusText,
+  streetView,
   timeLeft,
   tutorial,
   viewYear,
@@ -34,6 +36,10 @@ export function canEdit(): boolean {
   }
   if (viewYear.peek() !== 2026) {
     statusText.value = `Viewing ${viewYear.peek()}. Return to 2026 to change the plan.`;
+    return false;
+  }
+  if (streetView.peek()) {
+    statusText.value = 'Return to the tabletop to change the plan.';
     return false;
   }
   return true;
@@ -227,11 +233,51 @@ export function togglePause(): void {
   statusText.value = paused.peek() ? 'Paused. Press Resume to continue.' : 'Resumed.';
 }
 
-/** Called every frame by the flow system. */
+/** Called every frame by the flow system. The clock stops while visiting a street. */
 export function tickClock(seconds: number): void {
-  if (phase.peek() !== 'building' || paused.peek()) return;
+  if (phase.peek() !== 'building' || paused.peek() || streetView.peek()) return;
   const ended = challenge.tick(seconds);
   const whole = Math.ceil(challenge.timeLeft);
   if (whole !== timeLeft.peek()) timeLeft.value = whole;
   if (ended) finishGame(true);
+}
+
+// ----------------------------------------------------- enter your city --
+
+/** The district to visit: the selected homes, else the first one planned. */
+export function streetTarget(): string | null {
+  const sel = selectedId.peek();
+  const plan = game.placements;
+  if (sel && plan.some((p) => p.id === sel && p.type === StructureType.Residential)) return sel;
+  return plan.find((p) => p.type === StructureType.Residential)?.id ?? null;
+}
+
+export function enterCity(): void {
+  if (streetView.peek()) return;
+  const id = streetTarget();
+  if (!id) {
+    statusText.value = 'Place a Homes neighbourhood first, then enter it.';
+    return;
+  }
+  compareOpen.value = false;
+  clearSelection();
+  streetView.value = { id, viewpoint: 0 };
+  statusText.value = 'You are in your neighbourhood. Move between viewpoints, or return to the tabletop.';
+}
+
+export function exitCity(): void {
+  if (!streetView.peek()) return;
+  streetView.value = null;
+  statusText.value = 'Back at the tabletop.';
+}
+
+export function stepViewpoint(step: number): void {
+  const v = streetView.peek();
+  if (!v) return;
+  streetView.value = { ...v, viewpoint: nextViewpoint(v.viewpoint, step) };
+}
+
+export function gotoViewpoint(i: number): void {
+  const v = streetView.peek();
+  if (v && v.viewpoint !== i) streetView.value = { ...v, viewpoint: i };
 }

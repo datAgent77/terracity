@@ -1,0 +1,22 @@
+<!--
+  Street-level visit ("Enter your city"): where you are, teleport between fixed
+  viewpoints, and an always-available way back to the tabletop. Large targets.
+-->
+<style>
+  .root { flex-direction: column; width: 520px; padding-top: 14px; padding-bottom: 16px; padding-left: 20px; padding-right: 20px; }
+  .title { font-size: 21px; font-weight: 700; color: #1d3f46; }
+  .title:dark { color: #ffffff; }
+  .sub { font-size: 16px; color: #3d5a60; margin-top: 4px; }
+  .sub:dark { color: rgba(255, 255, 255, 0.85); }
+  .row { flex-direction: row; margin-top: 14px; }
+  .button { margin-right: 10px; }
+</style>
+<Panel id="root" class="root">
+  <div id="st-title" class="title">Your neighbourhood - 2026</div>
+  <div id="st-view" class="sub">Viewpoint 1 of 4: Your street</div>
+  <div class="row">
+    <Button id="st-prev" class="button"><ButtonIcon><ChevronLeft></ChevronLeft></ButtonIcon><ButtonLabel>Previous</ButtonLabel></Button>
+    <Button id="st-next" class="button"><ButtonIcon><ChevronRight></ChevronRight></ButtonIcon><ButtonLabel>Next</ButtonLabel></Button>
+    <Button id="st-return" class="button"><ButtonIcon><LogOut></LogOut></ButtonIcon><ButtonLabel>Return to tabletop</ButtonLabel></Button>
+  </div>
+</Panel>

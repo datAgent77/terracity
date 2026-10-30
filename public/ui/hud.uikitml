@@ -35,7 +35,7 @@
   .chip-label { font-size: 14px; font-weight: 700; color: #1d3f46; }
   .button { justify-content: flex-start; margin-left: 22px; margin-right: 22px; margin-top: 12px; margin-bottom: 18px; }
 </style>
-<Panel class="panel-root">
+<Panel id="root" class="panel-root">
   <div class="panel-content">
     <div class="title">TerraCity</div>
     <div class="tagline">Plan Costa Verde for 2050.</div>
