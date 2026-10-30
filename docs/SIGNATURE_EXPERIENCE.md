@@ -7,8 +7,8 @@ Milestones are reviewed one at a time; this file records each one.
 | Milestone | Status |
 |---|---|
 | 1 — Beautiful neighbourhood | approved (2026-10-30) |
-| 2 — Enter Your City (tabletop → human scale) | **implemented, awaiting interaction review** |
-| 3 — Time travel in the neighbourhood | not started (tabletop time travel already exists) |
+| 2 — Enter Your City (tabletop → human scale) | approved (2026-10-30) |
+| 3 — Time travel in the neighbourhood | **implemented, awaiting review** |
 | 4 — Compare futures in the neighbourhood | not started (tabletop Plan A/B exists) |
 | 5 — Experience polish | not started |
 
@@ -140,3 +140,42 @@ Evidence: `docs/visual/m2-0-tabletop-district.png` (the district on the board),
 `m2-1..4-street-viewpoint-*.png` (desktop, four viewpoints),
 `m2-5-returned-tabletop.png`, `m2-6-xr-street.png`, `m2-7-xr-panel.png`,
 `m2-8-xr-after-marker.png` (IWER), `m2-log.txt`.
+
+
+## Milestone 3 — Time travel in the neighbourhood
+
+Branch `feature/signature-vr-m3`. Inside the street the panel now has **2026 /
+2035 / 2050** buttons (hand ray / poke / mouse). Choosing a year plays a warm
+"time flash" (~0.4 s, skipped with reduced motion) and rebuilds the **same**
+street from the projection of the current plan for that year: same parcels,
+same six villas, same viewpoint.
+
+What changes, and where it comes from:
+
+| Shown | Driven by |
+|---|---|
+| Architectural modernisation, solar adoption (2035 PV, 2050 solar roofs), sustainable infrastructure (cycle lane, bioswale, EV chargers, batteries, rain cisterns), maturing trees | `homeEra` (illustrative adoption, same in every plan, not counted in renewables) |
+| Parched gardens: lawn, hedge, tree foliage and green roofs shift to straw / ochre (a street copy of the atlas, vegetation cells only) | `dryness` |
+| Smog: exponential haze veils the next blocks, hazy sky, dimmer warmer sun | `haze` (environment below target only) |
+| Lost crops (bare soil strips) and burnt trees (scar + snag) on nearby fields, forest and hills | `treeLoss` (same stable share rule as the tabletop) |
+| Young woodland on nearby plains / hills, birds over the street | `greening` (environment at or above target only) |
+| Raw-concrete unplanned sprawl on nearby tiles | `sprawl` tiles of the projection |
+| Flooded beaches nearby | `seaRise` |
+
+A short text on the panel explains the consequences in plain words
+(`src/world/street-story.ts`, unit-tested): the homes' era, nature vs its target
+(graded — a slight miss is "the first dry gardens", not "smog"), newcomers left
+in unplanned sprawl, the sea on the beaches. It is derived from the same
+projection, so the words match the scene.
+
+Evidence (`docs/visual/m3-*`): for two plans — *decline* (one neighbourhood,
+energy, a park; under-housed) and *balanced* (the reference plan) — the street
+down the road (vp1) and across the road (vp3) in 2026 / 2035 / 2050, plus IWER
+hands-only: enter with a hand ray, pinch *2050* on the street panel
+(`m3-xr-panel-2050.png`, `m3-xr-street-2050.png`); `m3-log.txt` lists the
+mapped values and the story for every shot.
+
+Limitations: the district's own street trees and gardens cannot be removed
+individually (one merged mesh per era), so inside the district decline shows as
+parching and smog rather than lost trees; tree loss and burn scars appear on the
+surrounding tiles. The year can also be changed on the tabletop before entering.

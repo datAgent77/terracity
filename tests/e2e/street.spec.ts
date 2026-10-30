@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { buildPlan, key, open, snap } from './helpers';
 
-type Street = { active: boolean; viewpoint: number | null; boardVisible: boolean | null; fading: boolean };
+type Street = { active: boolean; viewpoint: number | null; boardVisible: boolean | null; fading: boolean; year: number; story: string[] };
 const street = (page: import('@playwright/test').Page) =>
   page.evaluate(() => (window as unknown as { __terracity: { street(): Street } }).__terracity.street());
 const settled = (page: import('@playwright/test').Page) =>
@@ -34,6 +34,16 @@ test('enter your city: street view from the plan, viewpoints, clock paused, retu
   await key(page, 'ArrowLeft');
   await settled(page);
   expect((await street(page)).viewpoint).toBe(3);
+
+  // Time travel inside the street: same neighbourhood, 2050, with its consequences in words.
+  const y2050 = await page.evaluate(() => (window as unknown as { __terracity: { uiToScreen(a: string, b: string): { x: number; y: number } } }).__terracity.uiToScreen('street-panel', 'st-2050'));
+  await page.mouse.click(y2050.x, y2050.y);
+  await settled(page);
+  s = await street(page);
+  expect(s.active).toBe(true);
+  expect(s.year).toBe(2050);
+  expect(s.story[0]).toMatch(/solar roofs/);
+  expect(s.story.join(' ')).toMatch(/newcomers found no planned home/); // one homes tile: under-housed
 
   // Return with the panel button.
   const ret = await page.evaluate(() => (window as unknown as { __terracity: { uiToScreen(a: string, b: string): { x: number; y: number } } }).__terracity.uiToScreen('street-panel', 'st-return'));

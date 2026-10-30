@@ -18,6 +18,7 @@
 import {
   BackSide,
   BoxGeometry,
+  CanvasTexture,
   CircleGeometry,
   Color,
   ConeGeometry,
@@ -26,8 +27,11 @@ import {
   Euler,
   Float32BufferAttribute,
   Fog,
+  FogExp2,
   Group,
   IcosahedronGeometry,
+  InstancedMesh,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -36,11 +40,15 @@ import {
   RayInteractable,
   RingGeometry,
   SphereGeometry,
+  type Texture,
   Vector3,
 } from '@iwsdk/core';
 import { UIKit, type Entity, type UIKitMLAsset } from '@iwsdk/core';
-import { PROJECTION } from '../config/projection.js';
-import { StructureType, TerrainType, TILE_SIZE } from '../config/scenario.js';
+import { YEARS } from '../config/projection.js';
+// Addon not re-exported by @iwsdk/core (imports the same `three` alias).
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { GRID_COLS, StructureType, TerrainType, TILE_SIZE } from '../config/scenario.js';
+import { projectYear } from '../simulation/projection.js';
 import * as cmd from '../core/commands.js';
 import { game, streetView, viewYear } from '../core/session.js';
 import { Placeable } from '../interactions/placeable-component.js';
@@ -49,8 +57,11 @@ import { setPanelVisible } from '../ui/panel-visibility.js';
 import { tileTopY, WATER_LEVEL } from './board-coords.js';
 import { TERRAIN_COLORS } from './board-mesh.js';
 import { districtOrientation } from './district-links.js';
-import { eraForProgress } from './future-visual-state.js';
-import { idNumber, rng } from './rand.js';
+import { futureVisualState, type FutureVisualState } from './future-visual-state.js';
+import { createSprawl } from './houses.js';
+import { hashInts, idNumber, rng } from './rand.js';
+import { LEAF_CROWN, SOLAR_GLASS } from './shared-materials.js';
+import { streetStory } from './street-story.js';
 import { streetPose, STREET_SCALE, VIEWPOINTS } from './street-view.js';
 import { createStructureModel, setDistrictLinks, setRoadArms, structureLook } from './structure-models.js';
 import { tileAt } from './terrain-map.js';
@@ -59,6 +70,14 @@ import { createTownTile, setEra } from './villas.js';
 const TABLETOP_PANELS = ['hud-panel', 'actions-panel', 'time-panel', 'overlay-panel', 'compare-panel', 'tray-labels'];
 const RADIUS = 2; // tiles around the district (5 x 5)
 const FADE = 0.22; // seconds per half of a teleport fade
+const DRY_TINT = new Color('#b98f58');
+const LUSH_TINT = new Color('#7fbf5c');
+const MURKY = new Color('#8e9468');
+const CLEAR_AIR = new Color('#dce8ec');
+const SMOG_AIR = new Color('#a8957a');
+const SMOG_SKY = new Color('#c9b48f');
+const WHITE = new Color('#ffffff');
+const BIRDS = 14;
 
 export class StreetSystem extends createSystem({ placeables: { required: [Placeable] } }) {
   private root = new Group();
@@ -70,9 +89,16 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   private fadeT = 0;
   private fadeDir = 0; // -1 fading in (to clear), +1 fading out (to black), 0 idle
   private pending: (() => void) | null = null;
-  private saved: { camPos: Vector3; camQuat: Quaternion; fog: Fog | null; hidden: Object3D[] } | null = null;
+  private saved: { camPos: Vector3; camQuat: Quaternion; fog: Fog | FogExp2 | null; hidden: Object3D[] } | null = null;
   private wasActive = false;
   private innerEntity!: Entity;
+  private state: FutureVisualState | null = null;
+  private story: string[] = [];
+  private streetMat: MeshStandardMaterial | undefined;
+  private sky!: Mesh;
+  private birds!: InstancedMesh;
+  private clock = 0;
+  private paintPanel: (() => void) | null = null;
 
   init(): void {
     this.root.name = 'street-scene';
@@ -84,6 +110,15 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.innerEntity = this.world.createTransformEntity(this.inner, { parent: rootEntity });
     this.buildSky();
     this.buildMarkers();
+    // Birds over a recovering region (count follows `greening`).
+    const wingA = new BoxGeometry(0.5, 0.05, 0.14).translate(0.24, 0, 0).rotateY(0.5);
+    const wingB = new BoxGeometry(0.5, 0.05, 0.14).translate(-0.24, 0, 0).rotateY(-0.5);
+    this.birds = new InstancedMesh(mergeGeometries([wingA, wingB])!, new MeshBasicMaterial({ color: '#2f3438' }), BIRDS);
+    this.birds.name = 'street-birds';
+    this.birds.count = 0;
+    this.birds.frustumCulled = false;
+    this.birds.raycast = () => {};
+    this.root.add(this.birds);
 
     // Fade shell around the viewer's head (teleport comfort).
     this.fade = new Mesh(
@@ -99,6 +134,16 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     setPanelVisible(this.world, 'street-panel', false);
     this.cleanupFuncs.push(
       streetView.subscribe((v) => this.onChange(v)),
+      viewYear.subscribe(() => {
+        const v = streetView.peek();
+        if (!v || !this.wasActive) return;
+        // A warm "time flash" (not the dark teleport fade), then the same street in the new year.
+        this.fadeThen(() => {
+          const p = game.get(v.id);
+          if (p) this.build(p.col, p.row);
+          this.place(v.viewpoint);
+        }, '#fff4d6');
+      }),
       this.world.visibilityState.subscribe(() => {
         // Leaving XR while visiting: come back to the tabletop.
         if (streetView.peek() && this.saved) cmd.exitCity();
@@ -113,6 +158,11 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       built: this.builtKey,
       boardVisible: this.world.scene.getObjectByName('terrain-board')?.visible ?? null,
       fading: this.fadeDir !== 0,
+      year: viewYear.peek(),
+      story: [...this.story],
+      haze: this.state?.haze ?? 0,
+      greening: this.state?.greening ?? 0,
+      birds: this.birds?.count ?? 0,
       /** World positions of the standing markers (beam mid-height), for hand-ray tests. */
       markers: this.markers.map((m) => (m.visible ? m.localToWorld(new Vector3(0, 1.1, 0)).toArray() : null)),
     });
@@ -132,14 +182,23 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     click('st-prev', () => cmd.stepViewpoint(-1));
     click('st-next', () => cmd.stepViewpoint(1));
     click('st-return', cmd.exitCity);
+    for (const y of YEARS) click(`st-${y}`, () => cmd.setYear(y));
     const title = panel.getElementById<UIKit.Text>('st-title');
     const sub = panel.getElementById<UIKit.Text>('st-view');
+    const lines = [0, 1, 2, 3].map((i) => panel.getElementById<UIKit.Text>(`st-line-${i}`));
     const refresh = () => {
       const v = streetView.peek();
       if (!v) return;
       title?.setProperties({ text: `Your neighbourhood - ${viewYear.peek()}` });
       sub?.setProperties({ text: `Viewpoint ${v.viewpoint + 1} of ${VIEWPOINTS.length}: ${VIEWPOINTS[v.viewpoint].name}` });
+      for (const y of YEARS) {
+        const on = viewYear.peek() === y;
+        panel.getElementById(`st-${y}`)?.setProperties({ backgroundColor: on ? '#1d5f6b' : '#eef3f4', borderColor: on ? '#1d5f6b' : '#c7d6da' });
+        panel.getElementById<UIKit.Text>(`st-${y}-label`)?.setProperties({ color: on ? '#ffffff' : '#1d3f46' });
+      }
+      lines.forEach((el, i) => el?.setProperties({ text: this.story[i] ?? '', display: this.story[i] ? 'flex' : 'none' }));
     };
+    this.paintPanel = refresh;
     this.cleanupFuncs.push(streetView.subscribe(refresh), viewYear.subscribe(refresh));
   }
 
@@ -157,7 +216,8 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     }
   }
 
-  private fadeThen(fn: () => void): void {
+  private fadeThen(fn: () => void, color = '#0b1214'): void {
+    (this.fade.material as MeshBasicMaterial).color.set(color);
     if (prefersReducedMotion()) {
       fn();
       return;
@@ -196,11 +256,12 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.saved = {
       camPos: cam.position.clone(),
       camQuat: cam.quaternion.clone(),
-      fog: (this.world.scene.fog as Fog | null) ?? null,
+      fog: (this.world.scene.fog as Fog | FogExp2 | null) ?? null,
       hidden,
     };
-    this.world.scene.fog = new Fog('#dce8ec', 60, 175);
+    this.world.scene.fog = new FogExp2('#dce8ec', 0.006);
     this.root.visible = true;
+    this.applyAtmosphere();
     setPanelVisible(this.world, 'street-panel', true);
     this.place(viewpoint);
   }
@@ -246,6 +307,24 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   }
 
   update(delta: number): void {
+    this.clock += delta;
+    if (this.root.visible && this.birds.count) {
+      const m = new Matrix4();
+      const q = new Quaternion();
+      const up = new Vector3(0, 1, 0);
+      const v = new Vector3();
+      for (let i = 0; i < this.birds.count; i++) {
+        const flock = i % 2;
+        const a = this.clock * (flock ? 0.12 : -0.09) + (i >> 1) * 0.11 + flock * 2.1;
+        // Low over the street (local frame of the scene root), crossing the views.
+        const rad = 16 + flock * 12 + ((i * 7) % 5) * 1.2;
+        v.set(Math.cos(a) * rad, 9 + flock * 4 + ((i * 3) % 4), Math.sin(a) * rad - 10);
+        q.setFromAxisAngle(up, -a + (flock ? 0 : Math.PI));
+        m.compose(v, q, new Vector3(1, 0.7 + 0.3 * Math.sin(this.clock * 8 + i), 1));
+        this.birds.setMatrixAt(i, m);
+      }
+      this.birds.instanceMatrix.needsUpdate = true;
+    }
     if (this.fadeDir === 0) return;
     this.fadeT = Math.min(1, Math.max(0, this.fadeT + (this.fadeDir * delta) / FADE));
     (this.fade.material as MeshBasicMaterial).opacity = this.fadeT;
@@ -270,13 +349,20 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.builtKey = key;
     for (const c of [...this.hood.children]) this.hood.remove(c);
 
-    const era = eraForProgress(PROJECTION.progress[year]);
+    // Everything below follows the projection of the current plan for this year.
+    const projected = projectYear(game.terrain, plan, year, game.metrics);
+    const st = futureVisualState(game.terrain, plan, projected);
+    this.state = st;
+    const era = st.homeEra;
+    const sprawl = new Map(st.sprawl.map((t) => [t.row * GRID_COLS + t.col, t]));
     const home = plan.find((p) => p.col === col && p.row === row)!;
     const homeTile = tileAt(game.terrain, col, row)!;
     const base = tileTopY(homeTile);
     const q = districtOrientation(game.terrain, plan, home).quarter;
     const hood = new Group(); // board metres, board orientation, centred on the district
     const townTiles = game.terrain.filter((t) => t.type === TerrainType.Town);
+    let sprawlNearby = 0;
+    let beachesNearby = 0;
 
     for (let dr = -RADIUS; dr <= RADIUS; dr++) {
       for (let dc = -RADIUS; dc <= RADIUS; dc++) {
@@ -286,10 +372,18 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
         const z = dr * TILE_SIZE;
         const water = t.type === TerrainType.Sea || t.type === TerrainType.River;
         const top = (water ? WATER_LEVEL : tileTopY(t)) - base;
-        hood.add(this.ground(t.type, x, z, top, t.col, t.row));
+        const sp = sprawl.get(t.row * GRID_COLS + t.col);
         const p = game.at(t.col, t.row);
+        if (t.type === TerrainType.Beach) beachesNearby++;
+        hood.add(this.ground(t.type, x, z, top, t.col, t.row, st, !!(p || sp)));
         if (p) hood.add(this.structure(p, x, z, top, plan, era));
-        else if (t.type === TerrainType.Town) {
+        else if (sp) {
+          // Unplanned sprawl where the projection puts newcomers without homes.
+          sprawlNearby++;
+          const g = createSprawl(hashInts(sp.col, sp.row, 5), sp.buildings);
+          g.position.set(x, top, z);
+          hood.add(g);
+        } else if (t.type === TerrainType.Town) {
           const i = townTiles.findIndex((tt) => tt.col === t.col && tt.row === t.row);
           const mid = Math.floor(townTiles.length / 2);
           const kind = i === mid ? 'plaza' : i === townTiles.length - 1 ? 'civic' : 'block';
@@ -303,46 +397,156 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     // The visited district's local frame is the street frame: undo its board turn.
     hood.rotation.y = -q * (Math.PI / 2);
     hood.scale.setScalar(STREET_SCALE);
+    const kitTint = new Color('#ffffff').lerp(DRY_TINT, st.dryness * 0.55);
     hood.traverse((o) => {
       o.castShadow = false; // the sun's shadow map only covers the tabletop
       o.receiveShadow = false;
       o.raycast = () => {};
+      // Kit models use a street copy of the atlas material, tinted toward dry
+      // ochre with the projected dryness (lawns, gardens and trees parch).
+      const mesh = o as Mesh;
+      const mat = mesh.material as MeshStandardMaterial | undefined;
+      if (mesh.isMesh && mat?.map && mat !== SOLAR_GLASS && mat !== LEAF_CROWN) {
+        this.streetMat ??= mat.clone();
+        mesh.material = this.streetMat;
+      }
     });
+    this.streetMat?.color.copy(kitTint);
+    this.applyDrought(st.dryness);
     this.hood.add(hood);
+    this.story = streetStory(projected, st, { sprawlNearby, beachesNearby });
+    this.applyAtmosphere();
   }
 
-  private ground(type: TerrainType, x: number, z: number, top: number, col: number, row: number): Object3D {
+  /**
+   * Parched gardens: a copy of the kit atlas whose vegetation cells (lawn,
+   * foliage, green roof) are shifted toward dry ochre by the projected dryness.
+   * Walls, roofs and paving keep their colours. Rebuilt in coarse steps.
+   */
+  private droughtKey = -1;
+  private wetMap: Texture | null = null;
+  private applyDrought(dryness: number): void {
+    const mat = this.streetMat;
+    if (!mat?.map) return;
+    this.wetMap ??= mat.map;
+    const step = Math.round(Math.max(0, dryness - 0.12) * 8) / 8; // 0 = no change
+    if (step === this.droughtKey) return;
+    this.droughtKey = step;
+    if (step === 0) {
+      mat.map = this.wetMap;
+      mat.needsUpdate = true;
+      return;
+    }
+    const img = this.wetMap.image as CanvasImageSource & { width: number; height: number };
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+    ctx.drawImage(img, 0, 0);
+    const cell = img.width / 4;
+    // Atlas row 2 from the bottom (Blender origin) = third row from the top here:
+    // lawn (col 0), foliage (col 1), green roof (col 2).
+    const y0 = cell;
+    const data = ctx.getImageData(0, y0, cell * 3, cell);
+    const k = Math.min(1, step * 1.4);
+    const px = data.data;
+    for (let i = 0; i < px.length; i += 4) {
+      const col = Math.floor((i / 4) % (cell * 3) / cell);
+      if (col === 1) {
+        // Foliage is grey and tinted by vertex colour: tint it toward straw.
+        px[i] *= 1 - 0.02 * k;
+        px[i + 1] *= 1 - 0.32 * k;
+        px[i + 2] *= 1 - 0.6 * k;
+      } else {
+        const l = (px[i] + px[i + 1] + px[i + 2]) / 3 / 255;
+        px[i] += (Math.min(255, 175 + 70 * l) - px[i]) * k;
+        px[i + 1] += (Math.min(255, 135 + 60 * l) - px[i + 1]) * k;
+        px[i + 2] += (Math.min(255, 80 + 40 * l) - px[i + 2]) * k;
+      }
+    }
+    ctx.putImageData(data, 0, y0);
+    const tex = new CanvasTexture(canvas);
+    tex.flipY = this.wetMap.flipY;
+    tex.colorSpace = this.wetMap.colorSpace;
+    tex.anisotropy = this.wetMap.anisotropy;
+    if (mat.map !== this.wetMap) mat.map.dispose();
+    mat.map = tex;
+    mat.needsUpdate = true;
+  }
+
+  /** Smog and sky follow the projected haze; birds follow greening. */
+  private applyAtmosphere(): void {
+    const st = this.state;
+    if (!st) return;
+    const fog = this.world.scene.fog as FogExp2 | null;
+    if (fog && this.root.visible) {
+      // Exponential haze: clear air keeps the hills; smog veils the next block.
+      fog.color.copy(CLEAR_AIR).lerp(SMOG_AIR, Math.min(1, st.haze * 1.3));
+      fog.density = 0.006 + 0.04 * st.haze;
+    }
+    (this.sky.material as MeshBasicMaterial).color.copy(WHITE).lerp(SMOG_SKY, st.haze * 0.85);
+    this.birds.count = Math.round(BIRDS * Math.min(1, st.greening * 1.6));
+    this.paintPanel?.();
+  }
+
+  private ground(type: TerrainType, x: number, z: number, top: number, col: number, row: number, st: FutureVisualState, covered: boolean): Object3D {
     const g = new Group();
     const depth = 0.03;
     const color = new Color(TERRAIN_COLORS[type]);
+    const land = type !== TerrainType.Sea && type !== TerrainType.River && type !== TerrainType.Town && type !== TerrainType.Beach;
+    if (land) color.lerp(DRY_TINT, st.dryness * 0.8).lerp(LUSH_TINT, st.greening * 0.25);
     const block = new Mesh(new BoxGeometry(TILE_SIZE, depth, TILE_SIZE), new MeshStandardMaterial({ color, roughness: 0.95 }));
     block.position.set(x, top - depth / 2, z);
     g.add(block);
+    if (covered) return g; // a structure or sprawl stands here
     const r = rng(col * 97 + row * 13 + 5);
+    // Stable per-item loss share, as on the tabletop (`treeLoss`).
+    const lost = (k: number) => (hashInts(col, row, 300 + k) % 1000) / 1000 < st.treeLoss;
     if (type === TerrainType.Sea || type === TerrainType.River) {
-      (block.material as MeshStandardMaterial).color.set('#2f8fb3');
+      (block.material as MeshStandardMaterial).color.set('#2f8fb3').lerp(MURKY, st.haze * 0.8);
       (block.material as MeshStandardMaterial).roughness = 0.15;
+    } else if (type === TerrainType.Beach && st.seaRise > 0.02) {
+      // Sea-level rise: the beach goes under water, as on the tabletop.
+      const sea = new Mesh(
+        new BoxGeometry(TILE_SIZE, 0.0004, TILE_SIZE * st.seaRise),
+        new MeshStandardMaterial({ color: '#3aa9c4', roughness: 0.1, transparent: true, opacity: 0.88 }),
+      );
+      sea.position.set(x, top + 0.0002, z);
+      g.add(sea);
     } else if (type === TerrainType.Farmland) {
       for (let k = -2; k <= 2; k++) {
+        const crop = r() < 0.5 ? '#c8a548' : '#6f9a3c';
         const strip = new Mesh(
           new BoxGeometry(TILE_SIZE * 0.92, 0.0012, 0.0075),
-          new MeshStandardMaterial({ color: r() < 0.5 ? '#c8a548' : '#6f9a3c', roughness: 1 }),
+          new MeshStandardMaterial({ color: lost(k) ? '#8a6a45' : crop, roughness: 1 }), // lost crops: bare soil
         );
         strip.position.set(x, top + 0.0006, z + k * 0.0105);
         g.add(strip);
       }
-    } else if (type === TerrainType.Protected || type === TerrainType.Hill) {
-      const n = type === TerrainType.Protected ? 9 : 3;
-      for (let k = 0; k < n; k++) {
+    } else if (type === TerrainType.Protected || type === TerrainType.Hill || type === TerrainType.Plain) {
+      const n = type === TerrainType.Protected ? 9 : type === TerrainType.Hill ? 3 : 0;
+      // Recovery: young woodland on free plains and hills.
+      const young = type === TerrainType.Protected ? 0 : Math.round(st.greening * 6);
+      for (let k = 0; k < n + young; k++) {
         const tx = x + (r() - 0.5) * TILE_SIZE * 0.85;
         const tz = z + (r() - 0.5) * TILE_SIZE * 0.85;
-        const s = 0.8 + r() * 0.6;
+        const s = (0.8 + r() * 0.6) * (k >= n ? 0.6 : 1);
+        const cone = r() < 0.5;
+        if (k < n && lost(k)) {
+          // Burn scar and a charred snag where the tree was lost.
+          const scar = new Mesh(new CylinderGeometry(0.0045 * s, 0.005 * s, 0.0004, 9), new MeshStandardMaterial({ color: '#2f2a25', roughness: 1 }));
+          scar.position.set(tx, top + 0.0002, tz);
+          const snag = new Mesh(new CylinderGeometry(0.0003, 0.0005, 0.007 * s, 5), new MeshStandardMaterial({ color: '#2f2a25' }));
+          snag.position.set(tx, top + 0.0035 * s, tz);
+          g.add(scar, snag);
+          continue;
+        }
         const trunk = new Mesh(new CylinderGeometry(0.0004, 0.0006, 0.006 * s, 5), new MeshStandardMaterial({ color: '#6b4f36' }));
         trunk.position.set(tx, top + 0.003 * s, tz);
-        const crown =
-          r() < 0.5
-            ? new Mesh(new ConeGeometry(0.0034 * s, 0.011 * s, 7), new MeshStandardMaterial({ color: '#2f5a2c', flatShading: true }))
-            : new Mesh(new IcosahedronGeometry(0.0042 * s, 1), new MeshStandardMaterial({ color: '#4d7a37', flatShading: true }));
+        const leaf = new Color(cone ? '#2f5a2c' : '#4d7a37').lerp(DRY_TINT, st.dryness * 0.5);
+        const crown = cone
+          ? new Mesh(new ConeGeometry(0.0034 * s, 0.011 * s, 7), new MeshStandardMaterial({ color: leaf, flatShading: true }))
+          : new Mesh(new IcosahedronGeometry(0.0042 * s, 1), new MeshStandardMaterial({ color: leaf, flatShading: true }));
         crown.position.set(tx, top + 0.009 * s, tz);
         g.add(trunk, crown);
       }
@@ -397,6 +601,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     }
     geo.setAttribute('color', new Float32BufferAttribute(colors, 3));
     const sky = new Mesh(geo, new MeshBasicMaterial({ vertexColors: true, side: BackSide, fog: false, depthWrite: false }));
+    this.sky = sky;
     sky.name = 'street-sky';
     sky.renderOrder = -10;
     sky.raycast = () => {};

@@ -218,7 +218,7 @@
       "transform": {
         "position": [
           0,
-          0.95,
+          0.93,
           -0.5
         ],
         "rotationDeg": [
@@ -232,10 +232,10 @@
         "RayInteractable": {},
         "PokeInteractable": {},
         "ScreenSpace": {
-          "left": "28vw",
-          "width": "44vw",
-          "height": "19%",
-          "bottom": "3%"
+          "left": "27vw",
+          "width": "46vw",
+          "height": "31%",
+          "bottom": "2%"
         }
       }
     }

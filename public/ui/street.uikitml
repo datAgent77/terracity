@@ -1,19 +1,44 @@
 <!--
-  Street-level visit ("Enter your city"): where you are, teleport between fixed
-  viewpoints, and an always-available way back to the tabletop. Large targets.
+  Street-level visit ("Enter your city"): where you are, the year (2026 /
+  2035 / 2050) and what changed, teleport between fixed viewpoints, and an
+  always-available way back to the tabletop. Large targets.
 -->
 <style>
-  .root { flex-direction: column; width: 520px; padding-top: 14px; padding-bottom: 16px; padding-left: 20px; padding-right: 20px; }
+  .root { flex-direction: column; width: 560px; padding-top: 14px; padding-bottom: 16px; padding-left: 20px; padding-right: 20px; }
+  .head { flex-direction: row; align-items: center; justify-content: space-between; }
   .title { font-size: 21px; font-weight: 700; color: #1d3f46; }
   .title:dark { color: #ffffff; }
-  .sub { font-size: 16px; color: #3d5a60; margin-top: 4px; }
+  .sub { font-size: 15px; color: #3d5a60; margin-top: 2px; }
   .sub:dark { color: rgba(255, 255, 255, 0.85); }
-  .row { flex-direction: row; margin-top: 14px; }
+  .titles { flex-direction: column; }
+  .years { flex-direction: row; gap: 8px; }
+  .year { width: 84px; height: 46px; border-radius: 14px; justify-content: center; align-items: center;
+          background-color: #eef3f4; border-width: 3px; border-color: #c7d6da; cursor: pointer; }
+  .ylabel { font-size: 20px; font-weight: 700; color: #1d3f46; }
+  .story { flex-direction: column; margin-top: 10px; padding-top: 8px; padding-bottom: 8px; padding-left: 12px; padding-right: 12px;
+           border-radius: 12px; background-color: #f4efe2; }
+  .line { font-size: 15px; color: #3a3226; margin-top: 2px; }
+  .row { flex-direction: row; margin-top: 12px; }
   .button { margin-right: 10px; }
 </style>
 <Panel id="root" class="root">
-  <div id="st-title" class="title">Your neighbourhood - 2026</div>
-  <div id="st-view" class="sub">Viewpoint 1 of 4: Your street</div>
+  <div class="head">
+    <div class="titles">
+      <div id="st-title" class="title">Your neighbourhood - 2026</div>
+      <div id="st-view" class="sub">Viewpoint 1 of 4: Your street</div>
+    </div>
+    <div class="years">
+      <div id="st-2026" class="year"><div id="st-2026-label" class="ylabel">2026</div></div>
+      <div id="st-2035" class="year"><div id="st-2035-label" class="ylabel">2035</div></div>
+      <div id="st-2050" class="year"><div id="st-2050-label" class="ylabel">2050</div></div>
+    </div>
+  </div>
+  <div class="story">
+    <div id="st-line-0" class="line">-</div>
+    <div id="st-line-1" class="line">-</div>
+    <div id="st-line-2" class="line">-</div>
+    <div id="st-line-3" class="line">-</div>
+  </div>
   <div class="row">
     <Button id="st-prev" class="button"><ButtonIcon><ChevronLeft></ChevronLeft></ButtonIcon><ButtonLabel>Previous</ButtonLabel></Button>
     <Button id="st-next" class="button"><ButtonIcon><ChevronRight></ChevronRight></ButtonIcon><ButtonLabel>Next</ButtonLabel></Button>
