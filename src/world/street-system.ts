@@ -50,7 +50,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { GRID_COLS, StructureType, TerrainType, TILE_SIZE } from '../config/scenario.js';
 import { projectYear } from '../simulation/projection.js';
 import * as cmd from '../core/commands.js';
-import { game, streetView, viewYear } from '../core/session.js';
+import { game, planA, planVersion, streetView, viewYear } from '../core/session.js';
 import { Placeable } from '../interactions/placeable-component.js';
 import { prefersReducedMotion } from '../ui/accessibility.js';
 import { setPanelVisible } from '../ui/panel-visibility.js';
@@ -61,6 +61,7 @@ import { futureVisualState, type FutureVisualState } from './future-visual-state
 import { createSprawl } from './houses.js';
 import { hashInts, idNumber, rng } from './rand.js';
 import { LEAF_CROWN, SOLAR_GLASS } from './shared-materials.js';
+import { compareRows } from './street-compare.js';
 import { streetStory } from './street-story.js';
 import { streetPose, STREET_SCALE, VIEWPOINTS } from './street-view.js';
 import { createStructureModel, setDistrictLinks, setRoadArms, structureLook } from './structure-models.js';
@@ -99,6 +100,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   private birds!: InstancedMesh;
   private clock = 0;
   private paintPanel: (() => void) | null = null;
+  private visit = { col: 0, row: 0 };
+  private districtHere = true;
+  private shownPlan: 'A' | 'B' = 'B';
 
   init(): void {
     this.root.name = 'street-scene';
@@ -139,8 +143,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
         if (!v || !this.wasActive) return;
         // A warm "time flash" (not the dark teleport fade), then the same street in the new year.
         this.fadeThen(() => {
-          const p = game.get(v.id);
-          if (p) this.build(p.col, p.row);
+          this.build(this.visit.col, this.visit.row);
           this.place(v.viewpoint);
         }, '#fff4d6');
       }),
@@ -159,6 +162,8 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       boardVisible: this.world.scene.getObjectByName('terrain-board')?.visible ?? null,
       fading: this.fadeDir !== 0,
       year: viewYear.peek(),
+      plan: streetView.peek()?.plan ?? null,
+      districtHere: this.districtHere,
       story: [...this.story],
       haze: this.state?.haze ?? 0,
       greening: this.state?.greening ?? 0,
@@ -183,6 +188,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     click('st-next', () => cmd.stepViewpoint(1));
     click('st-return', cmd.exitCity);
     for (const y of YEARS) click(`st-${y}`, () => cmd.setYear(y));
+    click('st-plan-a', () => cmd.setStreetPlan('A'));
+    click('st-plan-b', () => cmd.setStreetPlan('B'));
+    const compare = panel.getElementById('st-compare');
     const title = panel.getElementById<UIKit.Text>('st-title');
     const sub = panel.getElementById<UIKit.Text>('st-view');
     const lines = [0, 1, 2, 3].map((i) => panel.getElementById<UIKit.Text>(`st-line-${i}`));
@@ -197,17 +205,46 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
         panel.getElementById<UIKit.Text>(`st-${y}-label`)?.setProperties({ color: on ? '#ffffff' : '#1d3f46' });
       }
       lines.forEach((el, i) => el?.setProperties({ text: this.story[i] ?? '', display: this.story[i] ? 'flex' : 'none' }));
+      // Compare futures (only with a saved Plan A): the four differences that matter here.
+      const a = planA.peek();
+      compare?.setProperties({ display: a ? 'flex' : 'none' });
+      if (a) {
+        for (const tag of ['a', 'b'] as const) {
+          const on = v.plan === tag.toUpperCase();
+          panel.getElementById(`st-plan-${tag}`)?.setProperties({ backgroundColor: on ? '#1d5f6b' : '#ffffff', borderColor: on ? '#1d5f6b' : '#c7d6da' });
+          panel.getElementById<UIKit.Text>(`st-plan-${tag}-label`)?.setProperties({ color: on ? '#ffffff' : '#1d3f46' });
+        }
+        compareRows(game.terrain, a, game.placements, viewYear.peek()).forEach((row, i) => {
+          panel.getElementById<UIKit.Text>(`st-c${i}-l`)?.setProperties({ text: row.label });
+          for (const side of ['a', 'b'] as const) {
+            const best = row.better === side.toUpperCase();
+            panel.getElementById<UIKit.Text>(`st-c${i}-${side}`)?.setProperties({
+              text: `${side.toUpperCase()}: ${row[side]}`,
+              color: best ? '#1f8a4c' : '#272727',
+              fontWeight: best ? 700 : 400,
+            });
+          }
+        });
+      }
     };
     this.paintPanel = refresh;
-    this.cleanupFuncs.push(streetView.subscribe(refresh), viewYear.subscribe(refresh));
+    this.cleanupFuncs.push(streetView.subscribe(refresh), viewYear.subscribe(refresh), planA.subscribe(refresh), planVersion.subscribe(refresh));
   }
 
   // ------------------------------------------------------- transitions --
 
-  private onChange(v: { id: string; viewpoint: number } | null): void {
+  private onChange(v: { id: string; viewpoint: number; plan: 'A' | 'B' } | null): void {
     if (v && !this.wasActive) {
       this.wasActive = true;
+      this.shownPlan = v.plan;
       this.fadeThen(() => this.enter(v.id, v.viewpoint));
+    } else if (v && this.wasActive && v.plan !== this.shownPlan) {
+      // Compare futures: the same place, camera and light under the other plan.
+      this.shownPlan = v.plan;
+      this.fadeThen(() => {
+        this.build(this.visit.col, this.visit.row);
+        this.place(v.viewpoint);
+      }, '#e8f1ff');
     } else if (v && this.wasActive) {
       this.fadeThen(() => this.place(v.viewpoint));
     } else if (!v && this.wasActive) {
@@ -230,6 +267,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   private enter(id: string, viewpoint: number): void {
     const p = game.get(id);
     if (!p) return;
+    this.visit = { col: p.col, row: p.row };
     this.build(p.col, p.row);
     // Hide the tabletop: board, placed pieces and tray, comparison dioramas, panels.
     const hidden: Object3D[] = [];
@@ -299,7 +337,8 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const head = cam.getWorldPosition(new Vector3());
     const fwd = cam.getWorldDirection(new Vector3());
     const headYaw = Math.atan2(-fwd.x, -fwd.z);
-    const pose = streetPose(v, head.y);
+    // Without a district here (e.g. Plan A left this tile empty) stand on the ground.
+    const pose = streetPose(this.districtHere ? v : { ...v, ground: 0 }, head.y);
     this.root.position.set(head.x, pose.y, head.z);
     this.root.rotation.set(0, pose.yaw + headYaw, 0);
     this.inner.position.set(pose.offsetX, 0, pose.offsetZ);
@@ -342,23 +381,26 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
 
   /** Rebuild the neighbourhood around (col,row) for the current plan and year. */
   private build(col: number, row: number): void {
-    const plan = game.placements;
+    const tag = streetView.peek()?.plan ?? 'B';
+    const plan = tag === 'A' && planA.peek() ? planA.peek()! : game.placements;
     const year = viewYear.peek();
-    const key = `${col},${row}|${year}|${plan.map((p) => `${p.id}:${p.col},${p.row},${p.rotation}`).join(';')}`;
+    const key = `${tag}|${col},${row}|${year}|${plan.map((p) => `${p.id}:${p.col},${p.row},${p.rotation}`).join(';')}`;
     if (key === this.builtKey) return;
     this.builtKey = key;
     for (const c of [...this.hood.children]) this.hood.remove(c);
 
     // Everything below follows the projection of the current plan for this year.
-    const projected = projectYear(game.terrain, plan, year, game.metrics);
+    // game.metrics belongs to the current map (Plan B); Plan A computes its own.
+    const projected = projectYear(game.terrain, plan, year, plan === game.placements ? game.metrics : undefined);
     const st = futureVisualState(game.terrain, plan, projected);
     this.state = st;
     const era = st.homeEra;
     const sprawl = new Map(st.sprawl.map((t) => [t.row * GRID_COLS + t.col, t]));
-    const home = plan.find((p) => p.col === col && p.row === row)!;
+    const home = plan.find((p) => p.col === col && p.row === row && p.type === StructureType.Residential);
+    this.districtHere = !!home;
     const homeTile = tileAt(game.terrain, col, row)!;
     const base = tileTopY(homeTile);
-    const q = districtOrientation(game.terrain, plan, home).quarter;
+    const q = home ? districtOrientation(game.terrain, plan, home).quarter : 0;
     const hood = new Group(); // board metres, board orientation, centred on the district
     const townTiles = game.terrain.filter((t) => t.type === TerrainType.Town);
     let sprawlNearby = 0;
@@ -373,7 +415,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
         const water = t.type === TerrainType.Sea || t.type === TerrainType.River;
         const top = (water ? WATER_LEVEL : tileTopY(t)) - base;
         const sp = sprawl.get(t.row * GRID_COLS + t.col);
-        const p = game.at(t.col, t.row);
+        const p = plan.find((q) => q.col === t.col && q.row === t.row);
         if (t.type === TerrainType.Beach) beachesNearby++;
         hood.add(this.ground(t.type, x, z, top, t.col, t.row, st, !!(p || sp)));
         if (p) hood.add(this.structure(p, x, z, top, plan, era));
@@ -567,7 +609,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     if (p.type === StructureType.Road) {
       quarter = 0;
       const c = (dc: number, dr: number) => {
-        const n = game.at(p.col + dc, p.row + dr);
+        const n = plan.find((q) => q.col === p.col + dc && q.row === p.row + dr);
         return n?.type === StructureType.Road || tileAt(game.terrain, p.col + dc, p.row + dr)?.type === TerrainType.Town;
       };
       setRoadArms(model, [c(1, 0), c(-1, 0), c(0, 1), c(0, -1)]);

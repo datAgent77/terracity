@@ -8,8 +8,8 @@ Milestones are reviewed one at a time; this file records each one.
 |---|---|
 | 1 — Beautiful neighbourhood | approved (2026-10-30) |
 | 2 — Enter Your City (tabletop → human scale) | approved (2026-10-30) |
-| 3 — Time travel in the neighbourhood | **implemented, awaiting review** |
-| 4 — Compare futures in the neighbourhood | not started (tabletop Plan A/B exists) |
+| 3 — Time travel in the neighbourhood | approved (2026-10-30) |
+| 4 — Compare futures in the neighbourhood | **implemented, awaiting review** |
 | 5 — Experience polish | not started |
 
 ## Milestone 1 — Beautiful neighbourhood
@@ -179,3 +179,31 @@ Limitations: the district's own street trees and gardens cannot be removed
 individually (one merged mesh per era), so inside the district decline shows as
 parching and smog rather than lost trees; tree loss and burn scars appear on the
 surrounding tiles. The year can also be changed on the tabletop before entering.
+
+
+## Milestone 4 — Compare futures in the neighbourhood
+
+Branch `feature/signature-vr-m4`. Uses the existing Plan A/B logic: save Plan A
+on the tabletop, change the map (Plan B = the current map), then enter a
+neighbourhood. When a Plan A exists, the street panel shows **Compare futures**:
+
+- **Plan A | Plan B (now)** toggles rebuild the street *in the same place*, from
+  the same viewpoint, with the same camera, scale and light, from **each plan's
+  own projection** (a cool flash, ~0.4 s). Comparing from 2026 jumps to 2050
+  (2026 is the same for both); 2035 can be picked too. If Plan A has no
+  neighbourhood on this tile, the viewer stands on the tile as Plan A left it.
+- Only four numbers, for the viewed year, A vs B, the better one in bold green
+  (`src/world/street-compare.ts`, unit-tested): **Housed**, **Nature** (vs its
+  target), **Renewable**, **Land used** (less is better).
+- The visual difference reads before the numbers: e.g. Plan A (under-housed) in
+  2050 — smog down the street, parched verges and trees, sprawl nearby; Plan B —
+  clear air, green gardens, birds (`m4-vp1-plan-a-2050.png` vs `m4-vp1-plan-b-2050.png`).
+
+Fix found while building it: the street projection had always been given the
+current map's metrics; Plan A now computes its own (a Plan A view would
+otherwise have shown Plan B's environment). Guarded by the new e2e test
+*compare futures at street level*.
+
+Evidence: `docs/visual/m4-vp{1,3}-plan-{a,b}-2050.png` (desktop),
+`m4-xr-panel-plan-a.png`, `m4-xr-street-plan-{a,b}.png` (IWER, hands only: hand
+ray on *Enter your city*, pinch *Plan A*, pinch *Plan B*), `m4-log.txt`.

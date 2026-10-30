@@ -261,7 +261,7 @@ export function enterCity(): void {
   }
   compareOpen.value = false;
   clearSelection();
-  streetView.value = { id, viewpoint: 0 };
+  streetView.value = { id, viewpoint: 0, plan: 'B' };
   statusText.value = 'You are in your neighbourhood. Move between viewpoints, or return to the tabletop.';
 }
 
@@ -280,4 +280,18 @@ export function stepViewpoint(step: number): void {
 export function gotoViewpoint(i: number): void {
   const v = streetView.peek();
   if (v && v.viewpoint !== i) streetView.value = { ...v, viewpoint: i };
+}
+
+/** Street comparison: show the same place under Plan A or Plan B (the current map). */
+export function setStreetPlan(plan: 'A' | 'B'): void {
+  const v = streetView.peek();
+  if (!v || v.plan === plan) return;
+  if (plan === 'A' && !planA.peek()) {
+    statusText.value = 'Save Plan A on the tabletop first, then change the map to make Plan B.';
+    return;
+  }
+  // Comparing futures: 2026 is the same for both plans, so show 2050.
+  if (viewYear.peek() === 2026) viewYear.value = 2050;
+  streetView.value = { ...v, plan };
+  statusText.value = plan === 'A' ? 'Plan A in the same place.' : 'Plan B (your current map) in the same place.';
 }

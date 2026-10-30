@@ -18,6 +18,14 @@
   .story { flex-direction: column; margin-top: 10px; padding-top: 8px; padding-bottom: 8px; padding-left: 12px; padding-right: 12px;
            border-radius: 12px; background-color: #f4efe2; }
   .line { font-size: 15px; color: #3a3226; margin-top: 2px; }
+  .compare { flex-direction: column; margin-top: 10px; padding-top: 8px; padding-bottom: 8px; padding-left: 12px; padding-right: 12px;
+             border-radius: 12px; background-color: #eef3f4; }
+  .crow { flex-direction: row; align-items: center; margin-top: 3px; }
+  .cname { width: 200px; font-size: 15px; color: #3d5a60; }
+  .plan { width: 130px; height: 40px; margin-right: 8px; border-radius: 12px; justify-content: center; align-items: center;
+          background-color: #ffffff; border-width: 3px; border-color: #c7d6da; cursor: pointer; }
+  .plabel { font-size: 16px; font-weight: 700; color: #1d3f46; }
+  .cval { width: 138px; font-size: 16px; color: #272727; }
   .row { flex-direction: row; margin-top: 12px; }
   .button { margin-right: 10px; }
 </style>
@@ -38,6 +46,17 @@
     <div id="st-line-1" class="line">-</div>
     <div id="st-line-2" class="line">-</div>
     <div id="st-line-3" class="line">-</div>
+  </div>
+  <div id="st-compare" class="compare">
+    <div class="crow">
+      <div class="cname">Compare futures</div>
+      <div id="st-plan-a" class="plan"><div id="st-plan-a-label" class="plabel">Plan A</div></div>
+      <div id="st-plan-b" class="plan"><div id="st-plan-b-label" class="plabel">Plan B (now)</div></div>
+    </div>
+    <div class="crow"><div id="st-c0-l" class="cname">-</div><div id="st-c0-a" class="cval">-</div><div id="st-c0-b" class="cval">-</div></div>
+    <div class="crow"><div id="st-c1-l" class="cname">-</div><div id="st-c1-a" class="cval">-</div><div id="st-c1-b" class="cval">-</div></div>
+    <div class="crow"><div id="st-c2-l" class="cname">-</div><div id="st-c2-a" class="cval">-</div><div id="st-c2-b" class="cval">-</div></div>
+    <div class="crow"><div id="st-c3-l" class="cname">-</div><div id="st-c3-a" class="cval">-</div><div id="st-c3-b" class="cval">-</div></div>
   </div>
   <div class="row">
     <Button id="st-prev" class="button"><ButtonIcon><ChevronLeft></ChevronLeft></ButtonIcon><ButtonLabel>Previous</ButtonLabel></Button>

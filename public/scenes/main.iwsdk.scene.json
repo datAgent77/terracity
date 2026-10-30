@@ -218,15 +218,15 @@
       "transform": {
         "position": [
           0,
-          0.93,
-          -0.5
+          0.9,
+          -0.48
         ],
         "rotationDeg": [
-          -32,
+          -34,
           0,
           0
         ],
-        "scale": 0.075
+        "scale": 0.07
       },
       "components": {
         "RayInteractable": {},
@@ -234,7 +234,7 @@
         "ScreenSpace": {
           "left": "27vw",
           "width": "46vw",
-          "height": "31%",
+          "height": "44%",
           "bottom": "2%"
         }
       }

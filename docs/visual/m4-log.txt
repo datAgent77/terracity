@@ -1,0 +1,7 @@
+vp1 plan A 2050: districtHere true haze 0.58 greening 0.00 birds 0 | Homes modernise: solar roofs, home batteries, EV charging, dry-climate gardens. / Nature 48 (target 60): smog, parched land and lost trees around the street. / 12,000 newcomers found no planned home: unplanned sprawl spreads nearby. / The sea has risen onto the nearby beaches.
+vp1 plan B 2050: districtHere true haze 0.00 greening 0.62 birds 14 | Homes modernise: solar roofs, home batteries, EV charging, dry-climate gardens. / Nature 65 (target 60): young woodland grows and birds return. / The sea has risen onto the nearby beaches.
+vp3 plan A 2050: districtHere true haze 0.58 greening 0.00 birds 0 | Homes modernise: solar roofs, home batteries, EV charging, dry-climate gardens. / Nature 48 (target 60): smog, parched land and lost trees around the street. / 12,000 newcomers found no planned home: unplanned sprawl spreads nearby. / The sea has risen onto the nearby beaches.
+vp3 plan B 2050: districtHere true haze 0.00 greening 0.62 birds 14 | Homes modernise: solar roofs, home batteries, EV charging, dry-climate gardens. / Nature 65 (target 60): young woodland grows and birds return. / The sea has risen onto the nearby beaches.
+xr hands: entered=true plan=A year=2050
+xr hands: plan=B
+page errors: 0 
