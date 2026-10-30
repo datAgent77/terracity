@@ -27,7 +27,7 @@ import { block, COLORS, painted, pick } from './palette.js';
 import { hashInts, rng } from './rand.js';
 
 /** Parts that animate or are restyled per instance stay separate meshes. */
-const DYNAMIC = /^(rotor|crown|pad|arm-[ewsn]|solar-panels|era-[012])$/;
+const DYNAMIC = /^(rotor|crown|pad|arm-[ewsn]|link-[ew]|solar-panels|era-[012])$/;
 
 const PAD = TILE_SIZE * 0.92;
 
@@ -49,6 +49,17 @@ function residential(variant: number, seed: number): Group {
   for (const era of [...district.children]) {
     era.position.y = 0.0016;
     g.add(era); // era-0/1/2 stay separate so time travel can switch them
+  }
+  // Bell-mouth junctions where the district street meets a road or the town
+  // (shown by `setDistrictLinks`).
+  for (const [name, yaw] of [['link-e', 0], ['link-w', Math.PI]] as const) {
+    const link = kitPart('district-link');
+    if (!link) break;
+    link.name = name;
+    link.position.y = 0.0016;
+    link.rotation.y = yaw;
+    link.visible = false;
+    g.add(link);
   }
   return g;
 }
@@ -285,6 +296,14 @@ export function createStructureModel(type: StructureType, name: string, variant 
   const g = mergeStatic(BUILDERS[type](variant, seed), (o) => DYNAMIC.test(o.name));
   g.name = name;
   return g;
+}
+
+/** Show the district street junctions at the local +x / -x ends. */
+export function setDistrictLinks(model: Object3D, east: boolean, west: boolean): void {
+  const e = model.getObjectByName('link-e');
+  const w = model.getObjectByName('link-w');
+  if (e) e.visible = east;
+  if (w) w.visible = west;
 }
 
 /** Show the road arms that lead to connected neighbours (e, w, s, n). */

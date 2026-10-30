@@ -10,7 +10,7 @@ import { game } from '../core/session.js';
 import { projectYear } from '../simulation/projection.js';
 import type { Year } from '../config/projection.js';
 import { largeText, soundOn } from '../ui/accessibility.js';
-import { challenge, coachText, compareOpen, paused, phase, planA, result, timeLeft, viewYear } from '../core/session.js';
+import { challenge, coachText, compareOpen, paused, phase, planA, result, streetView, timeLeft, viewYear } from '../core/session.js';
 
 
 export class FlowSystem extends createSystem({}) {
@@ -46,6 +46,13 @@ export class FlowSystem extends createSystem({}) {
   update(delta: number): void {
     cmd.tickClock(delta);
     const kb = this.input.keyboard;
+    if (kb.getKeyDown('KeyE')) (streetView.peek() ? cmd.exitCity : cmd.enterCity)();
+    if (streetView.peek()) {
+      if (kb.getKeyDown('ArrowRight')) cmd.stepViewpoint(1);
+      if (kb.getKeyDown('ArrowLeft')) cmd.stepViewpoint(-1);
+      if (kb.getKeyDown('Escape')) cmd.exitCity();
+      return; // tabletop shortcuts are off while visiting the street
+    }
     if (kb.getKeyDown('KeyT')) cmd.nextYear();
     if (kb.getKeyDown('KeyS')) cmd.savePlanA();
     if (kb.getKeyDown('KeyC')) cmd.toggleCompare();

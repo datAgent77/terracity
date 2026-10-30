@@ -37,6 +37,11 @@ export default defineAssets({
     priority: 'critical',
     name: 'City kit',
   },
+  'street-panel': {
+    url: publicAssetUrl('ui/street.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Street Visit',
+  },
   'compare-panel': {
     url: publicAssetUrl('ui/compare.uikitml'),
     type: AssetType.UIKitML,

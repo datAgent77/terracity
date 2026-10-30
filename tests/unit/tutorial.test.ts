@@ -3,18 +3,19 @@ import { StructureType as S } from '../../src/config/scenario';
 import { GameState } from '../../src/core/game-state';
 import { Tutorial } from '../../src/gameplay/tutorial';
 
-const ctx = (g: GameState, viewYear: 2026 | 2035 | 2050 = 2026) => ({
+const ctx = (g: GameState, viewYear: 2026 | 2035 | 2050 = 2026, inStreet = false) => ({
   placements: g.placements,
   servedIds: g.metrics.servedIds,
   viewYear,
+  inStreet,
 });
 
 describe('tutorial', () => {
-  it('walks homes -> wind -> 2050 -> back to 2026 -> done', () => {
+  it('walks homes -> wind -> enter your city -> 2050 -> back to the tabletop in 2026 -> done', () => {
     const g = new GameState();
     const t = new Tutorial();
     expect(t.step).toBe('homes');
-    expect(t.text).toMatch(/1\/4/);
+    expect(t.text).toMatch(/1\/5/);
     g.add(S.Residential, 9, 3); // not connected: does not count
     expect(t.update(ctx(g))).toBe(false);
     g.add(S.Residential, 6, 4); // next to the town
@@ -22,14 +23,18 @@ describe('tutorial', () => {
     expect(t.step).toBe('wind');
     g.add(S.Wind, 12, 8);
     t.update(ctx(g));
+    expect(t.step).toBe('enter');
+    t.update(ctx(g, 2026, true)); // entered the street
     expect(t.step).toBe('future');
-    t.update(ctx(g, 2035));
+    t.update(ctx(g, 2035, true));
     expect(t.step).toBe('future');
-    t.update(ctx(g, 2050));
+    t.update(ctx(g, 2050, true));
     expect(t.step).toBe('back');
-    t.update(ctx(g, 2050));
-    expect(t.step).toBe('back'); // still viewing the future
-    t.update(ctx(g, 2026));
+    t.update(ctx(g, 2026, true));
+    expect(t.step).toBe('back'); // still in the street
+    t.update(ctx(g, 2050, false));
+    expect(t.step).toBe('back'); // back at the table but still viewing the future
+    t.update(ctx(g, 2026, false));
     expect(t.step).toBe('done');
     expect(t.active).toBe(false);
     expect(t.text).toBe('');
@@ -41,6 +46,8 @@ describe('tutorial', () => {
     g.add(S.Wind, 12, 8);
     const t = new Tutorial();
     t.update(ctx(g));
+    expect(t.step).toBe('enter'); // a built plan does not skip entering
+    t.update(ctx(g, 2026, true));
     expect(t.step).toBe('future'); // 2026 view must not complete "back" early
   });
 

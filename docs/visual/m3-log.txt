@@ -1,0 +1,18 @@
+decline vp1 2026: haze 0.00 greening 0.00 birds 0 | Homes today: traditional villas, lawns and terracotta roofs. / Nature 64 (target 60).
+decline vp1 2035: haze 0.06 greening 0.00 birds 0 | Homes modernise: solar panels on most roofs, shaded windows, a cycle lane. / Nature 59 (target 60): just below target, the first dry gardens and fields. / 4,000 newcomers found no planned home: unplanned sprawl spreads nearby. / The sea has risen onto the nearby beaches.
+decline vp1 2050: haze 0.58 greening 0.00 birds 0 | Homes modernise: solar roofs, home batteries, EV charging, dry-climate gardens. / Nature 48 (target 60): smog, parched land and lost trees around the street. / 12,000 newcomers found no planned home: unplanned sprawl spreads nearby. / The sea has risen onto the nearby beaches.
+decline vp3 2026: haze 0.00 greening 0.00 birds 0 | Homes today: traditional villas, lawns and terracotta roofs. / Nature 64 (target 60).
+decline vp3 2035: haze 0.06 greening 0.00 birds 0 | Homes modernise: solar panels on most roofs, shaded windows, a cycle lane. / Nature 59 (target 60): just below target, the first dry gardens and fields. / 4,000 newcomers found no planned home: unplanned sprawl spreads nearby. / The sea has risen onto the nearby beaches.
+decline vp3 2050: haze 0.58 greening 0.00 birds 0 | Homes modernise: solar roofs, home batteries, EV charging, dry-climate gardens. / Nature 48 (target 60): smog, parched land and lost trees around the street. / 12,000 newcomers found no planned home: unplanned sprawl spreads nearby. / The sea has risen onto the nearby beaches.
+before XR: active=false
+btn-enter world: 0.380,0.973,-0.603
+after enter tap: active=true
+xr hands: entered=true year=2050 story=4 lines
+decline page errors: 0 
+balanced vp1 2026: haze 0.00 greening 0.00 birds 0 | Homes today: traditional villas, lawns and terracotta roofs. / Nature 61 (target 60).
+balanced vp1 2035: haze 0.00 greening 0.26 birds 6 | Homes modernise: solar panels on most roofs, shaded windows, a cycle lane. / Nature 63 (target 60): young woodland grows and birds return. / The sea has risen onto the nearby beaches.
+balanced vp1 2050: haze 0.00 greening 0.62 birds 14 | Homes modernise: solar roofs, home batteries, EV charging, dry-climate gardens. / Nature 65 (target 60): young woodland grows and birds return. / The sea has risen onto the nearby beaches.
+balanced vp3 2026: haze 0.00 greening 0.00 birds 0 | Homes today: traditional villas, lawns and terracotta roofs. / Nature 61 (target 60).
+balanced vp3 2035: haze 0.00 greening 0.26 birds 6 | Homes modernise: solar panels on most roofs, shaded windows, a cycle lane. / Nature 63 (target 60): young woodland grows and birds return. / The sea has risen onto the nearby beaches.
+balanced vp3 2050: haze 0.00 greening 0.62 birds 14 | Homes modernise: solar roofs, home batteries, EV charging, dry-climate gardens. / Nature 65 (target 60): young woodland grows and birds return. / The sea has risen onto the nearby beaches.
+balanced page errors: 0 

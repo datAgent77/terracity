@@ -40,7 +40,7 @@ SEED = 2050
 
 # ----------------------------------------------------------------- atlas --
 
-ATLAS = 512
+ATLAS = 1024  # 256 px per cell: crisp at tabletop close-ups and street level
 GRID = 4
 CELL_PX = ATLAS // GRID
 # Neighbouring cells have similar tones so low mip levels bleed gently.
@@ -292,6 +292,7 @@ def roof_cell(era, world_dir, kind, pv_house):
 class Ctx:
     def __init__(self, b, era, rot, rnd):
         self.b, self.era, self.rot, self.rnd = b, era, rot, rnd
+        self.trim = True  # window surrounds and sills (off for the dense town)
 
     def world_dir(self, local):
         if self.rot == 0:
@@ -326,6 +327,16 @@ def hip_roof(c, x0, x1, y0, y1, z, rise, pv_modules):
         }
     for d, pts in faces.items():
         b.poly(pts, roof_cell(era, c.world_dir(d), "hip", pv_modules), tint)
+    # Ridge cap and (traditional homes) a chimney.
+    cap = lin((0.62, 0.30, 0.20))
+    if W >= D:
+        b.box(r0 - 0.15, r1 + 0.15, ym - 0.2, ym + 0.2, zt + rise - 0.1, zt + rise + 0.16, "plain", cap)
+    else:
+        b.box(xm - 0.2, xm + 0.2, r0 - 0.15, r1 + 0.15, zt + rise - 0.1, zt + rise + 0.16, "plain", cap)
+    if era < 2 and c.rnd.random() < 0.55:
+        cx_, cy_ = x0 + (x1 - x0) * 0.72, y0 + (y1 - y0) * 0.62
+        b.box(cx_ - 0.45, cx_ + 0.45, cy_ - 0.45, cy_ + 0.45, z, zt + rise + 0.9, "stucco", c.wall_tint)
+        b.box(cx_ - 0.6, cx_ + 0.6, cy_ - 0.6, cy_ + 0.6, zt + rise + 0.9, zt + rise + 1.15, "plain", cap)
     fascia(b, X0, X1, Y0, Y1, z, zt)
     if pv_modules and era == 1:
         south = "S" if c.rot == 0 else "N"
@@ -353,6 +364,7 @@ def gable_roof(c, x0, x1, y0, y1, z, rise, axis, pv_modules):
                    [(xx, ym, z + rise), (xx, ym, zt + rise), (xx, Y0, zt), (xx, Y0, z)], "terracotta")
             b.poly([(xx, ym, z + rise), (xx, ym, zt + rise), (xx, Y1, zt), (xx, Y1, z)] if sgn > 0 else
                    [(xx, Y1, z), (xx, Y1, zt), (xx, ym, zt + rise), (xx, ym, z + rise)], "terracotta")
+        b.box(X0, X1, ym - 0.2, ym + 0.2, zt + rise - 0.1, zt + rise + 0.16, "plain", lin((0.62, 0.30, 0.20)))
         south_dir = "S"
     else:
         xm = (X0 + X1) / 2
@@ -402,6 +414,17 @@ def roof_modules(c, X0, X1, Y0, Y1, zt, rise, local_face, hip, small=False):
         b.poly(p, "pv")
 
 
+def wall_box(b, centre, u, n, a0, a1, z0, z1, d0, d1, cell, tint=WHITE):
+    """Axis-aligned box on a wall: a0..a1 along u, d0..d1 out along n, z0..z1."""
+    pts = [centre + u * a + n * d for a in (a0, a1) for d in (d0, d1)]
+    xs = sorted(p.x for p in pts)
+    ys = sorted(p.y for p in pts)
+    b.box(xs[0], xs[-1], ys[0], ys[-1], z0, z1, cell, tint)
+
+
+SURROUND = lin((0.93, 0.90, 0.84))
+
+
 def windows_on(c, x0, x1, y0, y1, z0, storeys, others, front_door=True, big=False):
     """Windows on the four walls (skipping parts hidden by other volumes)."""
     b, era = c.b, c.era
@@ -435,6 +458,18 @@ def windows_on(c, x0, x1, y0, y1, z0, storeys, others, front_door=True, big=Fals
                 q = lambda aa, zz, off=e: centre + u * aa + n * off + Z * (zb + zz)
                 cell = "timber" if door and era == 0 else "glass"
                 b.poly([q(-w / 2, zo), q(w / 2, zo), q(w / 2, zo + h), q(-w / 2, zo + h)], cell)
+                if c.trim:
+                    # Stone surround (flat head + jamb bands) and a projecting sill (2 faces).
+                    fz0, fz1 = zb + zo, zb + zo + h
+                    o = 0.1
+                    band = lambda a0, a1, z0_, z1_: b.poly([q(a0, z0_ - zb, o), q(a1, z0_ - zb, o), q(a1, z1_ - zb, o), q(a0, z1_ - zb, o)], "plain", SURROUND)
+                    band(-w / 2 - 0.22, w / 2 + 0.22, fz1, fz1 + 0.22)
+                    band(-w / 2 - 0.22, -w / 2, fz0, fz1)
+                    band(w / 2, w / 2 + 0.22, fz0, fz1)
+                    if not door and zo > 0.05:
+                        s0, s1 = -w / 2 - 0.3, w / 2 + 0.3
+                        b.poly([q(s0, zo, 0.3), q(s1, zo, 0.3), q(s1, zo, 0.02), q(s0, zo, 0.02)], "plain", SURROUND)
+                        b.poly([q(s0, zo - 0.16, 0.3), q(s1, zo - 0.16, 0.3), q(s1, zo, 0.3), q(s0, zo, 0.3)], "plain", SURROUND)
                 if era == 0 and not door:
                     for sgn in (-1, 1):
                         a0, a1 = sgn * (w / 2 + 0.05), sgn * (w / 2 + 0.6)
@@ -516,6 +551,18 @@ def pool(c, x0, x1, y0, y1):
     b.plate(x0, x0 + t, y0 + t, y1 - t, BASE - 0.1, z1, "paving", step=4)
     b.plate(x1 - t, x1, y0 + t, y1 - t, BASE - 0.1, z1, "paving", step=4)
     b.plate(x0 + t, x1 - t, y0 + t, y1 - t, BASE - 0.1, BASE + 0.12, "water", step=4)
+    # Two sun loungers and (until the 2050 shade sail) a parasol beside the pool.
+    for k in range(2):
+        lx = x0 + 0.9 + k * 1.3
+        b.box(lx - 0.45, lx + 0.45, y1 + 0.3, y1 + 2.3, BASE, BASE + 0.35, "plain", lin((0.96, 0.95, 0.92)))
+        b.poly([(lx - 0.45, y1 + 1.8, BASE + 0.35), (lx + 0.45, y1 + 1.8, BASE + 0.35), (lx + 0.45, y1 + 2.3, BASE + 0.9), (lx - 0.45, y1 + 2.3, BASE + 0.9)], "plain", lin((0.96, 0.95, 0.92)))
+    if c.era < 2:
+        ux, uy = x1 - 0.6, y1 + 1.2
+        b.box(ux - 0.07, ux + 0.07, uy - 0.07, uy + 0.07, BASE, BASE + 2.6, "plain")
+        cone = [(ux + 1.5 * math.cos(2 * math.pi * k / 8), uy + 1.5 * math.sin(2 * math.pi * k / 8)) for k in range(8)]
+        for k in range(8):
+            a, d = cone[k], cone[(k + 1) % 8]
+            b.poly([(a[0], a[1], BASE + 2.2), (d[0], d[1], BASE + 2.2), (ux, uy, BASE + 2.8)], "canvas", lin((0.95, 0.93, 0.86)))
     if c.era == 2:
         # Shade sail over the pool.
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
@@ -537,9 +584,11 @@ def car(c, x, y, ev=False, along="y"):
 def olive(c, x, y, s):
     b, r = c.b, c.rnd
     lean = (r.uniform(-0.3, 0.3) * s, r.uniform(-0.3, 0.3) * s)
+    # Gnarled twin trunk.
     b.prism(x, y, BASE, BASE + 1.6 * s, 0.32 * s, 5, "soil", TRUNK, lean)
-    for k in range(3):
-        a = 2 * math.pi * k / 3 + r.random()
+    b.prism(x + 0.15 * s, y - 0.1 * s, BASE, BASE + 1.3 * s, 0.22 * s, 5, "soil", TRUNK, (-lean[0] * 1.4, lean[1] * 0.5 + 0.3 * s))
+    for k in range(4):
+        a = 2 * math.pi * k / 4 + r.random()
         b.blob(x + lean[0] + math.cos(a) * 0.7 * s, y + lean[1] + math.sin(a) * 0.7 * s, BASE + 2.2 * s + r.random() * 0.4 * s,
                1.25 * s, 1.15 * s, 0.85 * s, "foliage", OLIVE, r, subdiv=1)
 
@@ -552,7 +601,12 @@ def pine(c, x, y, s):
 
 def cypress(c, x, y, s):
     b, r = c.b, c.rnd
-    b.blob(x, y, BASE + 3.1 * s, 0.85 * s, 0.85 * s, 3.0 * s, "foliage", CYPRESS, r, subdiv=1, jitter=0.08)
+    b.blob(x, y, BASE + 2.9 * s, 0.85 * s, 0.85 * s, 2.8 * s, "foliage", CYPRESS, r, subdiv=1, jitter=0.08)
+    # Pointed crown.
+    for k in range(6):
+        a0, a1 = 2 * math.pi * k / 6, 2 * math.pi * (k + 1) / 6
+        rr = 0.45 * s
+        b.poly([(x + rr * math.cos(a0), y + rr * math.sin(a0), BASE + 5.0 * s), (x + rr * math.cos(a1), y + rr * math.sin(a1), BASE + 5.0 * s), (x, y, BASE + 6.6 * s)], "foliage", CYPRESS)
 
 
 def lavender_bed(c, x0, x1, y0, y1):
@@ -591,6 +645,10 @@ def parcel_ground(c, garden_mix):
     # Low front wall with a gate gap for the drive and the path.
     b.box(-hw, -hw + 4.8, 0.0, 0.5, BASE, BASE + 0.8, "stucco", lin((0.95, 0.93, 0.88)))
     b.box(-hw + 7.2, hw - 1.8, 0.0, 0.5, BASE, BASE + 0.8, "stucco", lin((0.95, 0.93, 0.88)))
+    # Gate pillars with stone caps.
+    for gx in (-hw + 4.8, -hw + 7.2, hw - 1.8):
+        b.box(gx - 0.35, gx + 0.35, 0.0, 0.6, BASE, BASE + 1.3, "stone")
+        b.box(gx - 0.45, gx + 0.45, -0.05, 0.65, BASE + 1.3, BASE + 1.45, "plain", SURROUND)
     # Driveway and path.
     b.plate(-hw + 4.8, -hw + 7.2, 0.0, 6.0, 0, BASE + 0.08, "paving" if era < 2 else "gravel", step=3)
     b.plate(hw - 1.8, hw - 0.6, 0.0, 4.6, 0, BASE + 0.06, "paving", step=3)
@@ -737,6 +795,10 @@ def street(b, era, rnd):
     if era == 2:
         # Bioswale (rain garden) along the south kerb.
         b.box(-L, L, -2.9, -1.7, 0.32, 0.36, "greenroof", sides=False)
+    # Street lamps on both sidewalks, staggered.
+    for x, y in ((-20.0, 4.1), (0.0, 4.1), (20.0, 4.1), (-10.0, -4.1), (10.0, -4.1)):
+        b.box(x - 0.1, x + 0.1, y - 0.1, y + 0.1, 0.62, 4.6, "plain", lin((0.22, 0.24, 0.26)))
+        b.box(x - 0.32, x + 0.32, y - 0.32, y + 0.32, 4.6, 4.95, "plain", lin((1.0, 0.93, 0.7)))
     c = Ctx(b, era, 0, rnd)
     xs = {0: (-17.0, 17.0), 1: (-22.0, -9.0, 9.0, 22.0), 2: (-24.0, -14.0, -4.5, 4.5, 14.0, 24.0)}[era]
     s = (0.62, 0.8, 1.0)[era]

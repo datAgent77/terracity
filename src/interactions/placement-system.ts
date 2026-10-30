@@ -44,7 +44,9 @@ import { localToTile, tileCenter } from '../world/board-coords.js';
 import { boardDecor, buildBoard, tileTopY } from '../world/board-mesh.js';
 import { idNumber } from '../world/rand.js';
 import { rotorSpeed } from '../world/future-system.js';
-import { createStructureModel, setRoadArms, structureLook } from '../world/structure-models.js';
+import { districtOrientation } from '../world/district-links.js';
+import { prefersReducedMotion } from '../ui/accessibility.js';
+import { createStructureModel, setDistrictLinks, setRoadArms, structureLook } from '../world/structure-models.js';
 import { tileAt, type Tile } from '../world/terrain-map.js';
 import { Placeable, SupplyTray, TerrainBoard, TrayToken } from './placeable-component.js';
 
@@ -172,7 +174,33 @@ export class PlacementSystem extends createSystem({
     this.exposeTestHooks();
   }
 
+  /** Placement animations in flight: 'rise' (new) or 'settle' (dropped from a hand). */
+  private placing = new Map<Object3D, { t: number; mode: 'rise' | 'settle' }>();
+
+  private animatePlacement(obj: Object3D, mode: 'rise' | 'settle'): void {
+    if (prefersReducedMotion()) return;
+    this.placing.set(obj, { t: 0, mode });
+  }
+
+  private stepPlacements(delta: number): void {
+    for (const [obj, a] of this.placing) {
+      a.t = Math.min(1, a.t + delta / (a.mode === 'rise' ? 0.75 : 0.45));
+      const t = a.t;
+      // rise: grows up from the parcel with a soft overshoot; settle: a small squash.
+      const y =
+        a.mode === 'rise'
+          ? Math.max(0.02, 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2))
+          : 1 - 0.12 * Math.sin(Math.PI * t) * (1 - t);
+      obj.scale.set(1, y, 1);
+      if (t >= 1) {
+        obj.scale.set(1, 1, 1);
+        this.placing.delete(obj);
+      }
+    }
+  }
+
   update(delta: number): void {
+    this.stepPlacements(delta);
     // Rotor speed follows projected renewable coverage (see future-visual-state).
     for (const rotor of this.rotors) rotor.rotation.z -= delta * rotorSpeed.value;
 
@@ -277,8 +305,10 @@ export class PlacementSystem extends createSystem({
           entity.object3D!.name = p.id;
           this.applyLook(entity.object3D!, p.type, p.id);
           this.adopting = null;
+          this.animatePlacement(entity.object3D!, 'settle');
         } else {
           entity = this.spawnPlaced(p.type, p.id);
+          this.animatePlacement(entity.object3D!, 'rise');
         }
         this.entitiesById.set(p.id, entity);
       }
@@ -292,7 +322,17 @@ export class PlacementSystem extends createSystem({
           structureBaseY(tile) + lift + BOARD_CENTER[1],
           z + BOARD_CENTER[2],
         );
-        obj.rotation.set(0, p.type === StructureType.Road ? 0 : p.rotation * QUARTER, 0);
+        const quarter =
+          p.type === StructureType.Road
+            ? 0
+            : p.type === StructureType.Residential
+              ? districtOrientation(game.terrain, plan, p).quarter
+              : p.rotation;
+        obj.rotation.set(0, quarter * QUARTER, 0);
+      }
+      if (p.type === StructureType.Residential) {
+        const o = districtOrientation(game.terrain, plan, p);
+        setDistrictLinks(obj, o.linkEast, o.linkWest);
       }
       if (p.type === StructureType.Road) {
         setRoadArms(obj, [

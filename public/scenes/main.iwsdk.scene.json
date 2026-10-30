@@ -84,7 +84,7 @@
           "top": "16px",
           "right": "16px",
           "width": "21vw",
-          "height": "34%"
+          "height": "42%"
         }
       }
     },
@@ -205,6 +205,37 @@
           "right": "16px",
           "width": "19vw",
           "height": "26%"
+        }
+      }
+    },
+    {
+      "id": "street-panel",
+      "name": "Street Visit",
+      "content": {
+        "type": "asset",
+        "asset": "street-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          0.9,
+          -0.48
+        ],
+        "rotationDeg": [
+          -34,
+          0,
+          0
+        ],
+        "scale": 0.07
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {},
+        "ScreenSpace": {
+          "left": "27vw",
+          "width": "46vw",
+          "height": "44%",
+          "bottom": "2%"
         }
       }
     }

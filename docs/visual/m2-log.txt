@@ -1,0 +1,12 @@
+entered: {"active":true,"viewpoint":0,"name":"Your street","built":"6,4|2026|residential-1:6,4,0;road-2:6,3,0;road-3:7,3,0;residential-4:8,3,0;park-5:9,3,0;solar-6:9,4,0;wind-7:11,8,0;residential-8:6,5,0","boardVisible":false,"fading":false,"markers":[null,[3.769017070286634,1.0499999284744264,-26.322700832562585],[-4.195295474373841,1.0499999284744264,-23.79095530016296],[-0.42627840408720763,0.7499999165534974,-50.113656132725545]]}
+viewpoint 1: {"calls":54,"triangles":21996,"geometries":169,"textures":13,"objects":865,"meshes":642,"jsHeapMB":190}
+viewpoint 2: {"calls":36,"triangles":11896,"geometries":178,"textures":13,"objects":865,"meshes":642,"jsHeapMB":190}
+viewpoint 3: {"calls":58,"triangles":14132,"geometries":211,"textures":13,"objects":865,"meshes":642,"jsHeapMB":190}
+viewpoint 4: {"calls":63,"triangles":23832,"geometries":230,"textures":13,"objects":865,"meshes":642,"jsHeapMB":190}
+returned: {"active":false,"viewpoint":null,"name":null,"built":"6,4|2026|residential-1:6,4,0;road-2:6,3,0;road-3:7,3,0;residential-4:8,3,0;park-5:9,3,0;solar-6:9,4,0;wind-7:11,8,0;residential-8:6,5,0","boardVisible":true,"fading":false,"markers":[[-0.4262732481159133,0.7499999165534974,-50.1136564833316],[-4.195293051067333,1.0499999284744264,-23.79095587763176],[3.76901980295142,1.0499999284744264,-26.322700605699843],null]}
+xr hand ray -> Enter your city: active=true
+xr: {"active":true,"viewpoint":0,"name":"Your street","built":"6,4|2026|residential-1:6,4,0;road-2:6,3,0;road-3:7,3,0;residential-4:8,3,0;park-5:9,3,0;solar-6:9,4,0;wind-7:11,8,0;residential-8:6,5,0","boardVisible":false,"fading":false,"markers":[null,[3.769017070286634,0.950000023841858,-26.242700834350725],[-4.195295474373841,0.950000023841858,-23.7109553019511],[-0.42627840408720763,0.650000011920929,-50.033656134513684]]} {"calls":148,"triangles":63464,"geometries":240,"textures":20,"objects":926,"meshes":646,"jsHeapMB":190}
+xr hand ray -> Next: viewpoint=1
+xr hand ray -> marker 4: viewpoint=3
+xr hand ray -> Return: active=false board=true
+page errors: 0 

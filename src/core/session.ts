@@ -31,6 +31,8 @@ export const timeLeft = signal(challenge.timeLeft);
 export const result = signal<ChallengeResult | null>(null);
 /** Paused (e.g. headset removed / overlay open). */
 export const paused = signal(false);
+/** "Enter your city": the garden district being visited at street level (null = tabletop). */
+export const streetView = signal<{ id: string; viewpoint: number; plan: 'A' | 'B' } | null>(null);
 
 /** Guided tips for the first session. */
 export const tutorial = new Tutorial();
