@@ -60,3 +60,10 @@ describe('street story', () => {
     }
   });
 });
+
+describe('street story without a neighbourhood here', () => {
+  it('says so instead of describing homes', () => {
+    const s = story([], 2050, { sprawlNearby: 0, beachesNearby: 0, homesHere: false } as never);
+    expect(s[0]).toBe('No neighbourhood was planned here.');
+  });
+});

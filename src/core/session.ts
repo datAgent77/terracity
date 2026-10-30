@@ -34,7 +34,17 @@ export const paused = signal(false);
 /** "Split reality": two futures held side by side (null = one world on the table). */
 export const futuresOpen = signal<{ selected: 'A' | 'B' | null } | null>(null);
 /** "Enter your city": the garden district being visited at street level (null = tabletop). */
-export const streetView = signal<{ id: string; viewpoint: number; plan: 'A' | 'B' } | null>(null);
+export const streetView = signal<{
+  id: string;
+  /** The visited tile. */
+  col: number;
+  row: number;
+  viewpoint: number;
+  /** Which plan the street is built from: Plan A, the current map (B), or nobody planning. */
+  plan: 'A' | 'B' | 'none';
+  /** Set when entered from Split reality ("Future A: Your plan"). */
+  title?: string;
+} | null>(null);
 
 /** Guided tips for the first session. */
 export const tutorial = new Tutorial();

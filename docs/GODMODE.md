@@ -91,3 +91,57 @@ table, year and plan, Plan A/B pairing). Results: unit 155 / 155; Playwright 27 
 - The futures are baked miniatures: time can be changed while split (rebuild),
   not scrubbed continuously (Phase 4).
 - Labels are canvas plates; very small text at seated distance.
+
+## Phase 2 — Become Small
+
+Branch `feature/godmode-become-small` (from phase 1).
+
+**Interaction**: in the two-futures view, pinch / tap a future to select it (amber
+ring); the selected future becomes *grabbable*. Pinch it, **pull it toward your
+face** — within 35 cm the miniature grows around you (0.45 s dive, then a short
+fade) and you stand in that future at street level. Release it earlier and it
+floats back to its place. Fallbacks: **Enter future A/B** on the Plan pad, `E`.
+**Return to tabletop** brings you back to the two futures (enter the other one,
+or bring the hands together to merge).
+
+**Same world, same place**: the street is built from the selected future's own
+plan and projection (`streetView.plan` = Plan A, current map, or `none` =
+nobody planning), from the same canonical plan state and the same kit models as
+the tabletop. Both futures are entered at the SAME tile — the first
+neighbourhood of the current map — so A vs B is the same street: with your plan,
+your villas; if nobody planned, no street at all — sprawl, parched land and
+smog where your neighbourhood would be ("No neighbourhood was planned here.").
+
+**Daily life** (illustrative scenario, not a model): people on the sidewalks
+and, from 2035 when the cycle lane exists, two cyclists riding it. Under heavy
+smog (haze ≥ 0.2) fewer people are outdoors and nobody cycles.
+
+**Comfort**: the only motion is the miniature growing toward you for 0.45 s,
+followed by the existing fade-teleport; no camera movement, no continuous
+locomotion; the four fixed viewpoints and the street panel are unchanged.
+
+**Integrity fixes found during testing**: the dived miniature and its hit box
+are hidden and made non-pickable while inside (a 3 m invisible hit box at the
+head was swallowing hand rays aimed at *Return to tabletop*); the dived future
+is reset to its place before the street opens.
+
+**LOD**: tabletop = baked miniatures of the whole region; human scale = the kit
+models at 1:1 for the 5 × 5 tiles around the visited tile only. A separate
+higher-detail street asset set is not built yet (Phase 5).
+
+### Evidence (`docs/visual/gm2-*`, `gm2-log.txt`)
+
+- Desktop: `gm2-1-future-A-street.png` (your plan: villas, people, cyclist,
+  green) vs `gm2-1b-future-B-street.png` (same place if nobody plans: no street,
+  sprawl, smog); `gm2-2-back-at-futures.png`.
+- IWER, hands only: split by gesture → ray-select A (`gm2-3-xr-selected-A.png`)
+  → pinch and pull it toward the eyes (`gm2-4-xr-pulling-future.png`) → inside
+  Future A (`gm2-5-xr-inside-future-A.png`) → *Return to tabletop* by hand ray →
+  back at the futures (`gm2-6-xr-back-at-futures.png`) → merge by gesture; plan
+  unchanged.
+
+### Tests
+
+New e2e *become small* (enter A, return to the futures, enter B at the same
+place with no neighbourhood, merge, plan unchanged); unit test for the
+no-neighbourhood story line. Results: unit 156 / 156; Playwright 28 passed, 3 skipped (env-gated); IWER hand scripts exit 0; IWER phase-2 hand flow and the M2 street hand flow pass; build OK.

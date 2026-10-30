@@ -41,6 +41,7 @@ import {
   RingGeometry,
   SphereGeometry,
   type Texture,
+  TorusGeometry,
   Vector3,
 } from '@iwsdk/core';
 import { UIKit, type Entity, type UIKitMLAsset } from '@iwsdk/core';
@@ -107,7 +108,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   private paintPanel: (() => void) | null = null;
   private visit = { col: 0, row: 0 };
   private districtHere = true;
-  private shownPlan: 'A' | 'B' = 'B';
+  private shownPlan: 'A' | 'B' | 'none' = 'B';
 
   init(): void {
     this.root.name = 'street-scene';
@@ -211,7 +212,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const refresh = () => {
       const v = streetView.peek();
       if (!v) return;
-      title?.setProperties({ text: `Your neighbourhood - ${viewYear.peek()}` });
+      title?.setProperties({ text: `${v.title ?? 'Your neighbourhood'} - ${viewYear.peek()}` });
       sub?.setProperties({ text: `Viewpoint ${v.viewpoint + 1} of ${VIEWPOINTS.length}: ${VIEWPOINTS[v.viewpoint].name}` });
       for (const y of YEARS) {
         const on = viewYear.peek() === y;
@@ -227,8 +228,8 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       panel.getElementById('st-return')?.setProperties({ backgroundColor: cue === 'back' ? '#b87500' : undefined });
       // Compare futures (only with a saved Plan A): the four differences that matter here.
       const a = planA.peek();
-      compare?.setProperties({ display: a ? 'flex' : 'none' });
-      if (a) {
+      compare?.setProperties({ display: a && v.plan !== 'none' ? 'flex' : 'none' });
+      if (a && v.plan !== 'none') {
         for (const tag of ['a', 'b'] as const) {
           const on = v.plan === tag.toUpperCase();
           panel.getElementById(`st-plan-${tag}`)?.setProperties({ backgroundColor: on ? '#1d5f6b' : '#ffffff', borderColor: on ? '#1d5f6b' : '#c7d6da' });
@@ -259,12 +260,12 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
 
   // ------------------------------------------------------- transitions --
 
-  private onChange(v: { id: string; viewpoint: number; plan: 'A' | 'B' } | null): void {
+  private onChange(v: (typeof streetView)['value']): void {
     if (v && !this.wasActive) {
       this.wasActive = true;
       this.shownPlan = v.plan;
       sfx.enter();
-      this.fadeThen(() => this.enter(v.id, v.viewpoint));
+      this.fadeThen(() => this.enter(v.col, v.row, v.viewpoint));
     } else if (v && this.wasActive && v.plan !== this.shownPlan) {
       // Compare futures: the same place, camera and light under the other plan.
       this.shownPlan = v.plan;
@@ -295,11 +296,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.fade.visible = true;
   }
 
-  private enter(id: string, viewpoint: number): void {
-    const p = game.get(id);
-    if (!p) return;
-    this.visit = { col: p.col, row: p.row };
-    this.build(p.col, p.row);
+  private enter(col: number, row: number, viewpoint: number): void {
+    this.visit = { col, row };
+    this.build(col, row);
     // Hide the tabletop: board, placed pieces and tray, comparison dioramas, panels.
     const hidden: Object3D[] = [];
     const hide = (o: Object3D | undefined) => {
@@ -311,6 +310,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     hide(this.world.scene.getObjectByName('terrain-board'));
     hide(this.world.scene.getObjectByName('supply-tray'));
     hide(this.world.scene.getObjectByName('plan-comparison-minis'));
+    hide(this.world.scene.getObjectByName('split-futures'));
     for (const e of this.queries.placeables.entities) hide(e.object3D!);
     // Panels: hide all; remember which were shown (ScreenSpace panels may report
     // visible=false on desktop while displayed, so the always-on ones count as shown).
@@ -379,6 +379,18 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
 
   update(delta: number): void {
     this.clock += delta;
+    if (this.root.visible) {
+      for (const c of this.cyclists) {
+        c.obj.position.x += c.dir * c.speed * delta;
+        if (c.obj.position.x > 26) c.obj.position.x = -26;
+        if (c.obj.position.x < -26) c.obj.position.x = 26;
+      }
+      if (!prefersReducedMotion()) {
+        for (const p of this.life.children) {
+          if (p.userData.bob !== undefined) p.rotation.z = 0.02 * Math.sin(this.clock * 1.3 + (p.userData.bob as number));
+        }
+      }
+    }
     if (this.root.visible && this.birds.count) {
       const m = new Matrix4();
       const q = new Quaternion();
@@ -414,7 +426,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   /** Rebuild the neighbourhood around (col,row) for the current plan and year. */
   private build(col: number, row: number): void {
     const tag = streetView.peek()?.plan ?? 'B';
-    const plan = tag === 'A' && planA.peek() ? planA.peek()! : game.placements;
+    const plan = tag === 'none' ? [] : tag === 'A' && planA.peek() ? planA.peek()! : game.placements;
     const year = viewYear.peek();
     const key = `${tag}|${col},${row}|${year}|${plan.map((p) => `${p.id}:${p.col},${p.row},${p.rotation}`).join(';')}`;
     if (key === this.builtKey) return;
@@ -488,8 +500,96 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.streetMat?.color.copy(kitTint);
     this.applyDrought(st.dryness);
     this.hood.add(hood);
-    this.story = streetStory(projected, st, { sprawlNearby, beachesNearby });
+    this.story = streetStory(projected, st, { sprawlNearby, beachesNearby, homesHere: !!home });
+    this.buildLife(st, !!home);
     this.applyAtmosphere();
+  }
+
+  /**
+   * Daily life (street metres, district frame): people on the sidewalks and, from
+   * 2035 when the cycle lane exists, cyclists riding it. Illustrative scenario:
+   * under heavy smog (haze >= 0.2) fewer people are outdoors and nobody cycles.
+   * Nothing is drawn when there is no planned street here.
+   */
+  private life = new Group();
+  private cyclists: Array<{ obj: Object3D; speed: number; dir: 1 | -1 }> = [];
+  private buildLife(st: FutureVisualState, homesHere: boolean): void {
+    for (const c of [...this.life.children]) {
+      c.traverse((o) => {
+        const m = o as Mesh;
+        if (m.isMesh) m.geometry.dispose();
+      });
+      this.life.remove(c);
+    }
+    this.cyclists = [];
+    if (!this.life.parent) this.inner.add(this.life);
+    if (!homesHere) return;
+    const smog = st.haze >= 0.2;
+    const r = rng(77);
+    const spots: Array<[number, number, number]> = [
+      [-15, 3.9, 0.3], [-9.5, -3.9, 2.8], [-3.2, 4.0, -0.4], [4.4, -3.8, 3.4], [8.5, 3.9, 1.1], [13, -4.0, 2.2], [17.5, 4.1, -1.2], [-19.5, -3.9, 1.7],
+    ];
+    const outdoors = smog ? spots.filter((_, i) => i % 3 === 0) : spots;
+    for (const [x, z, yaw] of outdoors) this.life.add(this.person(x, z, 0.62, yaw, r));
+    if (st.homeEra >= 1 && !smog) {
+      for (const [x0, dir] of [[-20, 1], [12, -1]] as const) {
+        const bike = this.cyclist(r);
+        bike.position.set(x0, 0.35, dir === 1 ? 2.45 : 1.85);
+        bike.rotation.y = dir === 1 ? -Math.PI / 2 : Math.PI / 2;
+        this.life.add(bike);
+        this.cyclists.push({ obj: bike, speed: 3.2 + r(), dir });
+      }
+    }
+  }
+
+  private static readonly SKIN = ['#e8c4a0', '#c99a72', '#8d5a3b', '#f1d3b8'];
+  private static readonly CLOTH = ['#2f5d8a', '#c0563b', '#e7d9b8', '#3f7a52', '#7a4f8f', '#f2f2f2', '#d9a441'];
+  private personMat = new Map<string, MeshStandardMaterial>();
+  private mat(c: string): MeshStandardMaterial {
+    let m = this.personMat.get(c);
+    if (!m) this.personMat.set(c, (m = new MeshStandardMaterial({ color: c, roughness: 0.85 })));
+    return m;
+  }
+
+  private person(x: number, z: number, y: number, yaw: number, r: () => number): Object3D {
+    const g = new Group();
+    const h = 1.55 + r() * 0.3;
+    const top = this.mat(StreetSystem.CLOTH[Math.floor(r() * StreetSystem.CLOTH.length)]);
+    const legs = this.mat(r() < 0.5 ? '#3a3f4a' : '#6b5a46');
+    for (const dx of [-0.09, 0.09]) {
+      const leg = new Mesh(new CylinderGeometry(0.07, 0.06, h * 0.47, 6), legs);
+      leg.position.set(dx, h * 0.235, 0);
+      g.add(leg);
+    }
+    const body = new Mesh(new CylinderGeometry(0.17, 0.2, h * 0.36, 8), top);
+    body.position.y = h * 0.47 + h * 0.18;
+    const head = new Mesh(new SphereGeometry(0.11, 10, 8), this.mat(StreetSystem.SKIN[Math.floor(r() * StreetSystem.SKIN.length)]));
+    head.position.y = h * 0.47 + h * 0.36 + 0.12;
+    g.add(body, head);
+    g.position.set(x, y, z);
+    g.rotation.y = yaw;
+    g.userData.bob = r() * 6;
+    g.traverse((o) => (o.raycast = () => {}));
+    return g;
+  }
+
+  private cyclist(r: () => number): Object3D {
+    const g = new Group();
+    const steel = this.mat('#2b2f33');
+    for (const dz of [-0.55, 0.55]) {
+      const wheel = new Mesh(new TorusGeometry(0.33, 0.035, 6, 18), steel);
+      wheel.rotation.y = Math.PI / 2;
+      wheel.position.set(0, 0.33, dz);
+      g.add(wheel);
+    }
+    const frame = new Mesh(new BoxGeometry(0.05, 0.05, 1.0), this.mat('#c0563b'));
+    frame.position.set(0, 0.62, 0);
+    g.add(frame);
+    const rider = this.person(0, 0, 0.35, 0, r);
+    rider.scale.setScalar(0.85);
+    g.add(rider);
+    g.traverse((o) => (o.raycast = () => {}));
+    return g;
   }
 
   /**

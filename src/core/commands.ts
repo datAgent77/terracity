@@ -7,6 +7,7 @@ import { YEARS, type Year } from '../config/projection.js';
 import { StructureType } from '../config/scenario.js';
 import { STRUCTURES } from '../config/structures.js';
 import { projectYear } from '../simulation/projection.js';
+import { futurePair } from '../world/futures.js';
 import { nextViewpoint } from '../world/street-view.js';
 import {
   armedType,
@@ -266,14 +267,17 @@ export function enterCity(): void {
   }
   compareOpen.value = false;
   clearSelection();
-  streetView.value = { id, viewpoint: 0, plan: 'B' };
+  const p = game.get(id)!;
+  streetView.value = { id, col: p.col, row: p.row, viewpoint: 0, plan: 'B' };
   statusText.value = 'You are in your neighbourhood. Move between viewpoints, or return to the tabletop.';
 }
 
 export function exitCity(): void {
   if (!streetView.peek()) return;
   streetView.value = null;
-  statusText.value = 'Back at the tabletop.';
+  statusText.value = futuresOpen.peek()
+    ? 'Back at your two futures. Enter the other one, or bring your hands together to merge.'
+    : 'Back at the tabletop.';
 }
 
 export function stepViewpoint(step: number): void {
@@ -290,7 +294,7 @@ export function gotoViewpoint(i: number): void {
 /** Street comparison: show the same place under Plan A or Plan B (the current map). */
 export function setStreetPlan(plan: 'A' | 'B'): void {
   const v = streetView.peek();
-  if (!v || v.plan === plan) return;
+  if (!v || v.plan === plan || v.plan === 'none') return;
   if (plan === 'A' && !planA.peek()) {
     statusText.value = 'Save Plan A on the tabletop first, then change the map to make Plan B.';
     return;
@@ -328,4 +332,28 @@ export function selectFuture(side: 'A' | 'B'): void {
   const f = futuresOpen.peek();
   if (!f) return;
   futuresOpen.value = { selected: f.selected === side ? null : side };
+}
+
+/**
+ * Become small: enter one of the two futures at human scale. Both futures are
+ * entered at the SAME place — the first neighbourhood of the current map (else
+ * of that future) — so A and B can be compared on the same street.
+ */
+export function enterFuture(side: 'A' | 'B'): void {
+  if (!futuresOpen.peek() || streetView.peek()) return;
+  const a = planA.peek();
+  const pair = futurePair(a, game.placements, viewYear.peek());
+  const plan: 'A' | 'B' | 'none' = a ? side : side === 'A' ? 'B' : 'none';
+  const homes = (ps: readonly { type: StructureType; col: number; row: number; id: string }[]) => ps.find((p) => p.type === StructureType.Residential);
+  const target = homes(game.placements) ?? homes(pair[side].plan) ?? (a ? homes(a) : undefined);
+  futuresOpen.value = { selected: side };
+  streetView.value = {
+    id: target?.id ?? '',
+    col: target?.col ?? 6,
+    row: target?.row ?? 4,
+    viewpoint: 0,
+    plan,
+    title: `Future ${side}: ${pair[side].title}`,
+  };
+  statusText.value = `You are inside Future ${side} (${pair[side].title}), ${pair.year}.`;
 }

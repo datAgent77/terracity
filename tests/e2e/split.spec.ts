@@ -52,3 +52,47 @@ test('split reality: two futures from the same plan, editing blocked, merge rest
   await key(page, 'KeyV');
   await settled(page);
 });
+
+test('become small: enter each future at the same place, return to the futures, merge; plan unchanged', async ({ page }) => {
+  type St = { active: boolean; plan: string; districtHere: boolean; story: string[]; fading: boolean };
+  const T = () => page.evaluate(() => (window as unknown as { __terracity: { street(): St } }).__terracity.street());
+  const streetSettled = () => page.waitForFunction(() => !(window as unknown as { __terracity: { street(): St } }).__terracity.street().fading);
+  const click = async (panel: string, id: string) => {
+    const p = await page.evaluate(([a, b]) => (window as unknown as { __terracity: { uiToScreen(a: string, b: string): { x: number; y: number } } }).__terracity.uiToScreen(a, b), [panel, id]);
+    await page.mouse.click(p.x, p.y);
+  };
+  await open(page);
+  await buildPlan(page, [[1, 6, 4], [5, 6, 3], [3, 12, 8]]);
+  const plan = () => page.evaluate(() => JSON.stringify((window as unknown as { __terracity: { game: { placements: unknown } } }).__terracity.game.placements));
+  const before = await plan();
+  await key(page, 'KeyV');
+  await settled(page);
+
+  // Future A (your plan): your neighbourhood.
+  await click('actions-panel', 'btn-enter');
+  await streetSettled();
+  let s = await T();
+  expect(s.active).toBe(true);
+  expect(s.plan).toBe('B'); // the current map
+  expect(s.districtHere).toBe(true);
+  await click('street-panel', 'st-return');
+  await streetSettled();
+  await settled(page);
+  expect((await T()).active).toBe(false);
+  expect((await split(page)).open).toBe(true); // back at the two futures
+
+  // Future B (nobody plans): the same place, no neighbourhood.
+  await page.evaluate(() => (window as unknown as { __terracity: { selectFuture(s: string): void } }).__terracity.selectFuture('B'));
+  await key(page, 'KeyE');
+  await streetSettled();
+  s = await T();
+  expect(s.plan).toBe('none');
+  expect(s.districtHere).toBe(false);
+  expect(s.story[0]).toBe('No neighbourhood was planned here.');
+  await key(page, 'KeyE');
+  await streetSettled();
+  await key(page, 'KeyV');
+  await settled(page);
+  expect((await split(page)).boardVisible).toBe(true);
+  expect(await plan()).toBe(before);
+});

@@ -14,6 +14,8 @@ export interface StreetFacts {
   sprawlNearby: number;
   /** Beach tiles within the visited area. */
   beachesNearby: number;
+  /** Is there a planned neighbourhood on the visited tile? (default: yes) */
+  homesHere?: boolean;
 }
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
@@ -22,7 +24,9 @@ export function streetStory(projected: YearMetrics, state: FutureVisualState, fa
   const lines: string[] = [];
   const era = state.homeEra;
   lines.push(
-    era === 0
+    facts.homesHere === false
+      ? 'No neighbourhood was planned here.'
+      : era === 0
       ? 'Homes today: traditional villas, lawns and terracotta roofs.'
       : era === 1
         ? 'Homes modernise: solar panels on most roofs, shaded windows, a cycle lane.'

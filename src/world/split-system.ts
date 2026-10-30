@@ -19,6 +19,7 @@ import {
   createSystem,
   type Entity,
   Grabbed,
+  OneHandGrabbable,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -46,6 +47,10 @@ import { compareRows } from './street-compare.js';
 const FUTURE_SCALE = 0.5;
 const FUTURE_X = 0.25;
 const OPEN_TIME = 0.8;
+/** A held future this close to the eyes (m) is entered. */
+const ENTER_DISTANCE = 0.35;
+/** Duration (s) of the dive into a future. */
+const DIVE_TIME = 0.45;
 const BOARD_W = GRID_COLS * TILE_SIZE;
 const BOARD_D = 10 * TILE_SIZE;
 
@@ -62,13 +67,15 @@ export class SplitSystem extends createSystem({
   private fractureMat!: MeshBasicMaterial;
   private fractureGlow = 0;
   private futures = new Group();
-  private sides: Partial<Record<Side, { root: Group; entity: Entity; ring: Mesh }>> = {};
+  private sides: Partial<Record<Side, { root: Group; entity: Entity; ring: Mesh; hit: Mesh }>> = {};
   /** 0 = one world, 1 = two futures fully apart. */
   private t = 0;
   private target = 0;
   private builtKey = '';
   private hidden: Object3D[] = [];
   private yearBefore: (typeof viewYear)['value'] | null = null;
+  /** The future being pulled into ("become small"): it grows toward the viewer, then the street opens. */
+  private diving: { side: Side; t: number; from: Vector3; scale: number } | null = null;
 
   init(): void {
     this.futures.name = 'split-futures';
@@ -81,12 +88,30 @@ export class SplitSystem extends createSystem({
       viewYear.subscribe(() => {
         if (futuresOpen.peek()) this.buildFutures(); // time travel while split
       }),
+      // Inside a future at street level: the miniatures step aside; back on return.
+      streetView.subscribe((v) => {
+        if (!futuresOpen.peek()) return;
+        // Inside a future the miniatures are hidden and must not catch rays.
+        this.setPickable(!v);
+        for (const side of ['A', 'B'] as Side[]) {
+          const r = this.sides[side]?.root;
+          if (r) r.visible = !v;
+        }
+        if (!v) {
+          this.diving = null;
+          this.futures.visible = true;
+          this.layout();
+          setPanelVisible(this.world, 'tray-labels', false);
+        }
+      }),
       planA.subscribe(() => {
         if (futuresOpen.peek()) this.buildFutures();
       }),
     );
 
     const hook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
+    /** Test hook: select a future (what a pinch / tap on it does). */
+    hook.selectFuture = (side: Side) => cmd.selectFuture(side);
     hook.split = () => ({
       open: !!futuresOpen.peek(),
       selected: futuresOpen.peek()?.selected ?? null,
@@ -95,6 +120,8 @@ export class SplitSystem extends createSystem({
       progress: this.progress,
       boardVisible: this.world.scene.getObjectByName('terrain-board')?.visible ?? null,
       built: this.builtKey,
+      diving: this.diving?.side ?? null,
+      grabbable: (['A', 'B'] as Side[]).filter((x) => this.sides[x]?.entity.hasComponent(OneHandGrabbable)),
       hands: this.hands().map((h) => (h.pos ? h.pos.map((v) => +v.toFixed(3)) : null)),
       /** World centres of the two futures (for hand-ray tests). */
       centres: (['A', 'B'] as Side[]).map((s) => this.sides[s]?.root.getWorldPosition(new Vector3()).toArray() ?? null),
@@ -242,7 +269,7 @@ export class SplitSystem extends createSystem({
       entity.addComponent(RayInteractable);
       root.addEventListener('click' as never, (() => cmd.selectFuture(side)) as never);
       this.futures.add(root);
-      this.sides[side] = { root, entity, ring };
+      this.sides[side] = { root, entity, ring, hit };
     }
     this.layout();
     this.paintSelection(futuresOpen.peek()?.selected ?? null);
@@ -271,21 +298,90 @@ export class SplitSystem extends createSystem({
   private paintSelection(selected: Side | null): void {
     for (const side of ['A', 'B'] as Side[]) {
       const s = this.sides[side];
-      if (s) s.ring.visible = selected === side;
+      if (!s) continue;
+      s.ring.visible = selected === side;
+      // The selected future can be pinched and pulled toward you to enter it.
+      // (Grabbable entities ignore rays, so only the selected one is grabbable.)
+      const want = selected === side;
+      if (want && !s.entity.hasComponent(OneHandGrabbable)) s.entity.addComponent(OneHandGrabbable, { rotate: false });
+      if (!want && s.entity.hasComponent(OneHandGrabbable)) s.entity.removeComponent(OneHandGrabbable);
     }
   }
 
   /** Place the futures for the current opening amount `t`. */
   private layout(): void {
-    const k = smooth(this.t);
-    const scale = 1 + (FUTURE_SCALE - 1) * k;
     for (const side of ['A', 'B'] as Side[]) {
       const s = this.sides[side];
       if (!s) continue;
-      const dir = side === 'A' ? -1 : 1;
-      s.root.position.set(BOARD_CENTER[0] + dir * (0.015 + (FUTURE_X - 0.015) * k), BOARD_CENTER[1] + 0.02 * k, BOARD_CENTER[2] - 0.02 * k);
-      s.root.scale.setScalar(scale);
-      s.root.rotation.set(0.1 * k, -dir * 0.2 * k, 0); // turned toward the seated viewer
+      const p = this.pose(side, this.t);
+      s.root.position.copy(p.pos);
+      s.root.scale.setScalar(p.scale);
+      s.root.rotation.set(p.rx, p.ry, 0);
+    }
+  }
+
+  private pose(side: Side, t: number): { pos: Vector3; scale: number; rx: number; ry: number } {
+    const k = smooth(t);
+    const dir = side === 'A' ? -1 : 1;
+    return {
+      pos: new Vector3(BOARD_CENTER[0] + dir * (0.015 + (FUTURE_X - 0.015) * k), BOARD_CENTER[1] + 0.02 * k, BOARD_CENTER[2] - 0.02 * k),
+      scale: 1 + (FUTURE_SCALE - 1) * k,
+      rx: 0.1 * k,
+      ry: -dir * 0.2 * k, // turned toward the seated viewer
+    };
+  }
+
+  /** Pulled toward the face, or released: enter, or float back into place. */
+  private stepHeld(delta: number): void {
+    if (!futuresOpen.peek() || streetView.peek() || this.t !== 1) return;
+    const head = this.world.camera.getWorldPosition(new Vector3());
+    for (const side of ['A', 'B'] as Side[]) {
+      const s = this.sides[side];
+      if (!s) continue;
+      if (this.diving?.side === side) continue;
+      if (s.entity.hasComponent(Grabbed)) {
+        // Brought close to the eyes: become small.
+        if (s.root.getWorldPosition(new Vector3()).distanceTo(head) < ENTER_DISTANCE) {
+          this.diving = { side, t: 0, from: s.root.position.clone(), scale: s.root.scale.x };
+          s.entity.removeComponent(OneHandGrabbable); // let go of the hand
+          sfx.enter();
+        }
+        continue;
+      }
+      // Not held: drift back to its place on the table.
+      const p = this.pose(side, 1);
+      const k = Math.min(1, delta * 6);
+      s.root.position.lerp(p.pos, k);
+      s.root.scale.setScalar(s.root.scale.x + (p.scale - s.root.scale.x) * k);
+      s.root.rotation.set(p.rx, p.ry, 0);
+    }
+  }
+
+  private setPickable(on: boolean): void {
+    for (const side of ['A', 'B'] as Side[]) {
+      const h = this.sides[side]?.hit;
+      if (h) h.raycast = on ? Mesh.prototype.raycast : () => {};
+    }
+  }
+
+  /** The dive: the chosen future grows around the viewer, then the street opens. */
+  private stepDive(delta: number): void {
+    const d = this.diving;
+    if (!d || streetView.peek()) return;
+    const s = this.sides[d.side];
+    if (!s) return (this.diving = null), undefined;
+    d.t = Math.min(1, d.t + delta / DIVE_TIME);
+    const k = d.t * d.t;
+    const head = this.world.camera.getWorldPosition(new Vector3());
+    s.root.position.lerpVectors(d.from, head.clone().setY(head.y - 0.12), k);
+    s.root.scale.setScalar(d.scale * (1 + 5 * k));
+    if (d.t >= 1) {
+      // Back to its place (hidden while inside), then open the street.
+      const p = this.pose(d.side, 1);
+      s.root.position.copy(p.pos);
+      s.root.scale.setScalar(p.scale);
+      this.diving = null;
+      cmd.enterFuture(d.side);
     }
   }
 
@@ -311,6 +407,8 @@ export class SplitSystem extends createSystem({
 
   update(delta: number): void {
     this.stepGesture(delta);
+    this.stepHeld(delta);
+    this.stepDive(delta);
     this.fracture.visible = this.fractureGlow > 0.01;
     this.fractureMat.opacity = this.fractureGlow * (0.85 + 0.15 * Math.sin(performance.now() / 70));
 

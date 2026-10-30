@@ -240,7 +240,7 @@ export class PanelSystem extends createSystem({}) {
       'btn-compare': cmd.toggleCompare,
       'btn-pause': cmd.togglePause,
       'btn-finish': () => cmd.finishGame(),
-      'btn-enter': cmd.enterCity,
+      'btn-enter': () => (futuresOpen.peek() ? cmd.enterFuture(futuresOpen.peek()!.selected ?? 'A') : cmd.enterCity()),
       'btn-split': cmd.toggleFutures,
     };
     const buttons = new Map<string, Settable>();
@@ -253,6 +253,7 @@ export class PanelSystem extends createSystem({}) {
     }
     const pauseLabel = panel.getElementById<UIKit.Text>('pause-label');
     const splitLabel = panel.getElementById<UIKit.Text>('split-label');
+    const enterLabel = panel.getElementById<UIKit.Text>('enter-label');
     const dim = (id: string, on: boolean) => buttons.get(id)?.setProperties({ opacity: on ? 1 : 0.4 });
     const refresh = () => {
       const editing = phase.value === 'building' && viewYear.value === 2026 && !paused.value;
@@ -269,7 +270,8 @@ export class PanelSystem extends createSystem({}) {
       pauseLabel?.setProperties({ text: paused.value ? 'Resume' : 'Pause' });
       splitLabel?.setProperties({ text: futuresOpen.value ? 'Merge the futures' : 'Split into two futures' });
       dim('btn-split', phase.value !== 'intro');
-      dim('btn-enter', !futuresOpen.value && game.placements.some((p) => p.type === 'residential'));
+      dim('btn-enter', !!futuresOpen.value || game.placements.some((p) => p.type === 'residential'));
+      enterLabel?.setProperties({ text: futuresOpen.value ? `Enter future ${futuresOpen.value.selected ?? 'A'}` : 'Enter your city' });
     };
     for (const s of [planVersion, phase, viewYear, paused, planA, coachText, futuresOpen] as const) {
       this.cleanupFuncs.push((s as { subscribe(f: () => void): () => void }).subscribe(refresh));
