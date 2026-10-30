@@ -49,7 +49,8 @@ import { YEARS } from '../config/projection.js';
 // Addon not re-exported by @iwsdk/core (imports the same `three` alias).
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GRID_COLS, StructureType, TerrainType, TILE_SIZE } from '../config/scenario.js';
-import { projectYear } from '../simulation/projection.js';
+import { projectYear, type YearMetrics } from '../simulation/projection.js';
+import { TARGETS } from '../config/balance.js';
 import * as cmd from '../core/commands.js';
 import { coachText, game, planA, planVersion, streetView, tutorial, viewYear } from '../core/session.js';
 import { Placeable } from '../interactions/placeable-component.js';
@@ -65,9 +66,11 @@ import { hashInts, idNumber, rng } from './rand.js';
 import { LEAF_CROWN, SOLAR_GLASS } from './shared-materials.js';
 import { isKitResource } from './kit.js';
 import { PAINTED, PAINTED_FLAT } from './palette.js';
+import { Bubble, createChild, createGarden, disposeTree, type Child } from './child.js';
+import { CHILD_AGE, CHILD_NAME, childNarrative, type ChildNarrative } from './child-narrative.js';
 import { compareRows } from './street-compare.js';
 import { streetStory } from './street-story.js';
-import { streetPose, STREET_SCALE, VIEWPOINTS } from './street-view.js';
+import { CHILD_SPOT, GARDEN, streetPose, STREET_SCALE, VIEWPOINTS } from './street-view.js';
 import { createStructureModel, setDistrictLinks, setRoadArms, structureLook } from './structure-models.js';
 import { tileAt } from './terrain-map.js';
 import { createTownTile, setEra } from './villas.js';
@@ -176,6 +179,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       fading: this.fadeDir !== 0,
       year: viewYear.peek(),
       plan: streetView.peek()?.plan ?? null,
+      child: this.narrative
+        ? { state: this.narrative.state, garden: this.narrative.garden, lines: [...this.narrative.lines], speaking: this.talk.near, line: this.talk.line }
+        : null,
       districtHere: this.districtHere,
       geometries: this.world.renderer.info.memory.geometries,
       story: [...this.story],
@@ -207,7 +213,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const compare = panel.getElementById('st-compare');
     const title = panel.getElementById<UIKit.Text>('st-title');
     const sub = panel.getElementById<UIKit.Text>('st-view');
-    const lines = [0, 1, 2, 3].map((i) => panel.getElementById<UIKit.Text>(`st-line-${i}`));
+    const lines = [0, 1, 2, 3, 4].map((i) => panel.getElementById<UIKit.Text>(`st-line-${i}`));
     const tipEl = panel.getElementById<UIKit.Text>('st-tip');
     const refresh = () => {
       const v = streetView.peek();
@@ -379,6 +385,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
 
   update(delta: number): void {
     this.clock += delta;
+    this.stepChild(delta);
     if (this.root.visible) {
       for (const c of this.cyclists) {
         c.obj.position.x += c.dir * c.speed * delta;
@@ -502,7 +509,77 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.hood.add(hood);
     this.story = streetStory(projected, st, { sprawlNearby, beachesNearby, homesHere: !!home });
     this.buildLife(st, !!home);
+    this.buildChild(projected, st, !!home);
     this.applyAtmosphere();
+  }
+
+  // ------------------------------------------------------- the last child --
+
+  private childGroup = new Group();
+  private child: Child | null = null;
+  private narrative: ChildNarrative | null = null;
+  private bubble = new Bubble();
+  private talk = { t: 0, near: false, line: 0 };
+
+  /** Mira (2050 only) and her little garden, from the projection of this plan. */
+  private buildChild(projected: YearMetrics, st: FutureVisualState, homesHere: boolean): void {
+    for (const c of [...this.childGroup.children]) {
+      if (c !== this.bubble.mesh) disposeTree(c);
+      this.childGroup.remove(c);
+    }
+    if (!this.childGroup.parent) this.inner.add(this.childGroup);
+    this.narrative = childNarrative(projected, st, { homesHere });
+    this.child = null;
+    const ground = homesHere ? 0.62 : 0;
+    const gardenKind = this.narrative ? this.narrative.garden : projected.environment >= TARGETS.environment ? 'lush' : 'dry';
+    const garden = createGarden(gardenKind, GARDEN.w, GARDEN.d);
+    garden.position.set(GARDEN.x, ground, GARDEN.z);
+    this.childGroup.add(garden);
+    this.talk = { t: 0, near: false, line: 0 };
+    this.bubble.opacity = 0;
+    if (!this.narrative) return;
+    this.child = createChild();
+    this.child.root.position.set(CHILD_SPOT.x, ground, CHILD_SPOT.z);
+    this.childGroup.add(this.child.root);
+    this.bubble.mesh.position.set(CHILD_SPOT.x, ground + 1.7, CHILD_SPOT.z);
+    this.childGroup.add(this.bubble.mesh);
+    this.story.push(`${CHILD_NAME} (${CHILD_AGE}): "${this.narrative.lines.join(' ')}"`);
+  }
+
+  /** She turns to you, breathes, waves and speaks when you are near (< 8 m). */
+  private stepChild(delta: number): void {
+    const c = this.child;
+    const n = this.narrative;
+    if (!c || !n || !this.root.visible) return;
+    const cam = this.world.camera.getWorldPosition(new Vector3());
+    const local = this.childGroup.worldToLocal(cam.clone());
+    const dx = local.x - c.root.position.x;
+    const dz = local.z - c.root.position.z;
+    const near = Math.hypot(dx, dz) < 8;
+    const want = Math.atan2(dx, dz);
+    let dy = want - c.body.rotation.y;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    c.body.rotation.y += dy * Math.min(1, delta * 3);
+    const calm = prefersReducedMotion();
+    c.body.scale.y = calm ? 1 : 1 + 0.012 * Math.sin(this.clock * 2.1);
+    if (near && !this.talk.near) {
+      this.talk = { t: 0, near: true, line: 0 };
+      sfx.childChime(Math.max(-1, Math.min(1, dx / 6)));
+    } else if (!near) this.talk.near = false;
+    if (near) this.talk.t += delta;
+    const line = Math.min(n.lines.length - 1, Math.floor(this.talk.t / 6));
+    if (line !== this.talk.line) {
+      this.talk.line = line;
+      sfx.childChime(0);
+    }
+    this.bubble.set(`${CHILD_NAME}, ${CHILD_AGE}`, n.lines[line]);
+    const target = near ? 1 : 0;
+    const op = (this.bubble.mesh.material as MeshBasicMaterial).opacity;
+    this.bubble.opacity = op + (target - op) * Math.min(1, delta * 4);
+    this.bubble.mesh.lookAt(this.childGroup.localToWorld(new Vector3(local.x, this.bubble.mesh.position.y, local.z)));
+    // Wave during the first moments of each line.
+    const since = this.talk.t - line * 6;
+    c.arm.rotation.z = near && since < 1.8 && !calm ? -2.5 + 0.35 * Math.sin(this.clock * 9) : -0.12;
   }
 
   /**
@@ -527,7 +604,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const smog = st.haze >= 0.2;
     const r = rng(77);
     const spots: Array<[number, number, number]> = [
-      [-15, 3.9, 0.3], [-9.5, -3.9, 2.8], [-3.2, 4.0, -0.4], [4.4, -3.8, 3.4], [8.5, 3.9, 1.1], [13, -4.0, 2.2], [17.5, 4.1, -1.2], [-19.5, -3.9, 1.7],
+      [-15, 3.9, 0.3], [-9.5, -3.9, 2.8], [-3.2, 4.0, -0.4], [7.4, -4.0, 3.4], [8.5, 3.9, 1.1], [13, -4.0, 2.2], [17.5, 4.1, -1.2], [-19.5, -3.9, 1.7],
     ];
     const outdoors = smog ? spots.filter((_, i) => i % 3 === 0) : spots;
     for (const [x, z, yaw] of outdoors) this.life.add(this.person(x, z, 0.62, yaw, r));

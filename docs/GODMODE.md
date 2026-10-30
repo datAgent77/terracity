@@ -145,3 +145,56 @@ higher-detail street asset set is not built yet (Phase 5).
 New e2e *become small* (enter A, return to the futures, enter B at the same
 place with no neighbourhood, merge, plan unchanged); unit test for the
 no-neighbourhood story line. Results: unit 156 / 156; Playwright 28 passed, 3 skipped (env-gated); IWER hand scripts exit 0; IWER phase-2 hand flow and the M2 street hand flow pass; build OK.
+
+## Phase 3 — The Last Child
+
+Branch `feature/godmode-last-child` (from phase 2).
+
+**Mira, 9**, lives in the visited neighbourhood in **2050** (there is no child
+in 2026 or 2035). She always stands at the same place: the *little garden*, a
+stone planter on the south sidewalk. Entering any neighbourhood in 2050 (from
+the tabletop or from a future) arrives at the viewpoint beside her, ~2 m away;
+from the other viewpoints she can be seen down the street.
+
+**Deterministic narrative** (`src/world/child-narrative.ts`, pure, 7 unit
+tests). Each sentence is used only when the simulated quantity supports it:
+
+| Simulation state (2050) | Mira's state | Garden | First line |
+|---|---|---|---|
+| environment ≥ target (60) | thriving | in flower, young olive | "This is my favorite place. Did you help make it?" |
+| environment < target and trees lost (`treeLoss` > 0) | parched | cracked soil, dead stump | "My grandmother told me there used to be trees here." |
+| environment < target, no tree loss yet | parched | dry | "The garden is dry again this summer." |
+| no planned neighbourhood on this tile | unplanned | dry | "We live in the houses out here. Nobody planned a street or a garden." |
+
+At most one second line: unplanned sprawl residents > 0 → cousins in houses
+built without a plan, no park there (housing pressure); else renewable coverage
+< 80 % → only some of the power from wind and sun (energy); else, when
+thriving, most of the power from wind and sun. Water, health and other
+unmodelled outcomes are never mentioned (tested). Same inputs → same words.
+
+**Presentation**: a stylised child (~1.25 m) with an idle breath, turning to
+face you, and a wave as each line starts; subtitles in a speech bubble above
+her (6 s per line) and the same words in the street panel; a soft chime panned
+toward her when she starts speaking (procedural; no recorded voice yet — lines
+are fixed, so a recorded voice can be added later). The street panel now sits
+to the side (desktop: right; XR: turned to the right) so it never covers her.
+
+**Rewrite reality** (the core loop): an under-housed plan → enter in 2050 → Mira
+by a dry garden ("there used to be trees here … my cousins live in houses built
+without a plan"). Back to the tabletop, add neighbourhoods and a park, enter the
+same place again → the same child by a garden in flower ("This is my favorite
+place. Did you help make it?"). Covered by an e2e test.
+
+### Evidence (`docs/visual/gm3-*`, `gm3-log.txt`)
+
+- `gm3-1-before-line1/2.png` — under-housed plan, 2050: Mira, dry garden, smog.
+- `gm3-2-after-rewrite-line1/2.png` — same place after rewriting the plan.
+- `gm3-3-xr-meet-mira.png` — IWER, hands only (hand ray on *Enter your city* in 2050).
+- Phase 2 flow re-run on this branch: `gm3-split-*`.
+
+Tests: unit 163 / 163 (7 new); Playwright 29 passed, 3 skipped (new e2e *the last child*: no child in 2026, parched then thriving after rewriting, same words for the same state); IWER hand scripts exit 0; IWER phase-2 and phase-3 hand flows pass; build OK.
+
+### Limitations
+
+- Subtitles and a chime only; no voice acting. Stylised procedural figure.
+- One character, one location, three states (plus the second-line variants).

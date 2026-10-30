@@ -8,7 +8,7 @@ import { StructureType } from '../config/scenario.js';
 import { STRUCTURES } from '../config/structures.js';
 import { projectYear } from '../simulation/projection.js';
 import { futurePair } from '../world/futures.js';
-import { nextViewpoint } from '../world/street-view.js';
+import { GARDEN_VIEWPOINT, nextViewpoint } from '../world/street-view.js';
 import {
   armedType,
   challenge,
@@ -258,6 +258,11 @@ export function streetTarget(): string | null {
   return plan.find((p) => p.type === StructureType.Residential)?.id ?? null;
 }
 
+/** In 2050 you arrive beside the little garden, where Mira lives. */
+function startViewpoint(): number {
+  return viewYear.peek() === 2050 ? GARDEN_VIEWPOINT : 0;
+}
+
 export function enterCity(): void {
   if (streetView.peek()) return;
   const id = streetTarget();
@@ -268,7 +273,7 @@ export function enterCity(): void {
   compareOpen.value = false;
   clearSelection();
   const p = game.get(id)!;
-  streetView.value = { id, col: p.col, row: p.row, viewpoint: 0, plan: 'B' };
+  streetView.value = { id, col: p.col, row: p.row, viewpoint: startViewpoint(), plan: 'B' };
   statusText.value = 'You are in your neighbourhood. Move between viewpoints, or return to the tabletop.';
 }
 
@@ -351,7 +356,7 @@ export function enterFuture(side: 'A' | 'B'): void {
     id: target?.id ?? '',
     col: target?.col ?? 6,
     row: target?.row ?? 4,
-    viewpoint: 0,
+    viewpoint: startViewpoint(),
     plan,
     title: `Future ${side}: ${pair[side].title}`,
   };

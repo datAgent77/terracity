@@ -126,6 +126,27 @@ export const sfx = {
     noise(0, 0.7, 5000, 600, 0.22);
     tone(784, 0.3, 0.5, 'sine', 0.14, 523);
   },
+  /** Mira starts a line: a soft two-note chime, panned toward her. */
+  childChime: (pan = 0) => {
+    const a = audio();
+    if (!a || !master) return;
+    const p = a.createStereoPanner();
+    p.pan.value = pan;
+    p.connect(master);
+    const t0 = a.currentTime;
+    for (const [f, dt] of [[880, 0], [1175, 0.12]] as const) {
+      const o = a.createOscillator();
+      const g = a.createGain();
+      o.type = 'sine';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + dt);
+      g.gain.exponentialRampToValueAtTime(0.09, t0 + dt + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.5);
+      o.connect(g).connect(p);
+      o.start(t0 + dt);
+      o.stop(t0 + dt + 0.55);
+    }
+  },
   win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.12, 0.35, 'sine', 0.3)),
   lose: () => {
     tone(392, 0, 0.3, 'triangle', 0.25);
