@@ -331,11 +331,20 @@ function plazaTile(g: Group, r: () => number): void {
 
 /** The compact, walkable town centre: plaza, mixed-use blocks, civic buildings. */
 export function createTownTile(kind: 'plaza' | 'block' | 'civic', seed: number, storeys = 3): Group {
-  const kit = kitPart(kind === 'block' ? `town-block-${storeys >= 4 ? 4 : 3}` : `town-${kind}`);
-  if (kit) {
-    // Perimeter blocks are symmetric: a quarter turn per seed varies the street fronts.
-    if (kind === 'block') kit.rotation.y = (seed % 4) * (Math.PI / 2);
-    return kit;
+  // Kit tile: three era groups (2026 / 2035 / 2050 adoption of solar and green
+  // roofs, maturing trees), switched by time travel like the garden districts.
+  const name = kind === 'block' ? `town-block-${storeys >= 4 ? 4 : 3}` : `town-${kind}`;
+  const eras = ERAS.map((e) => kitPart(`${name}-era-${e}`));
+  if (eras.every((g) => g)) {
+    const root = new Group();
+    eras.forEach((g, e) => {
+      g!.name = `era-${e}`;
+      g!.visible = e === 0;
+      // Perimeter blocks are symmetric: a quarter turn per seed varies the street fronts.
+      if (kind === 'block') g!.rotation.y = (seed % 4) * (Math.PI / 2);
+      root.add(g!);
+    });
+    return root;
   }
   const g = new Group();
   const r = rng(seed);

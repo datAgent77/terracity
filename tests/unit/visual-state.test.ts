@@ -7,6 +7,7 @@ import { projectYear } from '../../src/simulation/projection';
 import {
   futureVisualState,
   MAX_DRYNESS,
+  MAX_TREE_LOSS,
   VIGOR_AT_TARGET,
   vigorFor,
 } from '../../src/world/future-visual-state';
@@ -33,7 +34,45 @@ describe('2026 is the present', () => {
       expect(s.seaRise).toBe(0);
       expect(s.floodRisk).toEqual([]);
       expect(s.parkGrowth).toBe(1);
+      expect(s.haze).toBe(0);
+      expect(s.treeLoss).toBe(0);
+      expect(s.greening).toBe(0);
     }
+  });
+});
+
+describe('decline and recovery follow the projected environment', () => {
+  const plans = () => [[], planA(), reference()];
+
+  it('decline only when the environment target is missed, recovery only when met, never both', () => {
+    for (const plan of plans()) {
+      for (const year of [2035, 2050] as const) {
+        const y = projectYear(terrain, plan, year);
+        const s = futureVisualState(terrain, plan, y);
+        const met = y.environment >= TARGETS.environment;
+        if (met) {
+          expect(s.haze).toBe(0);
+          expect(s.treeLoss).toBe(0);
+          expect(s.greening).toBeGreaterThan(0);
+        } else {
+          expect(s.greening).toBe(0);
+        }
+        expect(s.haze > 0 && s.greening > 0).toBe(false);
+        expect(s.treeLoss).toBeLessThanOrEqual(MAX_TREE_LOSS);
+      }
+    }
+  });
+
+  it('a do-nothing region declines visibly by 2050, more than in 2035', () => {
+    const a = vs([], 2035);
+    const b = vs([], 2050);
+    expect(b.haze).toBeGreaterThan(a.haze);
+    expect(b.treeLoss).toBeGreaterThan(a.treeLoss);
+    expect(b.haze).toBeGreaterThan(0.3);
+  });
+
+  it('the balanced reference plan greens by 2050', () => {
+    expect(vs(reference(), 2050).greening).toBeGreaterThan(vs(reference(), 2035).greening);
   });
 });
 

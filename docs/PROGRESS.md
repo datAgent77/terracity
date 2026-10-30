@@ -55,3 +55,16 @@ town centre, tree-lined streets, low-rise sprawl, informational land budget (HUD
 zoning change: no homes on steep hills. Unit 122/122, e2e 25 passed / 2 skipped,
 XR hand scripts pass, build OK. See docs/HORIZONTAL_URBANISM_DESIGN.md.
 Not yet merged or deployed; demo video predates this change.
+
+## 2026-10-29 — Dramatic time travel (branch `feature/dramatic-time-travel`)
+
+2035 / 2050 now change visibly, still driven only by the projection
+(docs/VISUAL_STATE_MAPPING.md): below the environment target — smog clouds,
+dimmer sun, murky water, stable tree/crop loss with burn scars, parched land;
+at or above it — reforestation of free plains/hills, lusher land, bird flocks.
+Beaches flood with a foam line; the town gains era versions (rooftop PV, solar
+tiles, green roofs, matured trees); transitions last 2.2 s with a time-wave ring.
+Evidence: docs/visual/tt-compare-{decline,balanced}.png (left = main before,
+right = this branch), tt-*-2050-xr.png. Unit 127/127, e2e all pass after making
+the timer-expiry test poll (frame-clamped clock on slow software rendering),
+IWER hand scripts pass, build OK. Desktop 2050 decline: 99 calls / 73 k tris.

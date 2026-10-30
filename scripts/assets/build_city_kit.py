@@ -3,7 +3,7 @@ TerraCity — city kit (Blender, reproducible). One GLB, one shared texture
 atlas and material, every part with baked ambient occlusion:
 
   district-L{0,1,2}-era-{0,1,2}  garden districts (3 parcel layouts x 3 eras)
-  town-plaza, town-block-3, town-block-4, town-civic   compact town centre
+  town-{plaza,block-3,block-4,civic}-era-{0,1,2}   compact town centre (3 eras)
   solar-base, solar-panels       agrivoltaic solar farm (panels restyled at runtime)
   wind-base, wind-rotor          wind turbine (rotor spins at runtime)
   park-base                      neighbourhood park (crowns stay runtime meshes)
@@ -123,7 +123,7 @@ def town_ground(b, cell="paving"):
     b.plate(-29.4, 29.4, -29.4, 29.4, 0, TOWN_GROUND, cell, step=4.0)
 
 
-def town_building(c, x0, x1, y0, y1, storeys, roof, tint, shopfront_side=None, others=()):
+def town_building(c, x0, x1, y0, y1, storeys, roof, tint, shopfront_side=None, others=(), idx=0):
     """Mixed-use building: shop level (stone + glazing + awning), apartments above."""
     b = c.b
     z0 = TOWN_GROUND
@@ -148,26 +148,42 @@ def town_building(c, x0, x1, y0, y1, storeys, roof, tint, shopfront_side=None, o
             top = ctr + Z * 2.9
             b.poly([top - u * 1.7 + n * 1.3 - Z * 0.5, top + u * 1.7 + n * 1.3 - Z * 0.5, top + u * 1.7, top - u * 1.7], "canvas", aw)
     z = z0 + h
+    era = c.era
     if roof == "hip":
-        vd.hip_roof(c, x0, x1, y0, y1, z, min(x1 - x0, y1 - y0) * 0.3 + 0.4, False)
+        rise = min(x1 - x0, y1 - y0) * 0.3 + 0.4
+        if era == 2 and idx % 2:
+            # Half the old town keeps tiles with on-roof modules; half has solar tiles.
+            c.era = 1
+            vd.hip_roof(c, x0, x1, y0, y1, z, rise, True)
+            c.era = era
+        else:
+            vd.hip_roof(c, x0, x1, y0, y1, z, rise, era == 1 and idx % 3 != 2)
     else:
-        # Roof terrace: parapet, tiles, a pergola corner and planters.
+        # Roof terrace: parapet, tiles (2050: green roof), a pergola corner, planters.
         b.box(x0, x1, y0, y1, z, z + 0.7, "stucco", tint, top="paving")
-        b.box(x0 + 0.4, x1 - 0.4, y0 + 0.4, y1 - 0.4, z + 0.7, z + 0.72, "paving", sides=False)
+        b.box(x0 + 0.4, x1 - 0.4, y0 + 0.4, y1 - 0.4, z + 0.7, z + 0.72, "greenroof" if era == 2 else "paving", sides=False)
+        if era >= 1:
+            b.box(x1 - 4.4, x1 - 0.7, y0 + 0.7, y1 - 0.7 if y1 - y0 < 9 else y0 + 5.0, z + 0.72, z + 1.1, "plain", lin((0.6, 0.62, 0.64)), top="pv")
         px, py = x0 + 1.0, y0 + 1.0
         for dx in (0, 3.0):
             for dy in (0, 3.0):
                 b.box(px + dx - 0.15, px + dx + 0.15, py + dy - 0.15, py + dy + 0.15, z + 0.7, z + 3.0, "timber")
         b.box(px - 0.3, px + 3.3, py - 0.3, py + 3.3, z + 3.0, z + 3.2, "timber")
         b.blob(x1 - 2.0, y1 - 2.0, z + 1.4, 1.1, 1.1, 0.9, "foliage", lin((0.36, 0.56, 0.28)), c.rnd, subdiv=0)
+        if era == 2:
+            b.blob(px + 1.5, py + 1.5, z + 3.4, 2.0, 2.0, 0.5, "foliage", vd.VINE, c.rnd)
 
 
-def town_block(storeys, seed):
+ERA_TREE = (1.0, 1.15, 1.4)  # street and courtyard trees mature by era
+
+
+def town_block(storeys, seed, era=0):
     """Perimeter block of individual 3-4 storey buildings around a courtyard garden."""
     b = Builder()
-    c = ctx(b, seed)
+    c = ctx(b, seed + era * 1000)
+    c.era = era
     town_ground(b)
-    r = c.rnd
+    r = random.Random(seed)  # layout only: identical in every era
     outer, inner = 27.5, 13.5
     segments = []
     xs = [-outer, -12.0, 4.0, outer]
@@ -182,17 +198,19 @@ def town_block(storeys, seed):
         st = storeys - (1 if r.random() < 0.35 else 0)
         roof = "hip" if r.random() < 0.6 else "terrace"
         others = [(a0 - 0.2, a1 + 0.2, b0 - 0.2, b1 + 0.2) for j, (a0, a1, b0, b1, _) in enumerate(segments) if j != k]
-        town_building(c, x0 + 0.05, x1 - 0.05, y0 + 0.05, y1 - 0.05, st, roof, PALETTE[(k + seed) % len(PALETTE)], shopfront_side=side, others=others)
+        town_building(c, x0 + 0.05, x1 - 0.05, y0 + 0.05, y1 - 0.05, st, roof, PALETTE[(k + seed) % len(PALETTE)], shopfront_side=side, others=others, idx=k)
     # Courtyard garden.
     b.plate(-inner + 0.5, inner - 0.5, -inner + 0.5, inner - 0.5, TOWN_GROUND, TOWN_GROUND + 0.25, "lawn", step=3.0)
     strip(b, [(-12, 0), (12, 0)], 1.6, TOWN_GROUND + 0.27, "gravel")
-    lifted(b, TOWN_GROUND + 0.25, vd.olive, c, -6.0, 6.0, 1.0)
-    lifted(b, TOWN_GROUND + 0.25, vd.olive, c, 6.5, -5.5, 0.9)
-    round_tree(c, 5.0, 6.5, TOWN_GROUND, 1.1)
+    lifted(b, TOWN_GROUND + 0.25, vd.olive, c, -6.0, 6.0, ERA_TREE[era])
+    lifted(b, TOWN_GROUND + 0.25, vd.olive, c, 6.5, -5.5, 0.9 * ERA_TREE[era])
+    round_tree(c, 5.0, 6.5, TOWN_GROUND, 1.1 * ERA_TREE[era])
+    if era == 2:
+        round_tree(c, -6.0, -7.0, TOWN_GROUND, 1.2)
     return b
 
 
-def town_plaza(seed):
+def town_plaza(seed, era=0):
     b = Builder()
     c = ctx(b, seed)
     town_ground(b, "paving")
@@ -238,24 +256,37 @@ def town_plaza(seed):
         b.box(x - 0.08, x + 0.08, y - 0.08, y + 0.08, TOWN_GROUND + 1.0, TOWN_GROUND + 3.0, "plain")
         tapered(b, x, y, TOWN_GROUND + 2.9, TOWN_GROUND + 3.6, 2.0, 0.1, 8, "canvas", lin((0.95, 0.93, 0.88)), cap=False)
     for x, y in ((24.0, -14.0), (24.0, 2.0), (-4.0, 12.0), (-4.0, -14.0), (12.0, 24.0)):
-        round_tree(c, x, y, TOWN_GROUND, 1.25)
+        round_tree(c, x, y, TOWN_GROUND, 1.25 * ERA_TREE[era])
+    if era >= 1:
+        # Solar pergola over the cafe terrace and a bike-share dock.
+        for x in (12.0, 22.0):
+            for y in (8.0, 21.0):
+                b.box(x - 0.15, x + 0.15, y - 0.15, y + 0.15, TOWN_GROUND, TOWN_GROUND + 4.6, "plain", lin((0.55, 0.57, 0.6)))
+        b.box(11.6, 22.4, 7.6, 21.4, TOWN_GROUND + 4.6, TOWN_GROUND + 4.8, "plain", lin((0.55, 0.57, 0.6)), top="pv")
+        for k in range(5):
+            b.box(-1.0 + k * 1.2, -0.4 + k * 1.2, -12.0, -10.8, TOWN_GROUND, TOWN_GROUND + 1.0, "plain", lin((0.2, 0.55, 0.45)))
+    if era == 2:
+        for x, y in ((-2.0, 22.0), (26.0, 24.0), (16.0, -26.0)):
+            round_tree(c, x, y, TOWN_GROUND, 1.3)
     for x, y in ((0.0, 4.0), (15.0, -8.0)):
         b.box(x - 1.6, x + 1.6, y - 0.4, y + 0.4, TOWN_GROUND, TOWN_GROUND + 0.8, "timber")
     return b
 
 
-def town_civic(seed):
+def town_civic(seed, era=0):
     b = Builder()
     c = ctx(b, seed)
+    c.era = era
     town_ground(b)
     # School: L-plan, three storeys, flat roof; clinic: two storeys, hip roof.
     for (x0, x1, y0, y1) in ((-27.0, 6.0, 9.0, 21.0), (-27.0, -15.0, -9.0, 9.0)):
         b.box(x0, x1, y0, y1, TOWN_GROUND, TOWN_GROUND + 3 * STOREY, "stucco", lin((0.97, 0.95, 0.90)))
         simple_windows(c, x0, x1, y0, y1, TOWN_GROUND, 3, size=(2.4, 1.6), spacing=3.2)
-        b.box(x0, x1, y0, y1, TOWN_GROUND + 3 * STOREY, TOWN_GROUND + 3 * STOREY + 0.6, "stucco", lin((0.97, 0.95, 0.90)), top="gravel")
-    for i in range(6):
-        x = -24.0 + i * 5.0
-        b.box(x, x + 4.0, 10.5, 18.0, TOWN_GROUND + 3 * STOREY + 0.6, TOWN_GROUND + 3 * STOREY + 0.9, "plain", top="pv")
+        b.box(x0, x1, y0, y1, TOWN_GROUND + 3 * STOREY, TOWN_GROUND + 3 * STOREY + 0.6, "stucco", lin((0.97, 0.95, 0.90)), top="greenroof" if era == 2 else "gravel")
+    if era >= 1:
+        for i in range(6):
+            x = -24.0 + i * 5.0
+            b.box(x, x + 4.0, 10.5, 18.0, TOWN_GROUND + 3 * STOREY + 0.6, TOWN_GROUND + 3 * STOREY + 0.9, "plain", top="pv")
     b.box(-15.0, -6.0, 3.0, 9.0, TOWN_GROUND, TOWN_GROUND + 3.2, "timber", top="plain")  # entrance canopy
     c.wall_tint = lin((0.96, 0.90, 0.80))
     b.box(10.0, 27.0, 5.0, 21.0, TOWN_GROUND, TOWN_GROUND + 2 * STOREY, "stucco", c.wall_tint)
@@ -270,7 +301,7 @@ def town_civic(seed):
         b.box(x - 0.12, x + 0.12, -26.2, -7.8, TOWN_GROUND + 0.2, TOWN_GROUND + 0.23, "plain", sides=False)
     disc(b, 5.0, -17.0, TOWN_GROUND + 0.24, 2.4, 14, "plain", lin((0.8, 0.85, 0.82)))
     for x, y in ((-20.0, -15.0), (-22.0, -24.0), (25.0, -3.0), (25.0, -20.0)):
-        round_tree(c, x, y, TOWN_GROUND, 1.2)
+        round_tree(c, x, y, TOWN_GROUND, 1.2 * ERA_TREE[era])
     lifted(b, TOWN_GROUND, vd.cypress, Ctx(b, 0, 0, c.rnd), 8.0, 24.5, 0.8)
     return b
 
@@ -515,12 +546,13 @@ def main():
     for layout in range(len(vd.LAYOUTS)):
         for era in (0, 1, 2):
             parts.append((f"district-L{layout}-era-{era}", vd.build_era(era, layout)))
-    parts += [
-        ("town-plaza", town_plaza(11)),
-        ("town-block-3", town_block(3, 12)),
-        ("town-block-4", town_block(4, 13)),
-        ("town-civic", town_civic(14)),
-    ]
+    for era in (0, 1, 2):
+        parts += [
+            (f"town-plaza-era-{era}", town_plaza(11, era)),
+            (f"town-block-3-era-{era}", town_block(3, 12, era)),
+            (f"town-block-4-era-{era}", town_block(4, 13, era)),
+            (f"town-civic-era-{era}", town_civic(14, era)),
+        ]
     sb, sp = solar_parts(21)
     wb, wr = wind_parts(22)
     parts += [("solar-base", sb), ("solar-panels", sp), ("wind-base", wb), ("wind-rotor", wr), ("park-base", park_base(23)), ("park-crown", park_crown(27)),

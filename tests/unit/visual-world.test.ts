@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { GRID_COLS, TILE_SIZE, TerrainType } from '../../src/config/scenario';
 import { tileCenter, tileTopY } from '../../src/world/board-coords';
 import { idNumber, hashInts, rng } from '../../src/world/rand';
-import { decorPlan } from '../../src/world/terrain-decor';
+import { decorHash, decorPlan, regrowPlan } from '../../src/world/terrain-decor';
 import { generateTerrain } from '../../src/world/terrain-map';
 
 // Pure parts of the visual overhaul. (Rendering itself is checked in the browser.)
@@ -58,5 +58,31 @@ describe('decoration plan', () => {
 
   it('terrace walls only on steeper hills (elevation >= 2)', () => {
     for (const it of plan.filter((i) => i.kind === 'wall')) expect(terrain[it.tile].elevation).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('time-travel decoration layers', () => {
+  it('regrowth is deterministic, only on plains and hills, inside its tile', () => {
+    const regrow = regrowPlan(terrain);
+    expect(regrowPlan(terrain)).toEqual(regrow);
+    expect(regrow.length).toBeGreaterThan(0);
+    for (const it of regrow) {
+      const t = terrain[it.tile];
+      expect([TerrainType.Plain, TerrainType.Hill]).toContain(t.type);
+      const c = tileCenter(t.col, t.row);
+      expect(Math.abs(it.x - c.x)).toBeLessThanOrEqual(TILE_SIZE / 2);
+      expect(Math.abs(it.z - c.z)).toBeLessThanOrEqual(TILE_SIZE / 2);
+    }
+  });
+
+  it('loss is stable per item and roughly proportional to the share', () => {
+    const plan = decorPlan(terrain);
+    const h = plan.map(decorHash);
+    expect(plan.map(decorHash)).toEqual(h);
+    const lost = (share: number) => h.filter((v) => v < share).length / h.length;
+    expect(lost(0)).toBe(0);
+    expect(lost(0.5)).toBeGreaterThan(0.35);
+    expect(lost(0.5)).toBeLessThan(0.65);
+    expect(lost(0.75)).toBeGreaterThan(lost(0.5));
   });
 });

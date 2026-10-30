@@ -28,7 +28,7 @@ import { mergeStatic } from './merge.js';
 import { block, paint, PAINTED, PAINTED_FLAT } from './palette.js';
 import { hashInts, idNumber } from './rand.js';
 import { createStructureModel, setRoadArms, structureLook } from './structure-models.js';
-import { decorPlan, TerrainDecor } from './terrain-decor.js';
+import { decorHash, decorPlan, LOSABLE, regrowPlan, TerrainDecor } from './terrain-decor.js';
 import { tileAt, type TerrainMap } from './terrain-map.js';
 
 const DRY_LAND = new Color('#d6b979');
@@ -74,14 +74,23 @@ export function createMiniBoard(terrain: TerrainMap, plan: readonly Placement[],
   // Fine detail (tufts, flowers, shrubs, rocks, walls, foam) is invisible at
   // mini scale; keep the field, orchard and forest silhouettes only.
   const MINI_KINDS = new Set(['crop', 'olive', 'pine', 'round', 'cypress']);
-  const items = decorPlan(terrain)
+  // Same stable loss / regrowth as the main board (time-travel mapping).
+  const regrown = regrowPlan(terrain).filter((it) => decorHash(it) >= 1 - state.greening);
+  const items = [...decorPlan(terrain), ...regrown]
     .filter((it) => !covered.has(it.tile) && MINI_KINDS.has(it.kind))
+    .filter((it) => !(LOSABLE.has(it.kind) && decorHash(it) < state.treeLoss))
     .map((it) => ({ ...it, color: `#${leaf.set(it.color).lerp(DRY_LEAF, it.kind === 'foam' || it.kind === 'rock' ? 0 : dry).getHexString()}` }));
   g.add(new TerrainDecor(items, PAINTED_FLAT).group);
 
   // Static content baked into painted meshes.
   const statics = new Group();
-  statics.add(buildTown(terrain));
+  const town = buildTown(terrain);
+  setEra(town, state.homeEra);
+  for (const n of ['era-0', 'era-1', 'era-2']) {
+    const g = town.getObjectByName(n);
+    if (g && !g.visible) town.remove(g);
+  }
+  statics.add(town);
   for (const p of plan) {
     const { variant, seed } = structureLook(p.id, idNumber(p.id));
     const model = createStructureModel(p.type, p.id, variant, seed);

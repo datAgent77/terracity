@@ -9,7 +9,10 @@
  *    proportional to the residents it holds;
  *  - vegetation vigour falls monotonically with the projected environment, and
  *    only reaches "healthy" when the environment target is met;
- *  - the "balanced" look is used only when every target is met that year.
+ *  - the "balanced" look is used only when every target is met that year;
+ *  - decline (haze, tree and crop loss) appears ONLY when the projected
+ *    environment misses its target, recovery (greening) ONLY when it meets it,
+ *    never both, and neither in 2026.
  */
 import { TARGETS } from '../config/balance.js';
 import { PROJECTION, type Year } from '../config/projection.js';
@@ -22,8 +25,10 @@ import { tileAt, type TerrainMap } from './terrain-map.js';
 export const ENV_BARREN = 30;
 /** Environment of the untouched region (fully vibrant). */
 export const ENV_PRISTINE = 72;
-/** Strongest tint toward dry ochre, kept restrained. */
-export const MAX_DRYNESS = 0.7;
+/** Strongest tint toward dry ochre (land visibly parched when the environment collapses). */
+export const MAX_DRYNESS = 0.92;
+/** Largest share of trees and crops lost when the environment collapses. */
+export const MAX_TREE_LOSS = 0.75;
 
 export interface SprawlTile {
   col: number;
@@ -58,6 +63,15 @@ export interface FutureVisualState {
   renewableActivity: number;
   /** Architectural era of the garden districts: 0 = 2026, 1 = 2035, 2 = 2050. */
   homeEra: 0 | 1 | 2;
+  /**
+   * Smog / heat haze, dimmer sun and murky water (0..1): grows as the projected
+   * environment falls below its target; 0 when it is met and in 2026.
+   */
+  haze: number;
+  /** Share of trees and crops lost to drought, fire and sprawl pressure (0..MAX_TREE_LOSS). */
+  treeLoss: number;
+  /** Reforestation of free plains and hills (0..1): only when the environment target is met. */
+  greening: number;
   /** Park tree size multiplier (mirrors the park-maturity rule). */
   parkGrowth: number;
   /** Every target met in this year -> the balanced look. */
@@ -118,6 +132,10 @@ export function futureVisualState(
 
   const vigor = vigorFor(projected.environment);
   const checks = checkTargets(projected);
+  const envMet = projected.environment >= TARGETS.environment;
+  // Concave curve: a clear miss already reads as visible decline.
+  const decline = envMet ? 0 : Math.pow(clamp01((VIGOR_AT_TARGET - vigor) / VIGOR_AT_TARGET), 0.6);
+  const recovery = envMet ? clamp01(0.35 + (0.65 * (vigor - VIGOR_AT_TARGET)) / (1 - VIGOR_AT_TARGET)) : 0;
   return {
     year: projected.year,
     progress,
@@ -128,6 +146,9 @@ export function futureVisualState(
     floodRisk,
     renewableActivity: clamp01(projected.renewableCoverage / 100),
     homeEra: eraForProgress(progress),
+    haze: progress * decline,
+    treeLoss: progress * decline * MAX_TREE_LOSS,
+    greening: progress * recovery,
     parkGrowth: 1 + 0.6 * progress * (PROJECTION.parkMaturity2050 / 2),
     balanced: allMet(checks),
     missed: (Object.keys(checks) as Array<keyof TargetCheck>).filter((k) => !checks[k]),
