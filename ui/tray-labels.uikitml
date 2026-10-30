@@ -1,0 +1,17 @@
+<!--
+  Labels under the supply tray: one cell per structure slot (8.5 cm pitch).
+  Updated at runtime with cost; armed slot is highlighted.
+-->
+<style>
+  .strip { flex-direction: row; width: 44px; height: 5px; background-color: #f6efe2; border-radius: 1px; }
+  .cell { width: 8.5px; height: 5px; flex-direction: column; align-items: center; justify-content: center; border-radius: 1px; }
+  .name { font-size: 1.7px; font-weight: 700; color: #3a2c1c; }
+  .cost { font-size: 1.2px; color: #6a5a48; }
+</style>
+<div class="strip">
+  <div id="slot-1" class="cell"><div class="name">Homes</div><div id="cost-1" class="cost">12</div></div>
+  <div id="slot-2" class="cell"><div class="name">Solar</div><div id="cost-2" class="cost">9</div></div>
+  <div id="slot-3" class="cell"><div class="name">Wind</div><div id="cost-3" class="cost">14</div></div>
+  <div id="slot-4" class="cell"><div class="name">Park</div><div id="cost-4" class="cost">4</div></div>
+  <div id="slot-5" class="cell"><div class="name">Road</div><div id="cost-5" class="cost">2</div></div>
+</div>

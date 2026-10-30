@@ -1,0 +1,92 @@
+<!--
+  TerraCity HUD: title, the four plan metrics against their 2050 targets, and
+  the live cause -> consequence line. Horizon kit + Lucide icons.
+-->
+<style>
+  .panel-root { flex-direction: column; width: 380px; }
+  .panel-content { flex-direction: column; padding-top: 14px; padding-left: 22px; padding-right: 22px; }
+  .title { font-size: 26px; font-weight: 700; color: #1d5f6b; }
+  .title:dark { color: #7fe3ea; }
+  .tagline { font-size: 13px; color: #4a4a4a; margin-bottom: 8px; }
+  .tagline:dark { color: rgba(255, 255, 255, 0.75); }
+  .row { flex-direction: row; align-items: center; gap: 10px; margin-top: 8px; width: 100%; }
+  .icon { width: 20px; height: 20px; color: #3b6f78; }
+  .label { font-size: 15px; font-weight: 500; color: #333333; width: 120px; }
+  .label:dark { color: rgba(255, 255, 255, 0.85); }
+  .value { font-size: 19px; font-weight: 700; color: #272727; width: 110px; }
+  .value:dark { color: #ffffff; }
+  .target { font-size: 12px; color: #777777; }
+  .target:dark { color: rgba(255, 255, 255, 0.6); }
+  .status { font-size: 16px; font-weight: 500; color: #1f2a2d; margin-top: 12px; margin-bottom: 4px; width: 100%; }
+  .status:dark { color: rgba(255, 255, 255, 0.92); }
+  .yearline { flex-direction: row; justify-content: space-between; width: 100%; margin-bottom: 6px; }
+  .year { font-size: 16px; font-weight: 700; color: #1d3f46; }
+  .year:dark { color: #ffffff; }
+  .clock { font-size: 16px; font-weight: 700; color: #1d5f6b; }
+  .clock:dark { color: #7fe3ea; }
+  .sprawl { font-size: 12px; color: #b5651d; margin-left: 30px; }
+  .land { font-size: 12px; color: #4f6b55; margin-top: 6px; width: 100%; }
+  .land:dark { color: rgba(220, 240, 225, 0.85); }
+  .coach { font-size: 15px; font-weight: 600; color: #3a2c00; background-color: #ffe9a8; border-radius: 10px;
+           padding-top: 8px; padding-bottom: 8px; padding-left: 10px; padding-right: 10px; margin-top: 10px; width: 100%; }
+  .prefs { flex-direction: row; gap: 8px; margin-top: 10px; }
+  .chip { height: 38px; padding-left: 12px; padding-right: 12px; border-radius: 17px; justify-content: center; align-items: center;
+          background-color: #e8eef0; border-width: 1px; border-color: #c7d6da; cursor: pointer; }
+  .chip-label { font-size: 14px; font-weight: 700; color: #1d3f46; }
+  .button { justify-content: flex-start; margin-left: 22px; margin-right: 22px; margin-top: 12px; margin-bottom: 18px; }
+</style>
+<Panel id="root" class="panel-root">
+  <div class="panel-content">
+    <div class="title">TerraCity</div>
+    <div class="tagline">Plan Costa Verde for 2050.</div>
+    <div class="yearline">
+      <div id="m-year" class="year">2026 - today</div>
+      <div id="m-clock" class="clock">7:00</div>
+    </div>
+    <Divider></Divider>
+    <div class="row">
+      <Users class="icon"></Users>
+      <div class="label">Population</div>
+      <div id="m-population" class="value">12,000</div>
+      <div id="t-population" class="target">goal 28,000</div>
+    </div>
+    <div id="m-sprawl" class="sprawl"></div>
+    <div class="row">
+      <Leaf class="icon"></Leaf>
+      <div class="label">Environment</div>
+      <div id="m-environment" class="value">72</div>
+      <div id="t-environment" class="target">goal 60+</div>
+    </div>
+    <div class="row">
+      <Wallet class="icon"></Wallet>
+      <div class="label">Budget left</div>
+      <div id="m-budget" class="value">120</div>
+      <div id="t-budget" class="target">of 120</div>
+    </div>
+    <div class="row">
+      <Zap class="icon"></Zap>
+      <div class="label">Renewable</div>
+      <div id="m-renewable" class="value">17%</div>
+      <div id="t-renewable" class="target">goal 80%</div>
+    </div>
+    <div id="m-land" class="land">-</div>
+    <Divider></Divider>
+    <div id="coach" class="coach">-</div>
+    <div id="status-text" class="status">Pinch a structure from the tray and drop it on the map.</div>
+  </div>
+  <div class="panel-content">
+    <div class="prefs">
+      <div id="btn-skip-tips" class="chip"><div id="skip-tips-label" class="chip-label">Skip tips</div></div>
+      <div id="btn-text-size" class="chip"><div id="text-size-label" class="chip-label">Larger text</div></div>
+      <div id="btn-sound" class="chip"><div id="sound-label" class="chip-label">Sound on</div></div>
+    </div>
+  </div>
+  <Button id="xr-button" class="button">
+    <ButtonIcon><RectangleGoggles></RectangleGoggles></ButtonIcon>
+    <ButtonLabel>Enter Mixed Reality</ButtonLabel>
+  </Button>
+  <Button id="exit-button" class="button" style="display: none">
+    <ButtonIcon><LogIn></LogIn></ButtonIcon>
+    <ButtonLabel>Exit to Browser</ButtonLabel>
+  </Button>
+</Panel>

@@ -1,0 +1,33 @@
+<!--
+  TerraCity plan pad: large poke/ray targets in two columns.
+  Left: edit the map. Right: compare plans and finish.
+-->
+<style>
+  .panel-root { flex-direction: column; width: 400px; padding-top: 12px; padding-bottom: 14px; }
+  .heading { font-size: 16px; font-weight: 700; color: #1d5f6b; margin-left: 20px; }
+  .heading:dark { color: #7fe3ea; }
+  .cols { flex-direction: row; }
+  .col { flex-direction: column; width: 200px; }
+  .button { justify-content: flex-start; margin-left: 14px; margin-right: 8px; margin-top: 8px; }
+  .enter { justify-content: center; margin-left: 14px; margin-right: 14px; margin-top: 12px; }
+</style>
+<Panel id="root" class="panel-root">
+  <div class="heading">Plan</div>
+  <div class="cols">
+    <div class="col">
+      <Button id="btn-undo" class="button"><ButtonIcon><Undo2></Undo2></ButtonIcon><ButtonLabel>Undo</ButtonLabel></Button>
+      <Button id="btn-redo" class="button"><ButtonIcon><Redo2></Redo2></ButtonIcon><ButtonLabel>Redo</ButtonLabel></Button>
+      <Button id="btn-rotate" class="button"><ButtonIcon><RotateCw></RotateCw></ButtonIcon><ButtonLabel>Rotate</ButtonLabel></Button>
+      <Button id="btn-remove" class="button"><ButtonIcon><Trash2></Trash2></ButtonIcon><ButtonLabel>Remove</ButtonLabel></Button>
+      <Button id="btn-restart" class="button"><ButtonIcon><RefreshCw></RefreshCw></ButtonIcon><ButtonLabel>Clear map</ButtonLabel></Button>
+    </div>
+    <div class="col">
+      <Button id="btn-save-a" class="button"><ButtonIcon><Save></Save></ButtonIcon><ButtonLabel>Save Plan A</ButtonLabel></Button>
+      <Button id="btn-restore-a" class="button"><ButtonIcon><History></History></ButtonIcon><ButtonLabel>Restore A</ButtonLabel></Button>
+      <Button id="btn-compare" class="button"><ButtonIcon><Columns2></Columns2></ButtonIcon><ButtonLabel>Compare A/B</ButtonLabel></Button>
+      <Button id="btn-pause" class="button"><ButtonIcon><Pause></Pause></ButtonIcon><ButtonLabel id="pause-label">Pause</ButtonLabel></Button>
+      <Button id="btn-finish" class="button"><ButtonIcon><Flag></Flag></ButtonIcon><ButtonLabel>Finish plan</ButtonLabel></Button>
+    </div>
+  </div>
+  <Button id="btn-enter" class="enter"><ButtonIcon><DoorOpen></DoorOpen></ButtonIcon><ButtonLabel>Enter your city</ButtonLabel></Button>
+</Panel>

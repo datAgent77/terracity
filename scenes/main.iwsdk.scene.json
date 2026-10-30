@@ -1,0 +1,243 @@
+{
+  "version": "iwsdk.scene.v1",
+  "units": "meters",
+  "components": {
+    "com.iwsdk.components.IBLGradient": {
+      "sky": [
+        0.74,
+        0.86,
+        0.96,
+        1
+      ],
+      "equator": [
+        0.95,
+        0.9,
+        0.82,
+        1
+      ],
+      "ground": [
+        0.72,
+        0.64,
+        0.52,
+        1
+      ],
+      "intensity": 0.62
+    }
+  },
+  "resources": {},
+  "nodes": [
+    {
+      "id": "hud-panel",
+      "name": "HUD Panel",
+      "content": {
+        "type": "asset",
+        "asset": "hud-panel"
+      },
+      "transform": {
+        "position": [
+          -0.38,
+          1.12,
+          -0.62
+        ],
+        "rotationDeg": [
+          -5.9,
+          29.6,
+          0
+        ],
+        "scale": 0.075
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {},
+        "ScreenSpace": {
+          "top": "16px",
+          "left": "16px",
+          "width": "22vw",
+          "height": "52%"
+        }
+      }
+    },
+    {
+      "id": "actions-panel",
+      "name": "Plan Actions",
+      "content": {
+        "type": "asset",
+        "asset": "actions-panel"
+      },
+      "transform": {
+        "position": [
+          0.38,
+          1.08,
+          -0.62
+        ],
+        "rotationDeg": [
+          -8.9,
+          -29.6,
+          0
+        ],
+        "scale": 0.075
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {},
+        "ScreenSpace": {
+          "top": "16px",
+          "right": "16px",
+          "width": "21vw",
+          "height": "42%"
+        }
+      }
+    },
+    {
+      "id": "tray-labels",
+      "name": "Tray Labels",
+      "metadata": {
+        "iwsdk.validation": {
+          "allowFloating": true
+        }
+      },
+      "content": {
+        "type": "asset",
+        "asset": "tray-labels"
+      },
+      "transform": {
+        "position": [
+          0,
+          0.777,
+          -0.087
+        ],
+        "rotationDeg": [
+          -65,
+          0,
+          0
+        ],
+        "scale": 1
+      },
+      "components": {}
+    },
+    {
+      "id": "time-panel",
+      "name": "Time Control",
+      "content": {
+        "type": "asset",
+        "asset": "time-panel"
+      },
+      "transform": {
+        "position": [
+          0.0,
+          0.93,
+          -0.88
+        ],
+        "rotationDeg": [
+          -16.2,
+          0.0,
+          0
+        ],
+        "scale": 0.08
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {},
+        "ScreenSpace": {
+          "top": "64px",
+          "left": "37vw",
+          "width": "26vw",
+          "height": "14%"
+        }
+      }
+    },
+    {
+      "id": "overlay-panel",
+      "name": "Intro and Result",
+      "content": {
+        "type": "asset",
+        "asset": "overlay-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          1.27,
+          -0.64
+        ],
+        "rotationDeg": [
+          -2.2,
+          0,
+          0
+        ],
+        "scale": 0.085
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {},
+        "ScreenSpace": {
+          "left": "29vw",
+          "width": "42vw",
+          "height": "46%",
+          "bottom": "3%"
+        }
+      }
+    },
+    {
+      "id": "compare-panel",
+      "name": "Plan Comparison",
+      "content": {
+        "type": "asset",
+        "asset": "compare-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          1.17,
+          -0.72
+        ],
+        "rotationDeg": [
+          -6,
+          0,
+          0
+        ],
+        "scale": 0.07
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {},
+        "ScreenSpace": {
+          "bottom": "26%",
+          "right": "16px",
+          "width": "19vw",
+          "height": "26%"
+        }
+      }
+    },
+    {
+      "id": "street-panel",
+      "name": "Street Visit",
+      "content": {
+        "type": "asset",
+        "asset": "street-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          0.9,
+          -0.48
+        ],
+        "rotationDeg": [
+          -34,
+          0,
+          0
+        ],
+        "scale": 0.07
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {},
+        "ScreenSpace": {
+          "left": "27vw",
+          "width": "46vw",
+          "height": "44%",
+          "bottom": "2%"
+        }
+      }
+    }
+  ]
+}
