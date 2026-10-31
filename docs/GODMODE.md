@@ -198,3 +198,62 @@ Tests: unit 163 / 163 (7 new); Playwright 29 passed, 3 skipped (new e2e *the las
 
 - Subtitles and a chime only; no voice acting. Stylised procedural figure.
 - One character, one location, three states (plus the second-line variants).
+
+## Phase 4 — Sculpt Time
+
+Branch `feature/godmode-sculpt-time` (from phase 3).
+
+**The time dial**: a glowing 240° ring beside the table (XR: right-front, near a
+seated player's right hand, facing them; desktop: lower right, facing the
+camera) with 2026 / 2035 / 2050 notches and a golden knob.
+
+- **Hands**: pinch the knob and move it along the ring. The world follows
+  continuously — trees and crops disappear or woodland returns, land parches or
+  greens, smog thickens, the sea creeps up, villas and the town change era,
+  turbines speed up — with a soft clockwork tick per passing year. Let go and it
+  settles on the nearest simulated year (chime).
+- **Ray / mouse** (one-hand / desktop alternative): press anywhere on the ring
+  to jump there and drag to scrub; tap a year label to go to that year.
+- The year panel stays as the conventional control.
+
+**Simulation integrity** (`src/interactions/time-dial.ts`, pure, 5 unit tests):
+only 2026, 2035 and 2050 are simulated. In between, the visual parameters
+(progress, dryness, haze, tree loss, greening, renewable activity, park growth)
+are linearly interpolated between the two neighbouring simulated years, and the
+label says so: `~2039 (between projections)`. The numbers on the HUD, sprawl
+tiles and at-risk sites follow the nearest simulated year (discrete), because
+interpolating them would be misleading. Releasing always ends on a simulated
+year; the plan is never touched.
+
+**Implementation**: a `timeScrub` signal (null when not scrubbing); `FutureSystem`
+precomputes the mapped state of all three years on each recompute and, while
+scrubbing, follows the interpolated target; the dial system
+(`src/world/time-dial-system.ts`) handles the knob (OneHandGrabbable handle in
+XR only), the ray/mouse face (pointer capture), snapping, labels and sounds. The
+dial is hidden inside a street and while the futures are split (both rebuild per
+year instead).
+
+**Bugs found while testing (fixed)**: the dial's lower-left sat inside the
+board's hill tiles (the board caught the pointer first) — moved out; the visual
+knob, ring and notch spheres caught rays meant for the face — made
+non-pickable; the action pad's ScreenSpace box was taller than its content and
+covered part of the dial on desktop — reduced to 38 %.
+
+### Evidence (`docs/visual/gm4-*`, `gm4-log.txt`)
+
+- Desktop mouse: `gm4-1-dial-2026.png`, `gm4-2-scrub-2031.png`,
+  `gm4-3-scrub-2039.png` (interpolated, labelled), `gm4-4-snapped-2050.png`.
+- IWER hands: `gm4-5-xr-turning-time.png` (knob held, ~2041, world mid-way),
+  `gm4-6-xr-2050.png` (released, snapped).
+
+### Limitations
+
+- Linear interpolation of visual parameters is a presentation device, not a
+  simulation of the intermediate years.
+- Inside a street or with the futures split, time changes are discrete (rebuild).
+
+Tests: unit 168 / 168 (5 new); Playwright 30 passed, 3 skipped (new
+`time-dial.spec.ts`: mouse drag, interpolated + labelled in between, snap on
+release, tap-to-jump, plan unchanged); IWER hand scripts exit 0; Split Reality
+gesture flow re-run on this branch passes; IWER hand turning (knob held, ~2041,
+release snaps to 2050) passes; build OK.

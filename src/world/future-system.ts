@@ -39,9 +39,11 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import { BOARD_CENTER, GRID_COLS, TILE_SIZE, TerrainType } from '../config/scenario.js';
-import { compareOpen, game, phase, planA, planVersion, viewYear } from '../core/session.js';
+import { compareOpen, game, phase, planA, planVersion, timeScrub, viewYear } from '../core/session.js';
 import { Placeable, TrayToken } from '../interactions/placeable-component.js';
 import { projectYear } from '../simulation/projection.js';
+import { YEARS, type Year } from '../config/projection.js';
+import { interpolate } from '../interactions/time-dial.js';
 import { prefersReducedMotion } from '../ui/accessibility.js';
 import { tileCenter, tileTopY } from './board-coords.js';
 import { boardDecor } from './board-mesh.js';
@@ -500,9 +502,27 @@ export class FutureSystem extends createSystem({
     idle(step);
   }
 
+  /** Mapped state of every simulated year, for continuous time scrubbing. */
+  private yearStates: Record<Year, Shown> | null = null;
+
+  private shownOf(st: FutureVisualState): Shown {
+    return {
+      progress: st.progress,
+      dryness: st.dryness,
+      activity: st.renewableActivity,
+      parkGrowth: st.parkGrowth,
+      haze: st.haze,
+      treeLoss: st.treeLoss,
+      greening: st.greening,
+    };
+  }
+
   private recompute(): void {
     const plan = game.placements;
     const year = viewYear.peek();
+    this.yearStates = Object.fromEntries(
+      YEARS.map((y) => [y, this.shownOf(futureVisualState(game.terrain, plan, projectYear(game.terrain, plan, y, game.metrics)))]),
+    ) as Record<Year, Shown>;
     const projected = projectYear(game.terrain, plan, year, game.metrics);
     this.state = futureVisualState(game.terrain, plan, projected);
     const st = this.state;
@@ -584,6 +604,18 @@ export class FutureSystem extends createSystem({
     const animating = this.t < 1;
     if (animating) this.t = Math.min(1, this.t + delta / DURATION);
     const k = smooth(this.t);
+    const scrub = timeScrub.peek();
+    if (scrub !== null && this.yearStates) {
+      // Sculpt time: follow the dial continuously, interpolating between the
+      // simulated years (only 2026 / 2035 / 2050 are simulated).
+      const target = interpolate(this.yearStates as unknown as Record<Year, Record<string, number>>, scrub) as unknown as Shown;
+      const f = Math.min(1, delta * 12);
+      const cur = this.shown as unknown as Record<string, number>;
+      const next = {} as Record<string, number>;
+      for (const key of Object.keys(target)) next[key] = cur[key] + ((target as unknown as Record<string, number>)[key] - cur[key]) * f;
+      this.from = next as unknown as Shown;
+      this.to = next as unknown as Shown;
+    }
     this.shown = {
       progress: lerp(this.from.progress, this.to.progress, k),
       dryness: lerp(this.from.dryness, this.to.dryness, k),
@@ -625,7 +657,7 @@ export class FutureSystem extends createSystem({
       if (m.visible && !prefersReducedMotion()) m.position.x = 0.012 * Math.sin(this.clock * (i ? 0.11 : 0.07) + i);
     }
 
-    if ((animating || this.t === 1) && !this.prewarming) {
+    if ((animating || this.t === 1 || scrub !== null) && !this.prewarming) {
       // Sprawl reveal, staggered; fields under visible sprawl give way.
       let hiddenChanged = false;
       for (const [idx, e] of this.sprawl) {

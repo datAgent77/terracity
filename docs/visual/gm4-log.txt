@@ -1,0 +1,8 @@
+mouse drag to 0.25: label="~2031 (between projections)" year=2035 | haze 0.03 treeLoss 0.02 dryness 0.23 progress 0.25
+mouse drag to 0.625: label="~2039 (between projections)" year=2035 | haze 0.19 treeLoss 0.14 dryness 0.35 progress 0.63
+mouse drag to 0.9: label="~2047 (between projections)" year=2050 | haze 0.47 treeLoss 0.36 dryness 0.48 progress 0.90
+released: label="2050" year=2050 dragging=null | haze 0.47 treeLoss 0.36 dryness 0.48 progress 0.90
+xr before: {"faceDowns":1,"p":0,"label":"2026","dragging":null,"visible":true,"year":2026}
+xr hand turning: label="~2041 (between projections)" dragging=hand year=2035 | haze 0.27 treeLoss 0.20 dryness 0.38 progress 0.70
+xr released: label="2050" year=2050 | haze 0.45 treeLoss 0.34 dryness 0.47 progress 0.88
+page errors: 0 

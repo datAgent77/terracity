@@ -147,6 +147,13 @@ export const sfx = {
       o.stop(t0 + dt + 0.55);
     }
   },
+  /** Sculpt time: a soft clockwork tick per passing year. */
+  timeTick: () => tone(2400, 0, 0.03, 'square', 0.05),
+  /** The dial settles on a simulated year. */
+  yearSnap: () => {
+    tone(1320, 0, 0.35, 'sine', 0.14);
+    tone(1980, 0.05, 0.4, 'sine', 0.06);
+  },
   win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.12, 0.35, 'sine', 0.3)),
   lose: () => {
     tone(392, 0, 0.3, 'triangle', 0.25);
