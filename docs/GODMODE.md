@@ -257,3 +257,63 @@ Tests: unit 168 / 168 (5 new); Playwright 30 passed, 3 skipped (new
 release, tap-to-jump, plan unchanged); IWER hand scripts exit 0; Split Reality
 gesture flow re-run on this branch passes; IWER hand turning (knob held, ~2041,
 release snaps to 2050) passes; build OK.
+
+## Phase 5 — Polish
+
+Branch `feature/godmode-polish` (from phase 4).
+
+- **Onboarding along GODMODE** (`gameplay/tutorial.ts`, pure, unit-tested): five
+  tips — place homes → add wind → **split the world** → **pull a future toward you
+  and step inside** ("someone lives there in 2050") → **come back, merge, change
+  the plan and visit her again**. Each GODMODE step needs its own action. The
+  next control glows amber (*Split into two futures*, then *Enter future*), and
+  at the split step a floating card over the city shows the gesture — in XR
+  "< Both open hands together here, > then pull them apart", on desktop "tap
+  the button or press V". It fades as soon as the fracture appears.
+- **Final reveal**: when Plan A and Plan B are held apart as two futures, after
+  a second **THE FUTURE ISN'T WRITTEN. IT'S BUILT.** fades in between them.
+- **Volume**: the Sound chip / `M` cycles *Sound high → low → off* (master gain
+  100 % / 35 % / 0); all procedural sounds and the street ambience follow it.
+  Audio still starts only after the first gesture (autoplay policy).
+- Year-button cues from the old tips removed (the time dial and street year
+  buttons remain).
+
+### The 150-second demo path (reproducible)
+
+`TAG=gm5 node scripts/visual/godmode-flow.mjs` drives it in the running app
+(desktop; the XR equivalents are the gesture scripts of phases 1–4):
+
+| Time | Beat | Step |
+|---|---|---|
+| 0:00–0:20 | The world awakens | start; tip 1 glows a tile |
+| 0:20–0:40 | First decision | place a neighbourhood, energy, a park (the world reacts: ring, placement animation, numbers) |
+| 0:40–1:00 | Split reality | hands together → fracture → pull apart: your plan vs nobody planning (or Plan A vs B) |
+| 1:00–1:25 | Enter the future | pinch a future, pull it to your face → street, 2050 |
+| 1:25–1:50 | Meet the last child | Mira by a dry garden: "there used to be trees here" |
+| 1:50–2:15 | Rewrite tomorrow | return, merge, save Plan A, add homes and a park, split again, enter Plan B: "This is my favorite place. Did you help make it?" |
+| 2:15–2:30 | Final reveal | Plan A and Plan B in your hands; the tagline |
+
+Screens: `docs/visual/gm5-0..7-*.png`; render stats per step in `gm5-log.txt`.
+
+### Performance observations (desktop Chromium + IWER, NOT a Quest)
+
+From `gm5-log.txt`: tabletop ~104–122 draw calls / 62–76 k triangles; two
+futures ~69 calls / 92 k; street (2050, Mira) ~75 calls / 13 k; scrubbing
+time ~125 calls / 92 k; IWER stereo tabletop ~224 calls / 157 k. Frame rate in
+this software-rendered environment is not meaningful; **Quest frame rate,
+thermal behaviour and hand-tracking robustness are unverified** and are the
+main risk for the competition build. Production build size in the log.
+
+### Definition of done — status (emulator / desktop)
+
+1–12 are all exercised in the running app: beautiful miniature, hands,
+split, select, enter at human scale, Mira reflects the simulation, return,
+change a decision, re-enter the same place, changed future, compare (Plan A vs
+B as two futures / street toggle), back to the start state (merge restores the
+table, year and plan). None of it is validated on a physical Quest.
+
+Tests: unit 168 / 168; Playwright 30 passed, 3 skipped (updated polish spec
+walks the five GODMODE tips through split, enter, return and merge; sound cycles
+high/low/off); IWER hand scripts exit 0; Split Reality and Become Small hand
+flows re-run on this branch pass; the full demo path runs with 0 page errors;
+production build 8.0 MB.

@@ -9,7 +9,7 @@ import * as cmd from '../core/commands.js';
 import { game } from '../core/session.js';
 import { projectYear } from '../simulation/projection.js';
 import type { Year } from '../config/projection.js';
-import { largeText, soundOn } from '../ui/accessibility.js';
+import { cycleSound, largeText, soundOn } from '../ui/accessibility.js';
 import { challenge, coachText, compareOpen, futuresOpen, paused, phase, planA, result, streetView, timeLeft, viewYear } from '../core/session.js';
 
 
@@ -65,7 +65,7 @@ export class FlowSystem extends createSystem({}) {
     if (kb.getKeyDown('KeyF')) cmd.finishGame();
     if (kb.getKeyDown('KeyH')) cmd.toggleTips();
     if (kb.getKeyDown('KeyL')) largeText.value = !largeText.peek();
-    if (kb.getKeyDown('KeyM')) soundOn.value = !soundOn.peek();
+    if (kb.getKeyDown('KeyM')) cycleSound();
     if (kb.getKeyDown('Enter')) {
       if (phase.peek() === 'intro') cmd.startGame();
       else if (phase.peek() === 'finished') cmd.playAgain();

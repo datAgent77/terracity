@@ -78,7 +78,7 @@
     <div class="prefs">
       <div id="btn-skip-tips" class="chip"><div id="skip-tips-label" class="chip-label">Skip tips</div></div>
       <div id="btn-text-size" class="chip"><div id="text-size-label" class="chip-label">Larger text</div></div>
-      <div id="btn-sound" class="chip"><div id="sound-label" class="chip-label">Sound on</div></div>
+      <div id="btn-sound" class="chip"><div id="sound-label" class="chip-label">Sound high</div></div>
     </div>
   </div>
   <Button id="xr-button" class="button">

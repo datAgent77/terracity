@@ -1,0 +1,9 @@
+desktop split: {"open":true,"selected":null,"t":1,"gesture":"idle","progress":0,"hint":false,"tagline":false,"boardVisible":false,"built":"2050|Your plan:residential-164,road-263,road-373,residential-483,wind-5118,wind-6128,park-793,solar-894|If nobody plans:","diving":null,"grabbable":[],"hands":[null,null],"centres":[[-0.25,0.800000011920929,-0.5199999809265137],[0.25,0.800000011920929,-0.5199999809265137]]}
+merged: open=false board=true planUnchanged=true
+xr hands together: {"open":false,"selected":null,"t":0,"gesture":"armed","progress":0,"hint":false,"tagline":false,"boardVisible":true,"built":"","diving":null,"grabbable":[],"hands":[[-0.079,0.922,-0.405],[0.021,0.922,-0.405]],"centres":[null,null]}
+xr pulling apart: gesture=armed progress=0.45
+xr split by gesture: open=true
+xr pinch-select right future: selected=B
+xr merge by gesture: open=false board=true
+xr plan unchanged: true
+page errors: 0 

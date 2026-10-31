@@ -27,12 +27,13 @@ import {
   PlaneGeometry,
   RayInteractable,
   RingGeometry,
+  SRGBColorSpace,
   Vector3,
 } from '@iwsdk/core';
 import { BOARD_CENTER, GRID_COLS, TILE_SIZE } from '../config/scenario.js';
 import { sfx } from '../audio/sfx.js';
 import * as cmd from '../core/commands.js';
-import { futuresOpen, game, phase, planA, streetView, viewYear } from '../core/session.js';
+import { futuresOpen, game, phase, planA, streetView, tutorial, viewYear } from '../core/session.js';
 import { Placeable } from '../interactions/placeable-component.js';
 import { initialGesture, stepGesture, type GestureState, type HandSample, type Vec3 } from '../interactions/two-hand-gesture.js';
 import { checkTargets, projectYear } from '../simulation/projection.js';
@@ -82,6 +83,15 @@ export class SplitSystem extends createSystem({
     this.futures.visible = false;
     this.world.scene.add(this.futures);
     this.buildFracture();
+    this.hint = this.card(1024, 200);
+    this.hint.mesh.name = 'split-hint';
+    this.hint.mesh.scale.setScalar(0.08);
+    this.world.scene.add(this.hint.mesh);
+    this.tagline = this.card(1400, 160);
+    this.tagline.mesh.name = 'tagline';
+    this.tagline.mesh.scale.setScalar(0.06);
+    this.paintCard(this.tagline, ["THE FUTURE ISN'T WRITTEN. IT'S BUILT."], 64, 'rgba(15,42,48,0.82)', '#ffe6a6');
+    this.world.scene.add(this.tagline.mesh);
 
     this.cleanupFuncs.push(
       futuresOpen.subscribe((f) => this.onFutures(f)),
@@ -118,6 +128,8 @@ export class SplitSystem extends createSystem({
       t: this.t,
       gesture: this.gestureMode,
       progress: this.progress,
+      hint: this.hint?.mesh.visible ?? false,
+      tagline: this.tagline?.mesh.visible ?? false,
       boardVisible: this.world.scene.getObjectByName('terrain-board')?.visible ?? null,
       built: this.builtKey,
       diving: this.diving?.side ?? null,
@@ -167,6 +179,78 @@ export class SplitSystem extends createSystem({
     const want = !show ? 0 : step.state.mode === 'arming' ? 0.25 * step.progress : 0.35 + 0.65 * step.progress;
     this.fractureGlow += (want - this.fractureGlow) * Math.min(1, dt * 14);
     if (step.mid && !futuresOpen.peek()) this.fracture.position.x = Math.max(-0.3, Math.min(0.3, step.mid[0] - BOARD_CENTER[0]));
+  }
+
+  // -------------------------------------------------------- hint, tagline --
+
+  private hint!: { mesh: Mesh; ctx: CanvasRenderingContext2D; tex: CanvasTexture; key: string };
+  private tagline!: { mesh: Mesh; ctx: CanvasRenderingContext2D; tex: CanvasTexture; key: string };
+  private taglineT = 0;
+
+  private card(w: number, h: number) {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    const tex = new CanvasTexture(canvas);
+    tex.colorSpace = SRGBColorSpace;
+    const mesh = new Mesh(new PlaneGeometry(w / h, 1), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0 }));
+    mesh.renderOrder = 6;
+    mesh.visible = false;
+    mesh.raycast = () => {};
+    return { mesh, ctx, tex, key: '' };
+  }
+
+  private paintCard(c: { ctx: CanvasRenderingContext2D; tex: CanvasTexture; key: string }, lines: string[], size: number, bg: string, fg: string): void {
+    const key = lines.join('|');
+    if (c.key === key) return;
+    c.key = key;
+    const { ctx } = c;
+    const { width: w, height: h } = ctx.canvas;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.roundRect(6, 6, w - 12, h - 12, h / 4);
+    ctx.fill();
+    ctx.fillStyle = fg;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `bold ${size}px system-ui, sans-serif`;
+    lines.forEach((l, i) => ctx.fillText(l, w / 2, h / 2 + (i - (lines.length - 1) / 2) * size * 1.15));
+    c.tex.needsUpdate = true;
+  }
+
+  /** Floating guidance and the tagline: shown only when relevant, always facing the viewer. */
+  private stepCards(delta: number): void {
+    const cam = this.world.camera.getWorldPosition(new Vector3());
+    const tip = tutorial.active && tutorial.step === 'split' && phase.peek() === 'building' && !futuresOpen.peek() && !streetView.peek() && viewYear.peek() === 2026;
+    const xr = this.world.renderer.xr.isPresenting;
+    if (tip) {
+      this.paintCard(
+        this.hint,
+        xr ? ['<  Both open hands together here,  >', 'then pull them apart'] : ['Split into two futures:', 'tap the button or press V'],
+        58,
+        'rgba(255,230,166,0.92)',
+        '#3a2a00',
+      );
+      // Over the middle of the city, bobbing gently.
+      this.hint.mesh.position.set(BOARD_CENTER[0], BOARD_CENTER[1] + (xr ? 0.17 : 0.12) + 0.006 * Math.sin(performance.now() / 400), BOARD_CENTER[2] + 0.05);
+      this.hint.mesh.lookAt(cam);
+    }
+    const hm = this.hint.mesh.material as MeshBasicMaterial;
+    hm.opacity += ((tip ? 1 : 0) - hm.opacity) * Math.min(1, delta * 5);
+    this.hint.mesh.visible = hm.opacity > 0.02 && this.fractureGlow < 0.3;
+    // Tagline above two plans of yours (Plan A vs Plan B): the final reveal.
+    const reveal = !!futuresOpen.peek() && !!planA.peek() && !streetView.peek() && this.t === 1;
+    this.taglineT = reveal ? this.taglineT + delta : 0;
+    const tm = this.tagline.mesh.material as MeshBasicMaterial;
+    tm.opacity += ((reveal && this.taglineT > 1 ? 1 : 0) - tm.opacity) * Math.min(1, delta * 2);
+    this.tagline.mesh.visible = tm.opacity > 0.02;
+    if (this.tagline.mesh.visible) {
+      // Between and below the two futures' labels, above the miniatures.
+      this.tagline.mesh.position.set(BOARD_CENTER[0], BOARD_CENTER[1] + 0.17, BOARD_CENTER[2] + 0.08);
+      this.tagline.mesh.lookAt(cam);
+    }
   }
 
   // ----------------------------------------------------------- fracture --
@@ -407,6 +491,7 @@ export class SplitSystem extends createSystem({
 
   update(delta: number): void {
     this.stepGesture(delta);
+    this.stepCards(delta);
     this.stepHeld(delta);
     this.stepDive(delta);
     this.fracture.visible = this.fractureGlow > 0.01;

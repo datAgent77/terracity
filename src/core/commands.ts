@@ -179,7 +179,7 @@ let tutorialFinished = false;
 /** Re-evaluate the coach after any state change. */
 export function updateTutorial(): void {
   if (!tutorial.active) return;
-  tutorial.update({ placements: game.placements, servedIds: game.metrics.servedIds, viewYear: viewYear.peek(), inStreet: !!streetView.peek() });
+  tutorial.update({ placements: game.placements, servedIds: game.metrics.servedIds, viewYear: viewYear.peek(), inStreet: !!streetView.peek(), futuresOpen: !!futuresOpen.peek() });
   if (!tutorial.active) tutorialFinished = true;
   coachText.value = phase.peek() === 'building' ? tutorial.text : '';
 }

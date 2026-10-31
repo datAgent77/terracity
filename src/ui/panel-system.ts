@@ -23,7 +23,7 @@ import {
 } from '../core/session.js';
 import { formatClock } from '../gameplay/challenge.js';
 import { coachText, futuresOpen, tutorial } from '../core/session.js';
-import { largeText, prefersReducedMotion, soundOn } from './accessibility.js';
+import { cycleSound, largeText, prefersReducedMotion, soundLevel } from './accessibility.js';
 import { onHover, pulse } from './hover.js';
 import { landBudget } from '../simulation/land-budget.js';
 import { projectYear, type YearMetrics } from '../simulation/projection.js';
@@ -191,11 +191,11 @@ export class PanelSystem extends createSystem({}) {
         sizeLabel?.setProperties({ text: on ? 'Normal text' : 'Larger text' });
         this.applyTextSize(on);
       }),
-      soundOn.subscribe((on) => soundLabel?.setProperties({ text: on ? 'Sound on' : 'Sound off' })),
+      soundLevel.subscribe((l) => soundLabel?.setProperties({ text: l === 'high' ? 'Sound high' : l === 'low' ? 'Sound low' : 'Sound off' })),
     );
     this.onClick(panel.getElementById('btn-skip-tips') as unknown as Clickable, cmd.toggleTips);
     this.onClick(panel.getElementById('btn-text-size') as unknown as Clickable, () => (largeText.value = !largeText.peek()));
-    this.onClick(panel.getElementById('btn-sound') as unknown as Clickable, () => (soundOn.value = !soundOn.peek()));
+    this.onClick(panel.getElementById('btn-sound') as unknown as Clickable, cycleSound);
     for (const id of ['btn-skip-tips', 'btn-text-size', 'btn-sound']) {
       const el = panel.getElementById(id);
       if (!el) continue;
@@ -267,6 +267,7 @@ export class PanelSystem extends createSystem({}) {
       dim('btn-finish', phase.value === 'building');
       // Tutorial cue: the Enter button glows amber on its step.
       buttons.get('btn-enter')?.setProperties({ backgroundColor: tutorial.active && tutorial.step === 'enter' ? '#b87500' : undefined });
+      buttons.get('btn-split')?.setProperties({ backgroundColor: tutorial.active && tutorial.step === 'split' ? '#b87500' : undefined });
       pauseLabel?.setProperties({ text: paused.value ? 'Resume' : 'Pause' });
       splitLabel?.setProperties({ text: futuresOpen.value ? 'Merge the futures' : 'Split into two futures' });
       dim('btn-split', phase.value !== 'intro');

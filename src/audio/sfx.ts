@@ -3,7 +3,7 @@
  * licensing). Short and soft by design; respects the `soundOn` preference.
  * The AudioContext is created lazily and resumed on the first user gesture.
  */
-import { soundOn } from '../ui/accessibility.js';
+import { soundGain, soundLevel, soundOn } from '../ui/accessibility.js';
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -14,8 +14,11 @@ function audio(): AudioContext | null {
     if (!ctx) {
       ctx = new AudioContext();
       master = ctx.createGain();
-      master.gain.value = 0.35;
+      master.gain.value = 0.35 * soundGain();
       master.connect(ctx.destination);
+      soundLevel.subscribe(() => {
+        if (ctx && master) master.gain.setTargetAtTime(0.35 * soundGain(), ctx.currentTime, 0.05);
+      });
     }
     if (ctx.state === 'suspended') void ctx.resume();
     return ctx;

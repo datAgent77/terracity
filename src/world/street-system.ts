@@ -230,7 +230,6 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       const tip = coachText.peek();
       tipEl?.setProperties({ text: tip || '-', display: tip ? 'flex' : 'none' });
       const cue = tutorial.active ? tutorial.step : null;
-      if (cue === 'future') panel.getElementById('st-2050')?.setProperties({ borderColor: '#f2b33d' });
       panel.getElementById('st-return')?.setProperties({ backgroundColor: cue === 'back' ? '#b87500' : undefined });
       // Compare futures (only with a saved Plan A): the four differences that matter here.
       const a = planA.peek();
