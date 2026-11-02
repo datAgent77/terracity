@@ -1,4 +1,4 @@
-import { DirectionalLight, Vector3, World } from '@iwsdk/core';
+import { DirectionalLight, NeutralToneMapping, Vector3, World } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { AudioSystem } from './audio/audio-system.js';
 import { FlowSystem } from './gameplay/flow-system.js';
@@ -19,8 +19,12 @@ World.create(
   document.getElementById('scene-container') as HTMLDivElement,
   projectOptions,
 ).then((world) => {
+  // Filmic tone mapping: the HDR image-based light (Poly Haven sky, CC0) and the
+  // warm sun roll off into rich highlights instead of flat clipped colour.
+  world.renderer.toneMapping = NeutralToneMapping;
+  world.renderer.toneMappingExposure = 0.92;
   // Soft key light for the diorama's miniature shadows.
-  const sun = new DirectionalLight('#ffe6c4', 1.15); // warm, low Mediterranean sun
+  const sun = new DirectionalLight('#ffe0b0', 1.7); // warm, low Mediterranean sun
   sun.position.set(0.6, 2.2, 0.4);
   world.createTransformEntity(sun);
 
@@ -63,6 +67,26 @@ World.create(
     world.camera.lookAt(...target);
   };
   hook.cameraWorld = () => world.camera.getWorldPosition(new Vector3()).toArray();
+  hook.rendererInfo = () => ({
+    toneMapping: world.renderer.toneMapping,
+    exposure: world.renderer.toneMappingExposure,
+    env: !!world.scene.environment,
+    shadows: world.renderer.shadowMap.enabled,
+    pixelRatio: world.renderer.getPixelRatio(),
+  });
+  /** Debug: visible triangles per top-level named object (instanced counts included). */
+  hook.triBreakdown = () => {
+    const out: Record<string, number> = {};
+    world.scene.traverseVisible((o) => {
+      const m = o as unknown as { isMesh?: boolean; geometry?: { index: { count: number } | null; attributes: { position: { count: number } } }; count?: number; isInstancedMesh?: boolean; name: string; parent: { name: string } | null };
+      if (!m.isMesh || !m.geometry) return;
+      const t = (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
+      const n = m.isInstancedMesh ? (m.count ?? 1) : 1;
+      const key = m.name || m.parent?.name || 'mesh';
+      out[key] = (out[key] ?? 0) + Math.round(t * n);
+    });
+    return Object.entries(out).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  };
   hook.renderStats = () => {
     const { calls, triangles } = world.renderer.info.render;
     const { geometries, textures } = world.renderer.info.memory;

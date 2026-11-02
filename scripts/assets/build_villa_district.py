@@ -805,7 +805,7 @@ def street(b, era, rnd):
     for x in xs:
         for y in (3.8, -3.8):
             b.prism(x, y, 0.62, 0.62 + 2.6 * s, 0.22, 5, "soil", TRUNK)
-            b.blob(x, y, 0.62 + 3.0 * s, 1.35 * s, 1.35 * s, 1.2 * s, "foliage", lin((0.38, 0.58, 0.30)), rnd, subdiv=1)
+            b.blob(x, y, 0.62 + 3.0 * s, 1.35 * s, 1.35 * s, 1.2 * s, "foliage", lin((0.38, 0.58, 0.30)), rnd, subdiv=2, jitter=0.08)
 
 
 # Neighbourhood layouts: which villa stands on which parcel (slots 0-2 north
@@ -941,6 +941,23 @@ def make_material(atlas, rough):
 
 def to_object(b, name, mat):
     ao = bake_ao(b)
+    # Foliage: one occlusion value per position (averaged over its faces), so
+    # smooth-shaded crowns read as soft volumes, not facets.
+    acc = {}
+    for fi, f in enumerate(b.faces):
+        if f["cell"] != "foliage":
+            continue
+        for k, i in enumerate(f["idx"]):
+            p = b.verts[i]
+            key = (round(p.x, 3), round(p.y, 3), round(p.z, 3))
+            acc.setdefault(key, []).append(ao[fi][k])
+    for fi, f in enumerate(b.faces):
+        if f["cell"] != "foliage":
+            continue
+        for k, i in enumerate(f["idx"]):
+            p = b.verts[i]
+            vals = acc[(round(p.x, 3), round(p.y, 3), round(p.z, 3))]
+            ao[fi][k] = sum(vals) / len(vals)
     # Merge coincident positions (the exporter splits by normal/uv/colour).
     index, verts, faces, keep, seen = {}, [], [], [], set()
     for fi, f in enumerate(b.faces):
@@ -979,8 +996,9 @@ def to_object(b, name, mat):
             a = ao[fi][k]
             col.data[loop].color = (tint[0] * a, tint[1] * a, tint[2] * a, 1.0)
     me.materials.append(mat)
-    for p in me.polygons:
-        p.use_smooth = False
+    # Foliage is smooth-shaded (soft volumes); architecture stays crisp.
+    for pi, p in enumerate(me.polygons):
+        p.use_smooth = b.faces[keep[pi]]["cell"] == "foliage"
     obj = bpy.data.objects.new(name, me)
     bpy.context.scene.collection.objects.link(obj)
     return obj, len(faces)  # faces actually exported

@@ -1,0 +1,23 @@
+import { chromium } from 'playwright';
+const [, , name] = process.argv;
+const browser = await chromium.launch({ args: ['--ignore-gpu-blocklist'] });
+const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 }, ignoreHTTPSErrors: true })).newPage();
+await page.addInitScript(() => { try { localStorage.clear(); } catch {} });
+await page.goto('https://localhost:8081/');
+await page.waitForFunction(() => window.__terracity?.tileToScreen);
+await page.waitForTimeout(3500);
+const f = (n = 4) => page.evaluate((n) => new Promise((r) => { const s = () => (--n ? requestAnimationFrame(s) : r()); requestAnimationFrame(s); }), n);
+await page.keyboard.press('Enter'); await f(); await page.keyboard.press('KeyH'); await f();
+for (const [s, c, r] of [[1,6,4],[5,6,3],[5,7,3],[1,8,3],[4,9,3],[2,9,4],[3,11,8]]) { await page.keyboard.press(`Digit${s}`); await f(); const p = await page.evaluate(([c, r]) => window.__terracity.tileToScreen(c, r), [c, r]); await page.mouse.click(p.x, p.y); await f(); }
+await page.keyboard.press('Escape'); await page.waitForTimeout(1500);
+console.log(JSON.stringify(await page.evaluate(() => window.__terracity.rendererInfo())));
+await page.screenshot({ path: `docs/visual/${name}-board.png` });
+const t = await page.evaluate(() => window.__terracity.tileWorld(6, 4));
+await page.evaluate((f) => window.__terracity.setCamera([f[0] + 0.03, f[1] + 0.09, f[2] + 0.12], [f[0] + 0.01, f[1], f[2] - 0.01]), t);
+await f(8); await page.waitForTimeout(500);
+await page.screenshot({ path: `docs/visual/${name}-close.png` });
+await page.evaluate(() => window.__terracity.setCamera([0, 1.3, 0.34], [0, 0.7, -0.5]));
+await page.keyboard.press('KeyT'); await page.keyboard.press('KeyT'); await page.waitForTimeout(500);
+await page.keyboard.press('KeyE'); await page.waitForTimeout(2500);
+await page.screenshot({ path: `docs/visual/${name}-street.png` });
+await browser.close();

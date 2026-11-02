@@ -18,8 +18,10 @@
 import {
   BackSide,
   BoxGeometry,
+  AssetManager,
   CanvasTexture,
   CircleGeometry,
+  EquirectangularReflectionMapping,
   Color,
   ConeGeometry,
   createSystem,
@@ -65,6 +67,7 @@ import { createSprawl } from './houses.js';
 import { hashInts, idNumber, rng } from './rand.js';
 import { LEAF_CROWN, SOLAR_GLASS } from './shared-materials.js';
 import { isKitResource } from './kit.js';
+import { decorPrototype } from './terrain-decor.js';
 import { PAINTED, PAINTED_FLAT } from './palette.js';
 import { Bubble, createChild, createGarden, disposeTree, type Child } from './child.js';
 import { CHILD_AGE, CHILD_NAME, childNarrative, type ChildNarrative } from './child-narrative.js';
@@ -88,6 +91,8 @@ const WHITE = new Color('#ffffff');
 const BIRDS = 14;
 /** Module-level materials shared by procedural models (never disposed). */
 const SHARED_PAINT = new Set<object>([PAINTED, PAINTED_FLAT]);
+/** Shared decor prototypes used for street trees (never disposed). */
+const SHARED_GEO = new Set<object>((['round', 'pine', 'cypress', 'olive', 'shrub'] as const).map((k) => decorPrototype(k)));
 
 export class StreetSystem extends createSystem({ placeables: { required: [Placeable] } }) {
   private root = new Group();
@@ -335,14 +340,33 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     };
     this.world.scene.fog = new FogExp2('#dce8ec', 0.006);
     this.root.visible = true;
+    // The real HDR sky (Poly Haven, CC0) behind the street; the dome stays as fallback.
+    this.savedBackground = this.world.scene.background;
+    void this.loadSky().then(() => this.applyAtmosphere());
     streetAmbience.start();
     this.applyAtmosphere();
     setPanelVisible(this.world, 'street-panel', true);
     this.place(viewpoint);
   }
 
+  private savedBackground: unknown = null;
+  private skyTex: Texture | null = null;
+  private async loadSky(): Promise<Texture | null> {
+    if (this.skyTex) return this.skyTex;
+    try {
+      const t = await AssetManager.loadHDRTexture(`${import.meta.env.BASE_URL}env/sky_1k.hdr`);
+      t.mapping = EquirectangularReflectionMapping;
+      this.skyTex = t;
+      return t;
+    } catch {
+      return null;
+    }
+  }
+
   private leave(): void {
     this.root.visible = false;
+    this.world.scene.background = this.savedBackground as never;
+    this.sky.visible = true;
     setPanelVisible(this.world, 'street-panel', false);
     const s = this.saved;
     if (!s) return;
@@ -729,14 +753,23 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
    * geometry, per-build materials). Kit geometry/materials and the shared
    * time-travel materials are kept: they are shared with the tabletop.
    */
+  private treeMats = new Map<string, MeshStandardMaterial>();
+  /** Vertex-coloured tree material per leaf tint (the geometry carries bark and shading). */
+  private treeMat(c: Color): MeshStandardMaterial {
+    const key = c.getHexString();
+    let m = this.treeMats.get(key);
+    if (!m) this.treeMats.set(key, (m = new MeshStandardMaterial({ color: c.clone().lerp(new Color('#ffffff'), 0.0), vertexColors: true, roughness: 0.9 })));
+    return m;
+  }
+
   private disposeHood(): void {
-    const keep = new Set<object>([SOLAR_GLASS, LEAF_CROWN]);
+    const keep = new Set<object>([SOLAR_GLASS, LEAF_CROWN, ...this.treeMats.values()]);
     if (this.streetMat) keep.add(this.streetMat);
     for (const c of [...this.hood.children]) {
       c.traverse((o) => {
         const mesh = o as Mesh;
         if (!mesh.isMesh) return;
-        if (!isKitResource(mesh.geometry)) mesh.geometry.dispose();
+        if (!isKitResource(mesh.geometry) && !SHARED_GEO.has(mesh.geometry)) mesh.geometry.dispose();
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         for (const m of mats) if (m && !keep.has(m) && !isKitResource(m) && !SHARED_PAINT.has(m)) m.dispose();
       });
@@ -755,6 +788,13 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       fog.density = 0.006 + 0.04 * st.haze;
     }
     (this.sky.material as MeshBasicMaterial).color.copy(WHITE).lerp(SMOG_SKY, st.haze * 0.85);
+    // Clear air: the real HDR sky. Smog: the tinted dome (a hazy, brownish sky).
+    if (this.root.visible) {
+      const clear = st.haze < 0.15 && !!this.skyTex;
+      this.world.scene.background = clear ? this.skyTex : null;
+      if (clear) this.world.scene.backgroundIntensity = 0.9;
+      this.sky.visible = !clear;
+    }
     this.birds.count = Math.round(BIRDS * Math.min(1, st.greening * 1.6));
     if (this.root.visible) streetAmbience.set({ birds: this.birds.count, haze: st.haze });
     this.paintPanel?.();
@@ -812,14 +852,14 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
           g.add(scar, snag);
           continue;
         }
-        const trunk = new Mesh(new CylinderGeometry(0.0004, 0.0006, 0.006 * s, 5), new MeshStandardMaterial({ color: '#6b4f36' }));
-        trunk.position.set(tx, top + 0.003 * s, tz);
-        const leaf = new Color(cone ? '#2f5a2c' : '#4d7a37').lerp(DRY_TINT, st.dryness * 0.5);
-        const crown = cone
-          ? new Mesh(new ConeGeometry(0.0034 * s, 0.011 * s, 7), new MeshStandardMaterial({ color: leaf, flatShading: true }))
-          : new Mesh(new IcosahedronGeometry(0.0042 * s, 1), new MeshStandardMaterial({ color: leaf, flatShading: true }));
-        crown.position.set(tx, top + 0.009 * s, tz);
-        g.add(trunk, crown);
+        // The same soft trees as on the tabletop (shared geometry), tinted by dryness.
+        const kind = cone ? 'pine' : k % 3 === 0 ? 'cypress' : 'round';
+        const leaf = new Color(cone ? '#3f6a37' : '#5b8a42').lerp(DRY_TINT, st.dryness * 0.5);
+        const tree = new Mesh(decorPrototype(kind), this.treeMat(leaf));
+        tree.position.set(tx, top, tz);
+        tree.scale.setScalar(s * 0.9);
+        tree.rotation.y = r() * Math.PI * 2;
+        g.add(tree);
       }
     }
     return g;

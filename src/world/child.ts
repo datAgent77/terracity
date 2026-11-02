@@ -106,14 +106,14 @@ export function createGarden(kind: 'lush' | 'dry', w: number, d: number): Group 
     // Young olive tree, shrubs and flowers.
     const trunk = new Mesh(new CylinderGeometry(0.04, 0.06, 0.9, 6), mat('#6b5038'));
     trunk.position.set(w * 0.22, h + 0.45, 0);
-    const crown = new Mesh(new IcosahedronGeometry(0.42, 1), mat('#7f9a5a', true));
+    const crown = new Mesh(new SphereGeometry(0.42, 16, 12), mat('#7f9a5a'));
     crown.position.set(w * 0.22, h + 1.05, 0);
     crown.scale.set(1, 0.8, 1);
     g.add(trunk, crown);
     for (let i = 0; i < 9; i++) {
       const x = -w / 2 + 0.18 + r() * (w * 0.55);
       const z = -d / 2 + 0.15 + r() * (d - 0.3);
-      const shrub = new Mesh(new IcosahedronGeometry(0.1 + r() * 0.06, 0), mat(i % 3 ? '#4f8a3c' : '#5f9a45', true));
+      const shrub = new Mesh(new SphereGeometry(0.1 + r() * 0.06, 10, 8), mat(i % 3 ? '#4f8a3c' : '#5f9a45'));
       shrub.position.set(x, h + 0.06, z);
       g.add(shrub);
       if (i % 2 === 0) {
