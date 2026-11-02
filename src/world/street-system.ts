@@ -67,6 +67,7 @@ import { createSprawl } from './houses.js';
 import { hashInts, idNumber, rng } from './rand.js';
 import { LEAF_CROWN, SOLAR_GLASS } from './shared-materials.js';
 import { isKitResource } from './kit.js';
+import { ADULT_VARIANTS, isPeopleResource, personModel } from './people.js';
 import { decorPrototype } from './terrain-decor.js';
 import { PAINTED, PAINTED_FLAT } from './palette.js';
 import { Bubble, createChild, createGarden, disposeTree, type Child } from './child.js';
@@ -185,7 +186,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       year: viewYear.peek(),
       plan: streetView.peek()?.plan ?? null,
       child: this.narrative
-        ? { state: this.narrative.state, garden: this.narrative.garden, lines: [...this.narrative.lines], speaking: this.talk.near, line: this.talk.line }
+        ? { happy: this.narrative.state === 'thriving', state: this.narrative.state, garden: this.narrative.garden, lines: [...this.narrative.lines], speaking: this.talk.near, line: this.talk.line }
         : null,
       districtHere: this.districtHere,
       geometries: this.world.renderer.info.memory.geometries,
@@ -562,6 +563,8 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.bubble.opacity = 0;
     if (!this.narrative) return;
     this.child = createChild();
+    // Her face follows the simulated outcome: she smiles only in a thriving neighbourhood.
+    this.child.mood?.(this.narrative.state === 'thriving');
     this.child.root.position.set(CHILD_SPOT.x, ground, CHILD_SPOT.z);
     this.childGroup.add(this.child.root);
     this.bubble.mesh.position.set(CHILD_SPOT.x, ground + 1.7, CHILD_SPOT.z);
@@ -617,7 +620,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     for (const c of [...this.life.children]) {
       c.traverse((o) => {
         const m = o as Mesh;
-        if (m.isMesh) m.geometry.dispose();
+        if (m.isMesh && !isPeopleResource(m.geometry)) m.geometry.dispose();
       });
       this.life.remove(c);
     }
@@ -652,6 +655,14 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   }
 
   private person(x: number, z: number, y: number, yaw: number, r: () => number): Object3D {
+    const authored = personModel(`adult-${Math.floor(r() * ADULT_VARIANTS)}`);
+    if (authored) {
+      authored.position.set(x, y, z);
+      authored.rotation.y = yaw;
+      authored.scale.setScalar(0.94 + r() * 0.12);
+      authored.userData.bob = r() * 6;
+      return authored;
+    }
     const g = new Group();
     const h = 1.55 + r() * 0.3;
     const top = this.mat(StreetSystem.CLOTH[Math.floor(r() * StreetSystem.CLOTH.length)]);
@@ -685,9 +696,16 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const frame = new Mesh(new BoxGeometry(0.05, 0.05, 1.0), this.mat('#c0563b'));
     frame.position.set(0, 0.62, 0);
     g.add(frame);
-    const rider = this.person(0, 0, 0.35, 0, r);
-    rider.scale.setScalar(0.85);
-    g.add(rider);
+    const seated = personModel('rider');
+    if (seated) {
+      seated.position.set(0, 0.0, 0.05); // hips on the saddle, hands on the bars
+      seated.rotation.y = Math.PI; // the rider faces along the frame
+      g.add(seated);
+    } else {
+      const rider = this.person(0, 0, 0.35, 0, r);
+      rider.scale.setScalar(0.85);
+      g.add(rider);
+    }
     g.traverse((o) => (o.raycast = () => {}));
     return g;
   }
@@ -769,9 +787,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       c.traverse((o) => {
         const mesh = o as Mesh;
         if (!mesh.isMesh) return;
-        if (!isKitResource(mesh.geometry) && !SHARED_GEO.has(mesh.geometry)) mesh.geometry.dispose();
+        if (!isKitResource(mesh.geometry) && !SHARED_GEO.has(mesh.geometry) && !isPeopleResource(mesh.geometry)) mesh.geometry.dispose();
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        for (const m of mats) if (m && !keep.has(m) && !isKitResource(m) && !SHARED_PAINT.has(m)) m.dispose();
+        for (const m of mats) if (m && !keep.has(m) && !isKitResource(m) && !isPeopleResource(m) && !SHARED_PAINT.has(m)) m.dispose();
       });
       this.hood.remove(c);
     }

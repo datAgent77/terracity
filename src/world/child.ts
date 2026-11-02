@@ -20,18 +20,40 @@ import {
   SphereGeometry,
   SRGBColorSpace,
 } from '@iwsdk/core';
+import { isPeopleResource, personModel } from './people.js';
 import { rng } from './rand.js';
 
 const mat = (color: string, flat = false) => new MeshStandardMaterial({ color, roughness: 0.8, flatShading: flat });
 
 export interface Child {
   root: Group;
+  /** Set her expression (authored model only): smiling, or sad. */
+  mood?: (happy: boolean) => void;
   /** Right arm pivot (waves while speaking). */
   arm: Group;
   body: Group;
 }
 
 export function createChild(): Child {
+  // The authored Mira (people.glb) when loaded: the whole figure turns, her
+  // right arm (pivot at the shoulder) waves.
+  const model = personModel('mira');
+  const authoredArm = model?.getObjectByName('mira-arm-r');
+  if (model && authoredArm) {
+    const root = new Group();
+    root.name = 'mira';
+    const body = new Group();
+    body.add(model);
+    root.add(body);
+    const smile = model.getObjectByName('mira-smile');
+    const sad = model.getObjectByName('mira-sad');
+    const mood = (happy: boolean) => {
+      if (smile) smile.visible = happy;
+      if (sad) sad.visible = !happy;
+    };
+    mood(true);
+    return { root, arm: authoredArm as unknown as Group, body, mood };
+  }
   const root = new Group();
   root.name = 'mira';
   const body = new Group();
@@ -202,7 +224,7 @@ export class Bubble {
 export function disposeTree(o: Object3D): void {
   o.traverse((x) => {
     const m = x as Mesh;
-    if (!m.isMesh) return;
+    if (!m.isMesh || isPeopleResource(m.geometry)) return;
     m.geometry.dispose();
     (m.material as MeshStandardMaterial).dispose();
   });

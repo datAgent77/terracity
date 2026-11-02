@@ -51,3 +51,31 @@ GODMODE demo path 0 page errors; build OK.
 3. Buildings: softer edges (bevels), richer roofs, window depth.
 4. Ambient life on the tabletop (moving boats exist; add cars/people specks).
 5. Quest performance budget for all of the above (unmeasured on device).
+
+## Iteration 2 — Mira and the people
+
+`scripts/assets/build_people.py` (Blender, reproducible, no third-party assets)
+→ `public/models/people.glb` (457 KB quantized):
+
+- **Mira, 9**: big friendly head with eyes and highlights, nose, rosy cheeks,
+  fringe and two pigtails with yellow ties; one A-line dress (lathe profile:
+  flared hem, fitted waist) with a white collar and a flower pocket; sandals.
+  Her right arm is a separate node with its pivot at the shoulder (she waves).
+  **Her expression follows the simulation**: two mouths (`mira-smile`,
+  `mira-sad`); she smiles only in a thriving neighbourhood (environment target
+  met) and looks sad in a parched or unplanned one — same deterministic state as
+  her words (e2e-tested).
+- **Four adults** (sun-hat and dress; short hair and white shirt; elder with cap
+  and walking stick; ponytail) and a **seated rider** on the bicycles.
+- Soft shading: smooth normals and a baked top-light gradient per vertex.
+- Budget: Mira 4.6 k triangles (+0.3 k arm, +0.6 k mouth), adults 3.4–5.2 k,
+  rider 3.7 k; only the street view shows them (~8 pedestrians + 2 riders).
+
+Evidence: `docs/visual/pp3-1-before-line1.png` (sad, dry garden) vs
+`pp3-2-after-rewrite-line1.png` (smiling, garden in flower); `pp3x-*` (IWER).
+
+Tests (iteration 2): unit 168 / 168; Playwright 30 passed, 3 skipped after
+giving *the last child* (three street visits, two plans) a 180 s budget — it
+took 1.8 min under software rendering, beyond the 90 s default; the new mood
+assertions pass (sad before the rewrite, smiling after). IWER hand scripts exit
+0; IWER Mira and Become Small hand flows pass; build OK.

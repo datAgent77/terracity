@@ -36,3 +36,6 @@ development tools only; their output is not under their licenses.
 and Jarod Guest, [Poly Haven](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky),
 CC0 1.0 (public domain). Used as image-based light for the whole scene and as
 the sky at street level. Downloaded unmodified at 1k resolution.
+
+`public/models/people.glb` (Mira and the street's people) is generated in this
+repository by `scripts/assets/build_people.py` (MIT, no third-party assets).

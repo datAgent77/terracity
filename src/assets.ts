@@ -37,6 +37,13 @@ export default defineAssets({
     priority: 'critical',
     name: 'City kit',
   },
+  // Stylized people (scripts/assets/build_people.py): Mira, adults, a rider.
+  people: {
+    url: publicAssetUrl('models/people.glb'),
+    type: AssetType.GLTF,
+    priority: 'critical',
+    name: 'People',
+  },
   'street-panel': {
     url: publicAssetUrl('ui/street.uikitml'),
     type: AssetType.UIKitML,

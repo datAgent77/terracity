@@ -91,7 +91,9 @@ test('compare futures at street level: same place and camera, Plan A vs Plan B f
 });
 
 test('the last child: her garden and words follow the plan; rewriting the plan changes them', async ({ page }) => {
-  type C = { state: string; garden: string; lines: string[] } | null;
+  // Three street visits and two plans: longer than the default budget under software rendering.
+  test.setTimeout(180_000);
+  type C = { happy: boolean; state: string; garden: string; lines: string[] } | null;
   const child = () => page.evaluate(() => (window as unknown as { __terracity: { street(): { child: C } } }).__terracity.street().child);
   const visit2050 = async () => {
     await key(page, 'KeyT');
@@ -117,6 +119,7 @@ test('the last child: her garden and words follow the plan; rewriting the plan c
   const before = await visit2050();
   expect(before!.state).toBe('parched');
   expect(before!.garden).toBe('dry');
+  expect(before!.happy).toBe(false); // her face follows the outcome
   expect(before!.lines[0]).toMatch(/there used to be trees here/);
 
   // Rewrite: more neighbourhoods and a park.
@@ -124,6 +127,7 @@ test('the last child: her garden and words follow the plan; rewriting the plan c
   const after = await visit2050();
   expect(after!.state).toBe('thriving');
   expect(after!.garden).toBe('lush');
+  expect(after!.happy).toBe(true);
   expect(after!.lines[0]).toMatch(/favorite place. Did you help make it/);
 
   // Same inputs, same words.
