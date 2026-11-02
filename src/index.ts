@@ -12,6 +12,7 @@ import { FeedbackSystem } from './world/feedback-system.js';
 import { FutureSystem } from './world/future-system.js';
 import { OutcomeSystem } from './world/outcome-system.js';
 import { SplitSystem } from './world/split-system.js';
+import { CausalitySystem } from './world/causality-system.js';
 import { TimeDialSystem } from './world/time-dial-system.js';
 import { StreetSystem } from './world/street-system.js';
 
@@ -39,6 +40,7 @@ World.create(
   world.registerSystem(FlowPanelSystem);
   world.registerSystem(StreetSystem);
   world.registerSystem(SplitSystem);
+  world.registerSystem(CausalitySystem);
   world.registerSystem(TimeDialSystem);
   world.registerSystem(FlowSystem);
   world.registerSystem(AudioSystem);

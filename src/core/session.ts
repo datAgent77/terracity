@@ -31,6 +31,10 @@ export const timeLeft = signal(challenge.timeLeft);
 export const result = signal<ChallengeResult | null>(null);
 /** Paused (e.g. headset removed / overlay open). */
 export const paused = signal(false);
+/** Causality Vision: show why outcomes changed (rings on affected tiles, explanation card). */
+export const causalityOn = signal(false);
+/** Information layer 3 (full metrics, all planning controls, settings, detailed street story) is open. */
+export const detailsOpen = signal(false);
 /** "Sculpt time": continuous time progress (0..1) while the dial is turned (null = not scrubbing). */
 export const timeScrub = signal<number | null>(null);
 /** "Split reality": two futures held side by side (null = one world on the table). */

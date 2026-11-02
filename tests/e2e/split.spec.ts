@@ -96,3 +96,27 @@ test('become small: enter each future at the same place, return to the futures, 
   expect((await split(page)).boardVisible).toBe(true);
   expect(await plan()).toBe(before);
 });
+
+test('save / reload: Plan A and the current map survive a reload; the two futures are unchanged', async ({ page }) => {
+  type W = { __terracity: { game: { placements: Array<{ id: string }> }; split(): { built: string; open: boolean; t: number } } };
+  await open(page);
+  await buildPlan(page, [[1, 6, 4], [5, 6, 3]]);
+  await key(page, 'KeyS'); // Plan A
+  await buildPlan(page, [[1, 8, 3], [3, 12, 8]]);
+  await key(page, 'KeyV');
+  await settled(page);
+  const before = (await split(page)).built;
+  const plan = await page.evaluate(() => JSON.stringify((window as unknown as W).__terracity.game.placements));
+  await key(page, 'KeyV');
+  await settled(page);
+
+  await page.reload();
+  await page.waitForFunction(() => (window as unknown as { __terracity?: { split?: unknown } }).__terracity?.split);
+  await page.waitForTimeout(1500);
+  await key(page, 'Enter'); // start: the saved map comes back
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => JSON.stringify((window as unknown as W).__terracity.game.placements))).toBe(plan);
+  await key(page, 'KeyV');
+  await settled(page);
+  expect((await split(page)).built).toBe(before); // same Plan A, same Plan B, same futures
+});

@@ -64,7 +64,12 @@ export async function clickAt(page: Page, fn: string, ...args: (string | number)
 }
 export const tile = (page: Page, c: number, r: number) => clickAt(page, 'tileToScreen', c, r);
 export const slot = (page: Page, s: number) => clickAt(page, 'slotToScreen', s);
-export const ui = (page: Page, panel: string, id: string) => clickAt(page, 'uiToScreen', panel, id);
+export const ui = async (page: Page, panel: string, id: string) => {
+  // Open the information layer holding the control first (a user taps "Details").
+  await page.evaluate(([p, i]) => (window.__terracity as unknown as { reveal?(p: string, i: string): void }).reveal?.(p, i), [panel, id]);
+  await frames(page, 3);
+  return clickAt(page, 'uiToScreen', panel, id);
+};
 export const button = (page: Page, id: string) => ui(page, 'actions-panel', id);
 export const key = async (page: Page, k: string) => {
   await page.keyboard.press(k);
@@ -72,9 +77,13 @@ export const key = async (page: Page, k: string) => {
 };
 
 export async function open(page: Page, { start = true } = {}) {
+  // Each test starts clean, but only on its first load (a test may reload to check persistence).
   await page.addInitScript(() => {
     try {
-      localStorage.clear();
+      if (!sessionStorage.getItem('terracity.test.cleared')) {
+        localStorage.clear();
+        sessionStorage.setItem('terracity.test.cleared', '1');
+      }
     } catch {
       /* ignore */
     }

@@ -28,7 +28,8 @@ import {
   viewYear,
 } from './session.js';
 
-const PLAN_A_KEY = 'terracity.planA.v1';
+import { LEGACY_PLAN_A_KEY, parseSaved, SAVE_KEY, serialize } from './persistence.js';
+import type { Placement } from '../simulation/metrics.js';
 
 /** Editing is allowed only while building and viewing 2026. */
 export function canEdit(): boolean {
@@ -135,11 +136,7 @@ export function savePlanA(): void {
   if (phase.peek() !== 'building') return;
   const snapshot = game.placements.map((p) => ({ ...p }));
   planA.value = snapshot;
-  try {
-    localStorage.setItem(PLAN_A_KEY, JSON.stringify(snapshot));
-  } catch {
-    /* storage unavailable: Plan A stays in memory for this session */
-  }
+  persist();
   statusText.value = `Plan A saved (${snapshot.length} pieces). Change the map to make Plan B, then Compare.`;
 }
 
@@ -162,13 +159,36 @@ export function toggleCompare(): void {
   compareOpen.value = !compareOpen.peek();
 }
 
-/** Restore a Plan A saved in an earlier visit (per-browser convenience). */
+/** The current map saved in an earlier visit, restored when the first session starts. */
+let savedCurrent: Placement[] | null = null;
+
+/**
+ * Load Plan A and the current map saved in an earlier visit (validated as a
+ * whole; a corrupt save is ignored). Plan A is available at once, the map is
+ * restored when the session starts.
+ */
 export function loadStoredPlanA(): void {
+  let raw: string | null = null;
+  let legacy: string | null = null;
   try {
-    const raw = localStorage.getItem(PLAN_A_KEY);
-    if (raw) planA.value = JSON.parse(raw);
+    raw = localStorage.getItem(SAVE_KEY);
+    legacy = localStorage.getItem(LEGACY_PLAN_A_KEY);
   } catch {
-    /* ignore corrupt or blocked storage */
+    return; // storage blocked
+  }
+  const s = parseSaved(game.terrain, raw, legacy);
+  if (!s) return;
+  if (s.planA) planA.value = s.planA;
+  savedCurrent = s.current.length ? s.current : null;
+}
+
+/** Save Plan A and the current map (only while a session is running). */
+export function persist(): void {
+  if (phase.peek() === 'intro') return;
+  try {
+    localStorage.setItem(SAVE_KEY, serialize(planA.peek(), game.placements));
+  } catch {
+    /* storage unavailable: everything stays in memory for this session */
   }
 }
 
@@ -203,12 +223,17 @@ export function startGame(): void {
   if (!tutorialFinished) tutorial.reset();
   challenge.start();
   phase.value = 'building';
+  if (savedCurrent) {
+    game.load(savedCurrent, 'Your saved plan');
+    savedCurrent = null;
+    statusText.value = 'Your saved plan was restored. Clear map to start over.';
+  }
   timeLeft.value = challenge.timeLeft;
   result.value = null;
   viewYear.value = 2026;
   compareOpen.value = false;
   paused.value = false;
-  statusText.value = 'Plan Costa Verde for 2050. Pinch a structure from the tray.';
+  if (!game.placements.length) statusText.value = 'Plan Costa Verde for 2050. Pinch a structure from the tray.';
   updateTutorial();
 }
 

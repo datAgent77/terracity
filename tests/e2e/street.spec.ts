@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { buildPlan, key, open, snap } from './helpers';
+import { buildPlan, key, open, snap, ui } from './helpers';
 
 type Street = { active: boolean; viewpoint: number | null; boardVisible: boolean | null; fading: boolean; year: number; story: string[] };
 const street = (page: import('@playwright/test').Page) =>
@@ -60,8 +60,7 @@ test('compare futures at street level: same place and camera, Plan A vs Plan B f
   type S2 = Street & { plan: 'A' | 'B'; haze: number; greening: number; districtHere: boolean };
   const st = () => page.evaluate(() => (window as unknown as { __terracity: { street(): S2 } }).__terracity.street());
   const click = async (id: string) => {
-    const p = await page.evaluate((id) => (window as unknown as { __terracity: { uiToScreen(a: string, b: string): { x: number; y: number } } }).__terracity.uiToScreen('street-panel', id), id);
-    await page.mouse.click(p.x, p.y);
+    await ui(page, 'street-panel', id); // opens Details first, as a user would
     await settled(page);
   };
   await open(page);

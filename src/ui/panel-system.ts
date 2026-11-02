@@ -22,7 +22,7 @@ import {
   viewYear,
 } from '../core/session.js';
 import { formatClock } from '../gameplay/challenge.js';
-import { coachText, futuresOpen, tutorial } from '../core/session.js';
+import { causalityOn, coachText, detailsOpen, futuresOpen, streetView, tutorial } from '../core/session.js';
 import { cycleSound, largeText, prefersReducedMotion, soundLevel } from './accessibility.js';
 import { onHover, pulse } from './hover.js';
 import { landBudget } from '../simulation/land-budget.js';
@@ -35,7 +35,7 @@ const ARMED_BG = '#ffd36b';
 const IDLE_BG = 'rgba(0,0,0,0)';
 const ACTION_IDS = [
   'btn-undo', 'btn-redo', 'btn-rotate', 'btn-remove', 'btn-restart',
-  'btn-save-a', 'btn-restore-a', 'btn-compare', 'btn-pause', 'btn-finish', 'btn-split', 'btn-enter',
+  'btn-save-a', 'btn-restore-a', 'btn-compare', 'btn-pause', 'btn-finish', 'btn-split', 'btn-enter', 'btn-why',
 ];
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
@@ -75,7 +75,59 @@ export class PanelSystem extends createSystem({}) {
     this.bindHud();
     this.bindActions();
     this.bindTrayLabels();
+    this.bindLayers();
     this.exposeTestHooks();
+  }
+
+  /**
+   * Information layers. Layer 1 (always): year, plan and mode, one instruction,
+   * the latest decision's effect. Layer 3 (on request, "Details" / D): the four
+   * metrics and land line, and the secondary planning controls.
+   */
+  private bindLayers(): void {
+    const hud = this.world.getSceneObject<UIKitMLAsset>('hud-panel');
+    const actions = this.world.getSceneObject<UIKitMLAsset>('actions-panel');
+    const label = hud?.getElementById<UIKit.Text>('details-label');
+    const mode = hud?.getElementById<UIKit.Text>('m-mode');
+    const btn = hud?.getElementById('btn-details') as unknown as Clickable | undefined;
+    if (btn) this.onClick(btn, () => (detailsOpen.value = !detailsOpen.peek()));
+    // Screen-space boxes follow the content (an oversized box would block the city).
+    const boxes: Record<string, [string, string]> = { 'hud-panel': ['34%', '62%'], 'actions-panel': ['36%', '56%'] };
+    const apply = () => {
+      const open = detailsOpen.value;
+      hud?.getElementById('hud-details')?.setProperties({ display: open ? 'flex' : 'none' });
+      actions?.getElementById('act-more')?.setProperties({ display: open ? 'flex' : 'none' });
+      label?.setProperties({ text: open ? 'Hide details' : 'Details' });
+      for (const [id, [small, big]] of Object.entries(boxes)) {
+        const obj = this.world.getSceneEntity(id)?.object3D;
+        if (obj) obj.userData.base_height = open ? big : small;
+      }
+      this.applyTextSize(largeText.peek());
+    };
+    const paintMode = () => {
+      const f = futuresOpen.value;
+      const st = streetView.value;
+      const plan = planA.value ? 'Plan B (now)' : 'Your plan';
+      const m = phase.value === 'intro'
+        ? 'Ready to start'
+        : phase.value === 'finished'
+          ? 'Plan submitted'
+          : st
+            ? `Visiting the street - ${st.title ?? plan}`
+            : f
+              ? 'Two futures side by side'
+              : viewYear.value === 2026
+                ? `${plan} - building`
+                : `${plan} - viewing the future`;
+      mode?.setProperties({ text: m });
+    };
+    const relayout = () => this.applyTextSize(largeText.peek());
+    window.addEventListener('terracity-relayout', relayout);
+    this.cleanupFuncs.push(
+      () => window.removeEventListener('terracity-relayout', relayout),
+      detailsOpen.subscribe(apply),
+      ...[futuresOpen, streetView, planA, phase, viewYear].map((s) => (s as { subscribe(f: () => void): () => void }).subscribe(paintMode)),
+    );
   }
 
   private clock = 0;
@@ -242,6 +294,7 @@ export class PanelSystem extends createSystem({}) {
       'btn-finish': () => cmd.finishGame(),
       'btn-enter': () => (futuresOpen.peek() ? cmd.enterFuture(futuresOpen.peek()!.selected ?? 'A') : cmd.enterCity()),
       'btn-split': cmd.toggleFutures,
+      'btn-why': () => (causalityOn.value = !causalityOn.peek()),
     };
     const buttons = new Map<string, Settable>();
     for (const id of ACTION_IDS) {
@@ -254,6 +307,7 @@ export class PanelSystem extends createSystem({}) {
     const pauseLabel = panel.getElementById<UIKit.Text>('pause-label');
     const splitLabel = panel.getElementById<UIKit.Text>('split-label');
     const enterLabel = panel.getElementById<UIKit.Text>('enter-label');
+    const whyLabel = panel.getElementById<UIKit.Text>('why-label');
     const dim = (id: string, on: boolean) => buttons.get(id)?.setProperties({ opacity: on ? 1 : 0.4 });
     const refresh = () => {
       const editing = phase.value === 'building' && viewYear.value === 2026 && !paused.value;
@@ -270,11 +324,13 @@ export class PanelSystem extends createSystem({}) {
       buttons.get('btn-split')?.setProperties({ backgroundColor: tutorial.active && tutorial.step === 'split' ? '#b87500' : undefined });
       pauseLabel?.setProperties({ text: paused.value ? 'Resume' : 'Pause' });
       splitLabel?.setProperties({ text: futuresOpen.value ? 'Merge the futures' : 'Split into two futures' });
+      whyLabel?.setProperties({ text: causalityOn.value ? 'Hide causality' : 'Why? Causality Vision' });
+      buttons.get('btn-why')?.setProperties({ backgroundColor: causalityOn.value ? '#0f7a6f' : undefined });
       dim('btn-split', phase.value !== 'intro');
       dim('btn-enter', !!futuresOpen.value || game.placements.some((p) => p.type === 'residential'));
       enterLabel?.setProperties({ text: futuresOpen.value ? `Enter future ${futuresOpen.value.selected ?? 'A'}` : 'Enter your city' });
     };
-    for (const s of [planVersion, phase, viewYear, paused, planA, coachText, futuresOpen] as const) {
+    for (const s of [planVersion, phase, viewYear, paused, planA, coachText, futuresOpen, causalityOn] as const) {
       this.cleanupFuncs.push((s as { subscribe(f: () => void): () => void }).subscribe(refresh));
     }
   }
@@ -327,6 +383,13 @@ export class PanelSystem extends createSystem({}) {
       return { x: r.left + ((p.x + 1) / 2) * r.width, y: r.top + ((1 - p.y) / 2) * r.height };
     };
     hook.uiWorldPosition = (panelId: string, elementId: string) => locate(panelId, elementId)?.toArray();
+    /** Open whatever information layer contains this element (what a user does with "Details"). */
+    hook.reveal = (panelId: string, elementId: string) => {
+      const layer3 = new Set(['btn-redo', 'btn-rotate', 'btn-remove', 'btn-restart', 'btn-restore-a', 'btn-compare', 'btn-pause']);
+      if ((panelId === 'actions-panel' && layer3.has(elementId)) || (panelId === 'street-panel' && /^st-(plan|line|c\d)/.test(elementId))) {
+        detailsOpen.value = true;
+      }
+    };
     // Dev only: print button positions so CLI-driven XR tests can aim at them.
     // Re-logged on every visibility change because ScreenSpace panels move
     // between the desktop overlay and their world transform.

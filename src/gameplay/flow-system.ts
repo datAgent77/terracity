@@ -10,12 +10,14 @@ import { game } from '../core/session.js';
 import { projectYear } from '../simulation/projection.js';
 import type { Year } from '../config/projection.js';
 import { cycleSound, largeText, soundOn } from '../ui/accessibility.js';
-import { challenge, coachText, compareOpen, futuresOpen, paused, phase, planA, result, streetView, timeLeft, viewYear } from '../core/session.js';
+import { challenge, coachText, compareOpen, planVersion, causalityOn, detailsOpen, futuresOpen, paused, phase, planA, result, streetView, timeLeft, viewYear } from '../core/session.js';
 
 
 export class FlowSystem extends createSystem({}) {
   init(): void {
     cmd.loadStoredPlanA();
+    // Keep the save current: every plan change and every Plan A save.
+    this.cleanupFuncs.push(planVersion.subscribe(() => cmd.persist()), planA.subscribe(() => cmd.persist()));
     // Test/debug hook: read-only view of the challenge state.
     const hook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
     Object.assign(hook, {
@@ -46,6 +48,8 @@ export class FlowSystem extends createSystem({}) {
   update(delta: number): void {
     cmd.tickClock(delta);
     const kb = this.input.keyboard;
+    if (kb.getKeyDown('KeyD')) detailsOpen.value = !detailsOpen.peek();
+    if (kb.getKeyDown('KeyW')) causalityOn.value = !causalityOn.peek();
     if (kb.getKeyDown('KeyE')) {
       if (streetView.peek()) cmd.exitCity();
       else if (futuresOpen.peek()) cmd.enterFuture(futuresOpen.peek()!.selected ?? 'A');

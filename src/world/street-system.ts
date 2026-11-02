@@ -54,7 +54,7 @@ import { GRID_COLS, StructureType, TerrainType, TILE_SIZE } from '../config/scen
 import { projectYear, type YearMetrics } from '../simulation/projection.js';
 import { TARGETS } from '../config/balance.js';
 import * as cmd from '../core/commands.js';
-import { coachText, game, planA, planVersion, streetView, tutorial, viewYear } from '../core/session.js';
+import { coachText, detailsOpen, game, planA, planVersion, streetView, tutorial, viewYear } from '../core/session.js';
 import { Placeable } from '../interactions/placeable-component.js';
 import { sfx, streetAmbience } from '../audio/sfx.js';
 import { prefersReducedMotion, soundOn } from '../ui/accessibility.js';
@@ -214,6 +214,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     click('st-next', () => cmd.stepViewpoint(1));
     click('st-return', cmd.exitCity);
     for (const y of YEARS) click(`st-${y}`, () => cmd.setYear(y));
+    click('st-details-btn', () => (detailsOpen.value = !detailsOpen.peek()));
     click('st-plan-a', () => cmd.setStreetPlan('A'));
     click('st-plan-b', () => cmd.setStreetPlan('B'));
     const compare = panel.getElementById('st-compare');
@@ -259,6 +260,17 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
         });
       }
     };
+    const layer = () => {
+      const open = detailsOpen.value;
+      panel.getElementById('st-details')?.setProperties({ display: open ? 'flex' : 'none' });
+      panel.getElementById<UIKit.Text>('st-details-label')?.setProperties({ text: open ? 'Less' : 'Details' });
+      const obj = this.world.getSceneEntity('street-panel')?.object3D;
+      if (obj) {
+        obj.userData.base_height = open ? (planA.peek() ? '50%' : '34%') : '22%';
+        window.dispatchEvent(new Event('terracity-relayout'));
+      }
+    };
+    this.cleanupFuncs.push(detailsOpen.subscribe(layer), planA.subscribe(layer));
     this.paintPanel = refresh;
     this.cleanupFuncs.push(
       streetView.subscribe(refresh),
@@ -567,7 +579,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.child.mood?.(this.narrative.state === 'thriving');
     this.child.root.position.set(CHILD_SPOT.x, ground, CHILD_SPOT.z);
     this.childGroup.add(this.child.root);
-    this.bubble.mesh.position.set(CHILD_SPOT.x, ground + 1.7, CHILD_SPOT.z);
+    this.bubble.mesh.position.set(CHILD_SPOT.x, ground + 1.62, CHILD_SPOT.z);
     this.childGroup.add(this.bubble.mesh);
     this.story.push(`${CHILD_NAME} (${CHILD_AGE}): "${this.narrative.lines.join(' ')}"`);
   }
@@ -630,7 +642,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const smog = st.haze >= 0.2;
     const r = rng(77);
     const spots: Array<[number, number, number]> = [
-      [-15, 3.9, 0.3], [-9.5, -3.9, 2.8], [-3.2, 4.0, -0.4], [7.4, -4.0, 3.4], [8.5, 3.9, 1.1], [13, -4.0, 2.2], [17.5, 4.1, -1.2], [-19.5, -3.9, 1.7],
+      [-15, 3.9, 0.3], [-9.5, -3.9, 2.8], [-3.2, 4.0, -0.4], [-6.0, -4.0, 3.4], [8.5, 3.9, 1.1], [13, -4.0, 2.2], [17.5, 4.1, -1.2], [-19.5, -3.9, 1.7],
     ];
     const outdoors = smog ? spots.filter((_, i) => i % 3 === 0) : spots;
     for (const [x, z, yaw] of outdoors) this.life.add(this.person(x, z, 0.62, yaw, r));

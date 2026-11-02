@@ -34,7 +34,9 @@ const CARRIAGEWAY = 0.32;
 export const VIEWPOINTS: readonly Viewpoint[] = [
   { name: 'Your street', x: -25, z: 1.7, ground: CARRIAGEWAY, lookX: 12, lookZ: -0.5 },
   { name: 'At the gate', x: 1.5, z: 3.9, ground: SIDEWALK, lookX: 0, lookZ: -12 },
-  { name: 'The little garden', x: 0.3, z: -3.3, ground: SIDEWALK, lookX: 4, lookZ: -3.45 },
+  // Between the 2050 street trees (x = 4.5 and 14): a clear line of sight to
+  // Mira at a conversational ~3 m, with her garden beside her.
+  { name: 'The little garden', x: 7.7, z: -4.3, ground: SIDEWALK, lookX: 11.1, lookZ: -3.55 },
   { name: 'Street end', x: 25, z: -1.7, ground: CARRIAGEWAY, lookX: -12, lookZ: 0.5 },
 ];
 
@@ -69,5 +71,5 @@ export function nextViewpoint(i: number, step: number): number {
 /** Viewpoint beside the little garden where Mira lives in 2050 (`child-narrative.ts`). */
 export const GARDEN_VIEWPOINT = 2;
 /** The little garden and Mira's spot (district-local metres, south sidewalk). */
-export const GARDEN = { x: 2.9, z: -4.15, w: 1.3, d: 0.7 };
-export const CHILD_SPOT = { x: 2.5, z: -3.35 };
+export const GARDEN = { x: 11.6, z: -4.15, w: 1.3, d: 0.7 };
+export const CHILD_SPOT = { x: 10.6, z: -3.3 };

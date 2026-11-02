@@ -178,7 +178,7 @@ export class Bubble {
     this.canvas.height = 256;
     this.tex = new CanvasTexture(this.canvas);
     this.tex.colorSpace = SRGBColorSpace;
-    this.mesh = new Mesh(new PlaneGeometry(1.1, 0.275), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false, opacity: 0 }));
+    this.mesh = new Mesh(new PlaneGeometry(0.86, 0.215), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false, opacity: 0 }));
     this.mesh.name = 'mira-subtitle';
     this.mesh.renderOrder = 5;
     this.mesh.raycast = () => {};
