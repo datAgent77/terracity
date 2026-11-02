@@ -16,5 +16,14 @@ export function prefersReducedMotion(): boolean {
 
 /** Larger spatial text (panels scaled up). Toggled from the HUD or with `L`. */
 export const largeText = signal(false);
-/** Sound on/off. Toggled from the HUD or with `M`. */
+/** Sound level: high / low / off. Cycled from the HUD Sound chip or with `M`. */
+export const soundLevel = signal<'high' | 'low' | 'off'>('high');
+/** Sound on (any level above off); kept for systems that only need on/off. */
 export const soundOn = signal(true);
+/** Master volume for the current level. */
+export const soundGain = () => (soundLevel.peek() === 'high' ? 1 : soundLevel.peek() === 'low' ? 0.35 : 0);
+
+export function cycleSound(): void {
+  soundLevel.value = soundLevel.peek() === 'high' ? 'low' : soundLevel.peek() === 'low' ? 'off' : 'high';
+  soundOn.value = soundLevel.peek() !== 'off';
+}

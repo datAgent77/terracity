@@ -76,7 +76,9 @@ export class FlowPanelSystem extends createSystem({}) {
     }
     this.paintYears = () => {
       // Tutorial cue: pulse the year the current tip asks for.
-      const cue = tutorial.active && phase.peek() === 'building' ? (tutorial.step === 'future' ? 2050 : tutorial.step === 'back' ? 2026 : null) : null;
+      // (The GODMODE tips use the split / enter controls; no year cue.)
+      const cue: number | null = null;
+      void tutorial;
       for (const y of YEARS) {
         const on = viewYear.peek() === y;
         const hover = this.yearHover.has(y);
@@ -102,7 +104,7 @@ export class FlowPanelSystem extends createSystem({}) {
   update(delta: number): void {
     this.clock += delta;
     // Only repaint while a tutorial cue is pulsing (a few properties, cheap).
-    if (tutorial.active && (tutorial.step === 'future' || tutorial.step === 'back')) this.paintYears?.();
+    void this.paintYears;
   }
 
   private bindOverlay(): void {

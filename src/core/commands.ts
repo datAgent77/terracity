@@ -7,7 +7,8 @@ import { YEARS, type Year } from '../config/projection.js';
 import { StructureType } from '../config/scenario.js';
 import { STRUCTURES } from '../config/structures.js';
 import { projectYear } from '../simulation/projection.js';
-import { nextViewpoint } from '../world/street-view.js';
+import { futurePair } from '../world/futures.js';
+import { GARDEN_VIEWPOINT, nextViewpoint } from '../world/street-view.js';
 import {
   armedType,
   challenge,
@@ -20,6 +21,7 @@ import {
   result,
   selectedId,
   statusText,
+  futuresOpen,
   streetView,
   timeLeft,
   tutorial,
@@ -40,6 +42,10 @@ export function canEdit(): boolean {
   }
   if (streetView.peek()) {
     statusText.value = 'Return to the tabletop to change the plan.';
+    return false;
+  }
+  if (futuresOpen.peek()) {
+    statusText.value = 'Merge the two futures to change the plan.';
     return false;
   }
   return true;
@@ -173,7 +179,7 @@ let tutorialFinished = false;
 /** Re-evaluate the coach after any state change. */
 export function updateTutorial(): void {
   if (!tutorial.active) return;
-  tutorial.update({ placements: game.placements, servedIds: game.metrics.servedIds, viewYear: viewYear.peek(), inStreet: !!streetView.peek() });
+  tutorial.update({ placements: game.placements, servedIds: game.metrics.servedIds, viewYear: viewYear.peek(), inStreet: !!streetView.peek(), futuresOpen: !!futuresOpen.peek() });
   if (!tutorial.active) tutorialFinished = true;
   coachText.value = phase.peek() === 'building' ? tutorial.text : '';
 }
@@ -235,7 +241,7 @@ export function togglePause(): void {
 
 /** Called every frame by the flow system. The clock stops while visiting a street. */
 export function tickClock(seconds: number): void {
-  if (phase.peek() !== 'building' || paused.peek() || streetView.peek()) return;
+  if (phase.peek() !== 'building' || paused.peek() || streetView.peek() || futuresOpen.peek()) return;
   const ended = challenge.tick(seconds);
   const whole = Math.ceil(challenge.timeLeft);
   if (whole !== timeLeft.peek()) timeLeft.value = whole;
@@ -252,6 +258,11 @@ export function streetTarget(): string | null {
   return plan.find((p) => p.type === StructureType.Residential)?.id ?? null;
 }
 
+/** In 2050 you arrive beside the little garden, where Mira lives. */
+function startViewpoint(): number {
+  return viewYear.peek() === 2050 ? GARDEN_VIEWPOINT : 0;
+}
+
 export function enterCity(): void {
   if (streetView.peek()) return;
   const id = streetTarget();
@@ -261,14 +272,17 @@ export function enterCity(): void {
   }
   compareOpen.value = false;
   clearSelection();
-  streetView.value = { id, viewpoint: 0, plan: 'B' };
+  const p = game.get(id)!;
+  streetView.value = { id, col: p.col, row: p.row, viewpoint: startViewpoint(), plan: 'B' };
   statusText.value = 'You are in your neighbourhood. Move between viewpoints, or return to the tabletop.';
 }
 
 export function exitCity(): void {
   if (!streetView.peek()) return;
   streetView.value = null;
-  statusText.value = 'Back at the tabletop.';
+  statusText.value = futuresOpen.peek()
+    ? 'Back at your two futures. Enter the other one, or bring your hands together to merge.'
+    : 'Back at the tabletop.';
 }
 
 export function stepViewpoint(step: number): void {
@@ -285,7 +299,7 @@ export function gotoViewpoint(i: number): void {
 /** Street comparison: show the same place under Plan A or Plan B (the current map). */
 export function setStreetPlan(plan: 'A' | 'B'): void {
   const v = streetView.peek();
-  if (!v || v.plan === plan) return;
+  if (!v || v.plan === plan || v.plan === 'none') return;
   if (plan === 'A' && !planA.peek()) {
     statusText.value = 'Save Plan A on the tabletop first, then change the map to make Plan B.';
     return;
@@ -294,4 +308,57 @@ export function setStreetPlan(plan: 'A' | 'B'): void {
   if (viewYear.peek() === 2026) viewYear.value = 2050;
   streetView.value = { ...v, plan };
   statusText.value = plan === 'A' ? 'Plan A in the same place.' : 'Plan B (your current map) in the same place.';
+}
+
+// ---------------------------------------------------------- split reality --
+
+/** Pull the world apart into two futures (two-hand gesture, button or V). */
+export function openFutures(): void {
+  if (futuresOpen.peek() || streetView.peek() || phase.peek() === 'intro') return;
+  clearSelection();
+  compareOpen.value = false;
+  futuresOpen.value = { selected: null };
+  statusText.value = planA.peek()
+    ? 'Two futures: Plan A in your left hand, Plan B (now) in your right. Bring your hands together to merge.'
+    : 'Two futures: your plan on the left, the same coast if nobody plans on the right. Bring your hands together to merge.';
+}
+
+export function closeFutures(): void {
+  if (!futuresOpen.peek()) return;
+  futuresOpen.value = null;
+  statusText.value = 'One world again. Your plan is unchanged.';
+}
+
+export function toggleFutures(): void {
+  (futuresOpen.peek() ? closeFutures : openFutures)();
+}
+
+export function selectFuture(side: 'A' | 'B'): void {
+  const f = futuresOpen.peek();
+  if (!f) return;
+  futuresOpen.value = { selected: f.selected === side ? null : side };
+}
+
+/**
+ * Become small: enter one of the two futures at human scale. Both futures are
+ * entered at the SAME place — the first neighbourhood of the current map (else
+ * of that future) — so A and B can be compared on the same street.
+ */
+export function enterFuture(side: 'A' | 'B'): void {
+  if (!futuresOpen.peek() || streetView.peek()) return;
+  const a = planA.peek();
+  const pair = futurePair(a, game.placements, viewYear.peek());
+  const plan: 'A' | 'B' | 'none' = a ? side : side === 'A' ? 'B' : 'none';
+  const homes = (ps: readonly { type: StructureType; col: number; row: number; id: string }[]) => ps.find((p) => p.type === StructureType.Residential);
+  const target = homes(game.placements) ?? homes(pair[side].plan) ?? (a ? homes(a) : undefined);
+  futuresOpen.value = { selected: side };
+  streetView.value = {
+    id: target?.id ?? '',
+    col: target?.col ?? 6,
+    row: target?.row ?? 4,
+    viewpoint: startViewpoint(),
+    plan,
+    title: `Future ${side}: ${pair[side].title}`,
+  };
+  statusText.value = `You are inside Future ${side} (${pair[side].title}), ${pair.year}.`;
 }

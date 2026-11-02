@@ -8,6 +8,8 @@
  */
 import {
   BoxGeometry,
+  BufferGeometry,
+  Float32BufferAttribute,
   ConeGeometry,
   CylinderGeometry,
   Group,
@@ -33,9 +35,55 @@ const PAD = TILE_SIZE * 0.92;
 
 export { LEAF_CROWN, SOLAR_GLASS } from './shared-materials.js';
 
+/**
+ * Landscaped plinth under a structure: a rounded square whose edges slope softly
+ * down into the land (no tray walls). Top at 1.6 mm, same footprint as before.
+ */
+function plinthGeometry(): BufferGeometry {
+  const rings: Array<[number, number, number]> = [
+    // [half-size, corner radius, height]
+    [PAD / 2 - 0.0012, 0.004, 0.0016],
+    [PAD / 2, 0.0045, 0.0013],
+    [PAD / 2 + 0.0012, 0.005, 0.0006],
+    [TILE_SIZE * 0.495, 0.006, -0.0004],
+  ];
+  const per = 6; // points per rounded corner
+  const pts = (h: number, r: number, y: number) => {
+    const out: number[][] = [];
+    for (const [cx, cz, a0] of [[1, 1, 0], [-1, 1, 0.5], [-1, -1, 1], [1, -1, 1.5]] as const) {
+      for (let k = 0; k < per; k++) {
+        const a = (a0 + (k / (per - 1)) * 0.5) * Math.PI;
+        out.push([cx * (h - r) + Math.cos(a) * r, y, cz * (h - r) + Math.sin(a) * r]);
+      }
+    }
+    return out;
+  };
+  const R = rings.map(([h, r, y]) => pts(h, r, y));
+  const n = R[0].length;
+  const pos: number[] = [];
+  const tri = (a: number[], b: number[], c: number[]) => pos.push(...a, ...b, ...c);
+  // Top cap (fan).
+  const top = [0, rings[0][2], 0];
+  for (let k = 0; k < n; k++) tri(top, R[0][(k + 1) % n], R[0][k]);
+  // Sloping sides.
+  for (let j = 0; j < R.length - 1; j++) {
+    for (let k = 0; k < n; k++) {
+      const a = R[j][k], b = R[j][(k + 1) % n], c = R[j + 1][(k + 1) % n], d = R[j + 1][k];
+      tri(a, b, c);
+      tri(a, c, d);
+    }
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+let PLINTH: BufferGeometry | null = null;
+
 function pad(color: string): Mesh {
-  const m = new Mesh(new BoxGeometry(PAD, 0.0016, PAD), new MeshStandardMaterial({ color, roughness: 0.92 }));
-  m.position.y = 0.0008;
+  PLINTH ??= plinthGeometry();
+  const m = new Mesh(PLINTH, new MeshStandardMaterial({ color, roughness: 0.92 }));
+  m.position.y = 0;
   m.name = 'pad';
   m.receiveShadow = true;
   return m;

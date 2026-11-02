@@ -29,3 +29,13 @@ generated in this repository by `scripts/assets/build_city_kit.py` (with
 covered by the project's MIT license. No third-party models, textures or HDRIs
 are used. Blender 5.2 (GPL) and glTF-Transform 4.5 (`@gltf-transform/*`, MIT) are
 development tools only; their output is not under their licenses.
+
+## Environment light
+
+`public/env/sky_1k.hdr` — "Kloofendal 48d Partly Cloudy (Pure Sky)" by Greg Zaal
+and Jarod Guest, [Poly Haven](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky),
+CC0 1.0 (public domain). Used as image-based light for the whole scene and as
+the sky at street level. Downloaded unmodified at 1k resolution.
+
+`public/models/people.glb` (Mira and the street's people) is generated in this
+repository by `scripts/assets/build_people.py` (MIT, no third-party assets).

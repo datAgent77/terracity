@@ -47,7 +47,11 @@ export class AmbientSystem extends createSystem({}) {
     if (prefersReducedMotion()) return;
     this.t += delta;
     if (this.water) {
-      this.water.opacity = 0.52 + 0.05 * Math.sin(this.t * 0.9);
+      // Drifting ripples (normal map) and a gentle breathing of the surface.
+      if (this.water.normalMap) {
+        this.water.normalMap.offset.set(this.t * 0.012, this.t * 0.007);
+      }
+      this.water.opacity = 0.68 + 0.04 * Math.sin(this.t * 0.9);
       this.water.emissiveIntensity = 0.12 + 0.06 * Math.sin(this.t * 1.3);
     }
     this.boats.forEach((b, i) => {

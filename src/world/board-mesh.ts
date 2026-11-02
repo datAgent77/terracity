@@ -9,6 +9,9 @@
 import {
   BoxGeometry,
   BufferAttribute,
+  CanvasTexture,
+  RepeatWrapping,
+  Vector2,
   Color,
   Group,
   InstancedMesh,
@@ -22,6 +25,7 @@ import {
 import { GRID_COLS, GRID_ROWS, TILE_SIZE, TerrainType } from '../config/scenario.js';
 import { tileCenter, tileTopY, WATER_LEVEL } from './board-coords.js';
 import { createTownTile } from './villas.js';
+import { buildTerrainSurface } from './terrain-surface.js';
 import { mergeStatic } from './merge.js';
 import { block, COLORS } from './palette.js';
 import { hashInts, rng } from './rand.js';
@@ -35,10 +39,10 @@ export const TERRAIN_COLORS: Record<TerrainType, string> = {
   sea: '#2a7fa6',
   beach: '#ecd9a6',
   river: '#3aa5b8',
-  farmland: '#a7b862',
-  plain: '#9cc76a',
-  hill: '#b5b36f',
-  protected: '#5c8f4a',
+  farmland: '#a9b46a',
+  plain: '#93b866',
+  hill: '#b4ad78',
+  protected: '#5e8a4c',
   town: '#e3d6bd',
 };
 
@@ -118,13 +122,45 @@ export function buildTerrainTiles(
   return [columns, caps];
 }
 
+/**
+ * Tileable ripple normal map, painted procedurally (no texture file): a few
+ * crossing sine waves. AmbientSystem scrolls it, so the sea glitters and moves.
+ */
+function rippleNormals(): CanvasTexture {
+  const N = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = N;
+  const ctx = canvas.getContext('2d')!;
+  const img = ctx.createImageData(N, N);
+  const h = (x: number, y: number) =>
+    Math.sin(((x + y * 0.3) / N) * Math.PI * 2 * 3) * 0.5 +
+    Math.sin(((y - x * 0.6) / N) * Math.PI * 2 * 5) * 0.3 +
+    Math.sin(((x * 0.8 + y) / N) * Math.PI * 2 * 9) * 0.2;
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const dx = h(x + 1, y) - h(x - 1, y);
+      const dy = h(x, y + 1) - h(x, y - 1);
+      const i = (y * N + x) * 4;
+      img.data[i] = 128 - dx * 90;
+      img.data[i + 1] = 128 - dy * 90;
+      img.data[i + 2] = 255;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = RepeatWrapping;
+  tex.repeat.set(6, 4);
+  return tex;
+}
+
 /** Sea and river: one translucent sheet, turquoise shallows to deep blue. */
 export function buildWater(terrain: TerrainMap): Mesh {
   const width = GRID_COLS * TILE_SIZE;
   const depth = GRID_ROWS * TILE_SIZE;
   const waterGeo = new PlaneGeometry(width, depth, GRID_COLS * 2, GRID_ROWS * 2);
-  const shallow = new Color('#6fdad3');
-  const deep = new Color('#2a7db0');
+  const shallow = new Color('#5cc9c4');
+  const deep = new Color('#1f6a9a');
   const col = new Color();
   const pos = waterGeo.attributes.position;
   const colors = new Float32Array(pos.count * 3);
@@ -141,11 +177,12 @@ export function buildWater(terrain: TerrainMap): Mesh {
     new MeshStandardMaterial({
       vertexColors: true,
       transparent: true,
-      opacity: 0.8,
-      roughness: 0.12,
-      metalness: 0.15,
-      emissive: '#2ec4d0',
-      emissiveIntensity: 0.1,
+      opacity: 0.72,
+      roughness: 0.06,
+      metalness: 0.1,
+      normalMap: rippleNormals(),
+      normalScale: new Vector2(0.35, 0.35),
+      envMapIntensity: 1.4, // the sky reflects in the sea
     }),
   );
   water.rotation.x = -Math.PI / 2;
@@ -159,7 +196,7 @@ export function buildBoard(terrain: TerrainMap): Group {
   const board = new Group();
   board.name = 'terrain-board';
   board.add(buildBase());
-  board.add(...buildTerrainTiles(terrain));
+  board.add(...buildTerrainSurface(terrain));
   board.add(buildWater(terrain));
   const town = buildTown(terrain);
   for (const g of [...town.children]) mergeStatic(g as Group); // one draw call per era

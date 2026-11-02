@@ -8,7 +8,9 @@
  * simulation: it is purely visual and bounded by its own tile.
  */
 import {
+  BufferAttribute,
   BufferGeometry,
+  SphereGeometry,
   ConeGeometry,
   CylinderGeometry,
   DodecahedronGeometry,
@@ -24,10 +26,10 @@ import {
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GRID_COLS, TILE_SIZE, TerrainType } from '../config/scenario.js';
 import { tileCenter, tileTopY } from './board-coords.js';
-import { COLORS, PAINTED_FLAT, paint, pick } from './palette.js';
+import { COLORS, PAINTED, paint, pick } from './palette.js';
 
 /** Decoration material (own instance so time travel can dry the vegetation). */
-export const DECOR_MATERIAL = PAINTED_FLAT.clone();
+export const DECOR_MATERIAL = PAINTED.clone(); // smooth shading: soft foliage volumes
 import { hashInts, rng } from './rand.js';
 import { tileAt, type TerrainMap } from './terrain-map.js';
 
@@ -171,25 +173,70 @@ function proto(parts: Array<[BufferGeometry, string, Matrix4?]>): BufferGeometry
 }
 const at = (x: number, y: number, z: number) => new Matrix4().makeTranslation(x, y, z);
 
+/**
+ * Soft, lobed crown (premium stylized): a few overlapping smooth spheres,
+ * shaded darker toward the bottom and the inside (cheap baked occlusion), so
+ * trees read as volumes in soft light instead of faceted gems.
+ */
+function crown(r: number, lobes: Array<[number, number, number, number]>, cy: number): BufferGeometry {
+  const parts = lobes.map(([x, y, z, s]) => {
+    const g = new SphereGeometry(r * s, 6, 4).toNonIndexed(); // ~60 tris per lobe: smooth shading hides the low count
+    g.translate(x * r, cy + y * r, z * r);
+    return g;
+  });
+  const g = mergeGeometries(parts, false)!;
+  const pos = g.attributes.position;
+  const c = new Float32Array(pos.count * 3);
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < pos.count; i++) {
+    minY = Math.min(minY, pos.getY(i));
+    maxY = Math.max(maxY, pos.getY(i));
+  }
+  for (let i = 0; i < pos.count; i++) {
+    const t = (pos.getY(i) - minY) / (maxY - minY);
+    const k = 0.5 + 0.55 * Math.pow(t, 0.8); // dark underside, sunlit top
+    c.set([k, k, k], i * 3);
+  }
+  g.setAttribute('color', new BufferAttribute(c, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Bark-coloured trunk with a darker base. */
+function trunk(r0: number, r1: number, h: number): BufferGeometry {
+  return paint(new CylinderGeometry(r1, r0, h, 5, 1, true).translate(0, h / 2, 0).toNonIndexed(), COLORS.trunk);
+}
+
+function tree(parts: BufferGeometry[]): BufferGeometry {
+  for (const p of parts) if (!p.attributes.color) paint(p, '#ffffff');
+  for (const p of parts) if (p.attributes.uv) p.deleteAttribute('uv');
+  return mergeGeometries(parts, false)!;
+}
+
 /** Unit prototypes (sizes in metres at scale 1; base at y = 0). */
 function prototypes(): Record<DecorKind, BufferGeometry> {
   return {
-    crop: proto([[new BoxGeometry(TILE_SIZE * 0.84, 0.0022, 0.0046), '#ffffff', at(0, 0.0011, 0)]]),
-    olive: proto([
-      [new CylinderGeometry(0.0007, 0.001, 0.005, 5), COLORS.trunk, at(0, 0.0025, 0)],
-      [new IcosahedronGeometry(0.0048, 0).scale(1, 0.8, 1), '#ffffff', at(0, 0.0072, 0)],
+    // Soft furrows, barely raised: fields read as painted stripes, not boxes.
+    crop: proto([[new BoxGeometry(TILE_SIZE * 0.84, 0.0005, 0.0062), '#ffffff', at(0, 0.00025, 0)]]),
+    olive: tree([
+      trunk(0.0011, 0.0006, 0.004),
+      crown(0.0036, [[0, 0, 0, 1], [0.75, -0.15, 0.3, 0.8]], 0.0062).scale(1, 0.82, 1),
     ]),
-    pine: proto([
-      [new CylinderGeometry(0.0009, 0.0013, 0.007, 5), COLORS.trunk, at(0, 0.0035, 0)],
-      [new ConeGeometry(0.0085, 0.016, 7), '#ffffff', at(0, 0.013, 0)],
-      [new ConeGeometry(0.006, 0.013, 7), '#ffffff', at(0, 0.021, 0)],
+    pine: tree([
+      trunk(0.0012, 0.0007, 0.011),
+      // Umbrella pine: a broad flat canopy on a tall trunk.
+      crown(0.005, [[0, 0, 0, 1], [1, -0.1, 0.2, 0.8], [-0.9, -0.05, -0.3, 0.85]], 0.0).scale(1, 0.5, 1).translate(0, 0.0125, 0),
     ]),
-    round: proto([
-      [new CylinderGeometry(0.0009, 0.0013, 0.008, 5), COLORS.trunk, at(0, 0.004, 0)],
-      [new IcosahedronGeometry(0.0075, 1), '#ffffff', at(0, 0.0135, 0)],
+    round: tree([
+      trunk(0.0013, 0.0008, 0.007),
+      crown(0.0052, [[0, 0, 0, 1], [0.7, -0.25, 0.3, 0.8], [-0.65, -0.2, -0.3, 0.85]], 0.0115),
     ]),
-    cypress: proto([[new ConeGeometry(0.0035, 0.024, 6), '#ffffff', at(0, 0.012, 0)]]),
-    shrub: proto([[new IcosahedronGeometry(0.0038, 0).scale(1.2, 0.8, 1), '#ffffff', at(0, 0.0025, 0)]]),
+    cypress: tree([
+      trunk(0.0008, 0.0005, 0.003),
+      crown(0.0028, [[0, 0, 0, 1], [0, 1.2, 0, 0.8], [0, 2.3, 0, 0.5]], 0.0045).scale(1, 1.55, 1),
+    ]),
+    shrub: tree([crown(0.0028, [[0, 0, 0, 1]], 0.0018).scale(1.25, 0.7, 1)]),
     tuft: proto([[new ConeGeometry(0.0018, 0.004, 4), '#ffffff', at(0, 0.002, 0)]]),
     flower: proto([[new IcosahedronGeometry(0.0016, 0), '#ffffff', at(0, 0.0012, 0)]]),
     wall: proto([[new BoxGeometry(TILE_SIZE * 0.94, 0.0042, 0.0024), '#ffffff', at(0, 0.0021, 0)]]),
@@ -224,6 +271,13 @@ export function regrowPlan(terrain: TerrainMap): DecorItem[] {
   return items;
 }
 
+/** Shared soft tree geometries (unit = board metres) for other systems (street view). */
+let protoCache: Record<DecorKind, BufferGeometry> | null = null;
+export function decorPrototype(kind: DecorKind): BufferGeometry {
+  protoCache ??= prototypes();
+  return protoCache[kind];
+}
+
 export class TerrainDecor {
   readonly group = new Group();
   private meshes = new Map<DecorKind, { mesh: InstancedMesh; items: DecorItem[] }>();
@@ -242,7 +296,8 @@ export class TerrainDecor {
     for (const [kind, list] of byKind) {
       const mesh = new InstancedMesh(protos[kind], material, list.length);
       mesh.name = `decor-${kind}`;
-      mesh.castShadow = kind !== 'crop' && kind !== 'foam' && kind !== 'tuft' && kind !== 'flower';
+      // Trees cast shadows; small ground cover does not (halves its cost).
+      mesh.castShadow = kind === 'olive' || kind === 'pine' || kind === 'round' || kind === 'cypress' || kind === 'wall';
       mesh.receiveShadow = true;
       mesh.raycast = () => {}; // decoration never intercepts pointers
       list.forEach((it, i) => mesh.setColorAt(i, c.set(it.color)));

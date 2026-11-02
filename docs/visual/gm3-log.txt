@@ -1,0 +1,6 @@
+1-before: vp=The little garden child={"state":"parched","garden":"dry","lines":["My grandmother told me there used to be trees here.","My cousins live in houses built without a plan. There is no park there."],"speaking":true,"line":1}
+1-before story: Homes modernise: solar roofs, home batteries, EV charging, dry-climate gardens. / Nature 48 (target 60): smog, parched land and lost trees around the street. / 12,000 newcomers found no planned home: unplanned sprawl spreads nearby. / The sea has risen onto the nearby beaches. / Mira (9): "My grandmother told me there used to be trees here. My cousins live in houses built without a plan. There is no park there."
+2-after-rewrite: vp=The little garden child={"state":"thriving","garden":"lush","lines":["This is my favorite place. Did you help make it?","Grandpa says most of our power comes from the wind and the sun now."],"speaking":true,"line":0}
+2-after-rewrite story: Homes modernise: solar roofs, home batteries, EV charging, dry-climate gardens. / Nature 65 (target 60): young woodland grows and birds return. / The sea has risen onto the nearby beaches. / Mira (9): "This is my favorite place. Did you help make it? Grandpa says most of our power comes from the wind and the sun now."
+xr hands -> 2050 street: active=true vp=The little garden child=thriving speaking=true
+page errors: 0 

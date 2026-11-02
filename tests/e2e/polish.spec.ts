@@ -15,14 +15,16 @@ test('guided tips walk the first minute and then get out of the way', async ({ p
   await tile(page, 12, 8);
   await key(page, 'Escape');
   expect(await sig(page, 'coachText')).toMatch(/Tip 3\/5/);
-  await ui(page, 'actions-panel', 'btn-enter');
-  await page.waitForFunction(() => !(window.__terracity as unknown as { street(): { fading: boolean } }).street().fading);
+  await ui(page, 'actions-panel', 'btn-split');
+  await page.waitForFunction(() => { const s = (window.__terracity as unknown as { split(): { t: number; open: boolean } }).split(); return s.open && s.t === 1; });
   expect(await sig(page, 'coachText')).toMatch(/Tip 4\/5/);
-  await ui(page, 'street-panel', 'st-2050');
+  await ui(page, 'actions-panel', 'btn-enter');
+  await page.waitForFunction(() => { const s = (window.__terracity as unknown as { street(): { active: boolean; fading: boolean } }).street(); return s.active && !s.fading; });
   expect(await sig(page, 'coachText')).toMatch(/Tip 5\/5/);
   await ui(page, 'street-panel', 'st-return');
-  await page.waitForFunction(() => !(window.__terracity as unknown as { street(): { active: boolean; fading: boolean } }).street().fading);
-  await ui(page, 'time-panel', 'year-2026');
+  await page.waitForFunction(() => !(window.__terracity as unknown as { street(): { active: boolean; fading: boolean } }).street().active);
+  await key(page, 'KeyV'); // merge
+  await page.waitForFunction(() => { const s = (window.__terracity as unknown as { split(): { t: number; open: boolean } }).split(); return !s.open && s.t === 0; });
   expect(await sig(page, 'coachText')).toBe('');
 });
 
@@ -50,11 +52,14 @@ test('larger text enlarges the panels; sound toggles', async ({ page }) => {
   await key(page, 'KeyL');
   expect(await sig(page, 'largeText')).toBe(false);
 
+  // Sound cycles high -> low -> off -> high (chip or M).
   expect(await sig(page, 'soundOn')).toBe(true);
   await ui(page, 'hud-panel', 'btn-sound');
-  expect(await sig(page, 'soundOn')).toBe(false);
+  expect(await sig(page, 'soundOn')).toBe(true); // low
+  await ui(page, 'hud-panel', 'btn-sound');
+  expect(await sig(page, 'soundOn')).toBe(false); // off
   await key(page, 'KeyM');
-  expect(await sig(page, 'soundOn')).toBe(true);
+  expect(await sig(page, 'soundOn')).toBe(true); // high
 });
 
 test('blocked tiles show an X, not only red', async ({ page }) => {

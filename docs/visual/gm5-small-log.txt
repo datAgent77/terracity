@@ -1,0 +1,10 @@
+desktop enter A: active=true plan=B districtHere=true | Homes modernise: solar roofs, home batteries, EV charging, dry-climate gardens. / Nature 65 (target 60): young woodland grows and birds return. / The sea has risen onto the nearby beaches. / Mira (9): "This is my favorite place. Did you help make it? Grandpa says most of our power comes from the wind and the sun now."
+returned: street=false futuresOpen=true
+desktop enter B: active=true plan=none districtHere=false | No neighbourhood was planned here. / Nature 48 (target 60): smog, parched land and lost trees around the street. / 16,000 newcomers found no planned home: unplanned sprawl spreads nearby. / The sea has risen onto the nearby beaches. / Mira (9): "We live in the houses out here. Nobody planned a street or a garden. Grandpa says only some of our power comes from the wind and the sun."
+plan unchanged after desktop visits: true board=true
+xr split: open=true
+xr ray-select: selected=A grabbable=A
+xr pulled into future: active=true plan=B title-year=2050
+xr return: street=false futuresOpen=true
+xr merge: open=false board=true planUnchanged=true
+page errors: 0 

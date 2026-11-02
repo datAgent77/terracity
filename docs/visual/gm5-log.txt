@@ -1,0 +1,15 @@
+0 start: Tip 1/5: Pinch the Homes piece in the tray and drop it on a glowing tile next to the town.
+tabletop start: {"calls":104,"triangles":62206,"geometries":130,"textures":18,"objects":673,"meshes":587,"jsHeapMB":169}
+1 built: Tip 3/5: Bring both open hands together over the city, then pull them apart (or tap Split into two futures). | hint=true
+tabletop built: {"calls":122,"triangles":76254,"geometries":138,"textures":19,"objects":747,"meshes":617,"jsHeapMB":169}
+2 split: Tip 4/5: Pinch a future and pull it toward you (or tap Enter future). Someone lives there in 2050.
+two futures: {"calls":69,"triangles":92410,"geometries":167,"textures":21,"objects":794,"meshes":651,"jsHeapMB":169}
+3 inside future A: Tip 5/5: Come back, bring your hands together to merge, change your plan, and visit her again. | Mira parched: My grandmother told me there used to be trees here.
+street 2050: {"calls":75,"triangles":12804,"geometries":245,"textures":23,"objects":1075,"meshes":814,"jsHeapMB":169}
+4 merged: tip="" year=2026
+5 Plan A vs Plan B: tagline=true
+6 inside Plan B: Mira thriving: This is my favorite place. Did you help make it?
+scrubbing ~2039: {"calls":125,"triangles":91504,"geometries":269,"textures":22,"objects":1112,"meshes":851,"jsHeapMB":169}
+xr split hint: {"tip":"Tip 3/5: Bring both open hands together ","hint":true}
+xr stats: {"calls":224,"triangles":157196,"geometries":142,"textures":22,"objects":757,"meshes":602,"jsHeapMB":159}
+page errors: 0 

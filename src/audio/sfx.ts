@@ -3,7 +3,7 @@
  * licensing). Short and soft by design; respects the `soundOn` preference.
  * The AudioContext is created lazily and resumed on the first user gesture.
  */
-import { soundOn } from '../ui/accessibility.js';
+import { soundGain, soundLevel, soundOn } from '../ui/accessibility.js';
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -14,8 +14,11 @@ function audio(): AudioContext | null {
     if (!ctx) {
       ctx = new AudioContext();
       master = ctx.createGain();
-      master.gain.value = 0.35;
+      master.gain.value = 0.35 * soundGain();
       master.connect(ctx.destination);
+      soundLevel.subscribe(() => {
+        if (ctx && master) master.gain.setTargetAtTime(0.35 * soundGain(), ctx.currentTime, 0.05);
+      });
     }
     if (ctx.state === 'suspended') void ctx.resume();
     return ctx;
@@ -111,6 +114,49 @@ export const sfx = {
   },
   /** Teleport between viewpoints / switching plans. */
   teleport: () => noise(0, 0.28, 1800, 900, 0.12),
+  /** Split reality: the fracture appears (hands held together). */
+  fracture: () => {
+    tone(880, 0, 0.5, 'sine', 0.12, 1320);
+    tone(1760, 0.05, 0.4, 'sine', 0.05, 2640);
+  },
+  /** The world splits into two futures: a crystalline shimmer and a wide whoosh. */
+  split: () => {
+    noise(0, 0.9, 600, 5000, 0.25);
+    [1047, 1319, 1568, 2093].forEach((f, i) => tone(f, 0.08 + i * 0.06, 0.6, 'sine', 0.08));
+  },
+  /** The two futures merge back into one world. */
+  merge: () => {
+    noise(0, 0.7, 5000, 600, 0.22);
+    tone(784, 0.3, 0.5, 'sine', 0.14, 523);
+  },
+  /** Mira starts a line: a soft two-note chime, panned toward her. */
+  childChime: (pan = 0) => {
+    const a = audio();
+    if (!a || !master) return;
+    const p = a.createStereoPanner();
+    p.pan.value = pan;
+    p.connect(master);
+    const t0 = a.currentTime;
+    for (const [f, dt] of [[880, 0], [1175, 0.12]] as const) {
+      const o = a.createOscillator();
+      const g = a.createGain();
+      o.type = 'sine';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + dt);
+      g.gain.exponentialRampToValueAtTime(0.09, t0 + dt + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.5);
+      o.connect(g).connect(p);
+      o.start(t0 + dt);
+      o.stop(t0 + dt + 0.55);
+    }
+  },
+  /** Sculpt time: a soft clockwork tick per passing year. */
+  timeTick: () => tone(2400, 0, 0.03, 'square', 0.05),
+  /** The dial settles on a simulated year. */
+  yearSnap: () => {
+    tone(1320, 0, 0.35, 'sine', 0.14);
+    tone(1980, 0.05, 0.4, 'sine', 0.06);
+  },
   win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.12, 0.35, 'sine', 0.3)),
   lose: () => {
     tone(392, 0, 0.3, 'triangle', 0.25);

@@ -27,3 +27,5 @@ export * from '@pmndrs/uikit-lucide/dist/ChevronLeft.js';
 export * from '@pmndrs/uikit-lucide/dist/ChevronRight.js';
 export * from '@pmndrs/uikit-lucide/dist/DoorOpen.js';
 export * from '@pmndrs/uikit-lucide/dist/LogOut.js';
+export * from '@pmndrs/uikit-lucide/dist/Split.js';
+export * from '@pmndrs/uikit-lucide/dist/Merge.js';

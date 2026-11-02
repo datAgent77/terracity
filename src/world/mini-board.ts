@@ -20,7 +20,8 @@ import {
 import { GRID_COLS, StructureType, TILE_BASE_HEIGHT, TILE_SIZE, TerrainType } from '../config/scenario.js';
 import type { Placement } from '../simulation/metrics.js';
 import { tileCenter, tileTopY } from './board-coords.js';
-import { buildBase, buildTerrainTiles, buildTown, buildWater } from './board-mesh.js';
+import { buildBase, buildTown, buildWater } from './board-mesh.js';
+import { buildTerrainSurface } from './terrain-surface.js';
 import type { FutureVisualState } from './future-visual-state.js';
 import { createSprawl } from './houses.js';
 import { setEra } from './villas.js';
@@ -59,10 +60,10 @@ export function createMiniBoard(terrain: TerrainMap, plan: readonly Placement[],
 
   g.add(buildBase());
   g.add(
-    ...buildTerrainTiles(terrain, (tile, c) => {
+    ...buildTerrainSurface(terrain, (tile, c) => {
       if (tile.type === TerrainType.Beach) c.lerp(WET_BEACH, state.seaRise * 0.85);
       else if (tile.type !== TerrainType.Sea && tile.type !== TerrainType.River && tile.type !== TerrainType.Town) c.lerp(DRY_LAND, dry);
-    }),
+    }, 5),
   );
   g.add(buildWater(terrain));
 
@@ -81,7 +82,7 @@ export function createMiniBoard(terrain: TerrainMap, plan: readonly Placement[],
     .filter((it) => !covered.has(it.tile) && MINI_KINDS.has(it.kind))
     .filter((it) => !(LOSABLE.has(it.kind) && decorHash(it) < state.treeLoss))
     .map((it) => ({ ...it, color: `#${leaf.set(it.color).lerp(DRY_LEAF, it.kind === 'foam' || it.kind === 'rock' ? 0 : dry).getHexString()}` }));
-  g.add(new TerrainDecor(items, PAINTED_FLAT).group);
+  g.add(new TerrainDecor(items, PAINTED).group);
 
   // Static content baked into painted meshes.
   const statics = new Group();
@@ -149,6 +150,16 @@ export function createMiniBoard(terrain: TerrainMap, plan: readonly Placement[],
   }
   bakeMaterials(statics);
   g.add(mergeStatic(statics));
+  // Smog over a region whose environment misses its target (same `haze` as the board).
+  if (state.haze > 0.01) {
+    const smog = new Mesh(
+      new PlaneGeometry(GRID_COLS * TILE_SIZE * 0.98, 10 * TILE_SIZE * 0.98).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ color: '#8a7559', transparent: true, opacity: Math.min(0.55, 0.6 * state.haze), depthWrite: false }),
+    );
+    smog.position.y = 0.05;
+    smog.name = 'mini-smog';
+    g.add(smog);
+  }
   g.traverse((o) => {
     o.raycast = () => {};
   });

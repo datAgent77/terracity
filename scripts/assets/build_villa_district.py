@@ -224,6 +224,23 @@ class Builder:
         P([(x0, y1, z0), (x0, y0, z0), (x0, y0, z1), (x0, y1, z1)], cell, tint)
         P([(x1, y0, z0), (x1, y1, z0), (x1, y1, z1), (x1, y0, z1)], cell, tint)
 
+    def wall_box(self, x0, x1, y0, y1, z0, z1, cell, tint=WHITE, c=0.32, top=True):
+        """Walls with chamfered vertical corners and a soft chamfer along the top
+        edge: corners catch the light, so volumes read as built, not as boxes."""
+        c = min(c, (x1 - x0) / 4, (y1 - y0) / 4)
+        ring = [(x0 + c, y0), (x1 - c, y0), (x1, y0 + c), (x1, y1 - c), (x1 - c, y1), (x0 + c, y1), (x0, y1 - c), (x0, y0 + c)]
+        inner = [(x0 + 2 * c, y0 + c), (x1 - 2 * c, y0 + c), (x1 - c, y0 + 2 * c), (x1 - c, y1 - 2 * c), (x1 - 2 * c, y1 - c), (x0 + 2 * c, y1 - c), (x0 + c, y1 - 2 * c), (x0 + c, y0 + 2 * c)]
+        zt = z1 - c * 0.6 if top else z1  # an open top (a floor above) runs the full height
+        n = len(ring)
+        for k in range(n):
+            (ax, ay), (bx, by) = ring[k], ring[(k + 1) % n]
+            self.poly([(ax, ay, z0), (bx, by, z0), (bx, by, zt), (ax, ay, zt)], cell, tint)
+            if top:
+                (ix, iy), (jx, jy) = inner[k], inner[(k + 1) % n]
+                self.poly([(ax, ay, zt), (bx, by, zt), (jx, jy, z1), (ix, iy, z1)], cell, tint)
+        if top:
+            self.poly([(x, y, z1) for x, y in inner], cell, tint)
+
     # Ground plate with a subdivided top so baked AO can draw contact shadows.
     def plate(self, x0, x1, y0, y1, z0, z1, cell, tint=WHITE, step=2.4, edge=None):
         nx = max(1, round((x1 - x0) / step))
@@ -458,6 +475,16 @@ def windows_on(c, x0, x1, y0, y1, z0, storeys, others, front_door=True, big=Fals
                 q = lambda aa, zz, off=e: centre + u * aa + n * off + Z * (zb + zz)
                 cell = "timber" if door and era == 0 else "glass"
                 b.poly([q(-w / 2, zo), q(w / 2, zo), q(w / 2, zo + h), q(-w / 2, zo + h)], cell)
+                if not door:
+                    # Glazing bars: white timber in traditional homes, slim dark
+                    # aluminium in modern ones. They make a window read as a window.
+                    bar = SURROUND if era == 0 else lin((0.22, 0.24, 0.26))
+                    t = 0.07 if era == 0 else 0.05
+                    o2 = 0.1
+                    b.poly([q(-t, zo, o2), q(t, zo, o2), q(t, zo + h, o2), q(-t, zo + h, o2)], "plain", bar)
+                    hz = zo + h * (0.62 if era == 0 else 0.5)
+                    if era == 0 or w > 2.0:
+                        b.poly([q(-w / 2, hz - t, o2), q(w / 2, hz - t, o2), q(w / 2, hz + t, o2), q(-w / 2, hz + t, o2)], "plain", bar)
                 if c.trim:
                     # Stone surround (flat head + jamb bands) and a projecting sill (2 faces).
                     fz0, fz1 = zb + zo, zb + zo + h
@@ -493,10 +520,12 @@ def volume(c, x0, x1, y0, y1, storeys, roof, others, wall="stucco", axis="x", pv
     z0 = BASE
     h = storeys * STOREY
     if base_stone and storeys > 1:
-        b.box(x0, x1, y0, y1, z0, z0 + STOREY, "stone")
-        b.box(x0, x1, y0, y1, z0 + STOREY, z0 + h, "stucco", c.wall_tint)
+        b.wall_box(x0, x1, y0, y1, z0, z0 + STOREY, "stone", top=False)
+        b.wall_box(x0, x1, y0, y1, z0 + STOREY, z0 + h, "stucco", c.wall_tint)
+        # String course where stone meets plaster.
+        b.box(x0 - 0.1, x1 + 0.1, y0 - 0.1, y1 + 0.1, z0 + STOREY - 0.12, z0 + STOREY + 0.12, "plain", SURROUND)
     else:
-        b.box(x0, x1, y0, y1, z0, z0 + h, wall, c.wall_tint if wall == "stucco" else WHITE)
+        b.wall_box(x0, x1, y0, y1, z0, z0 + h, wall, c.wall_tint if wall == "stucco" else WHITE)
     # Plinth line and contact band.
     b.box(x0 - 0.12, x1 + 0.12, y0 - 0.12, y1 + 0.12, z0, z0 + 0.35, "stone", lin((0.86, 0.82, 0.74)), sides=True)
     windows_on(c, x0, x1, y0, y1, z0, storeys, others)
@@ -796,7 +825,7 @@ def street(b, era, rnd):
         # Bioswale (rain garden) along the south kerb.
         b.box(-L, L, -2.9, -1.7, 0.32, 0.36, "greenroof", sides=False)
     # Street lamps on both sidewalks, staggered.
-    for x, y in ((-20.0, 4.1), (0.0, 4.1), (20.0, 4.1), (-10.0, -4.1), (10.0, -4.1)):
+    for x, y in ((-20.0, 4.1), (6.5, 4.1), (20.0, 4.1), (-10.0, -4.1), (10.0, -4.1)):
         b.box(x - 0.1, x + 0.1, y - 0.1, y + 0.1, 0.62, 4.6, "plain", lin((0.22, 0.24, 0.26)))
         b.box(x - 0.32, x + 0.32, y - 0.32, y + 0.32, 4.6, 4.95, "plain", lin((1.0, 0.93, 0.7)))
     c = Ctx(b, era, 0, rnd)
@@ -805,7 +834,7 @@ def street(b, era, rnd):
     for x in xs:
         for y in (3.8, -3.8):
             b.prism(x, y, 0.62, 0.62 + 2.6 * s, 0.22, 5, "soil", TRUNK)
-            b.blob(x, y, 0.62 + 3.0 * s, 1.35 * s, 1.35 * s, 1.2 * s, "foliage", lin((0.38, 0.58, 0.30)), rnd, subdiv=1)
+            b.blob(x, y, 0.62 + 3.0 * s, 1.35 * s, 1.35 * s, 1.2 * s, "foliage", lin((0.38, 0.58, 0.30)), rnd, subdiv=2, jitter=0.08)
 
 
 # Neighbourhood layouts: which villa stands on which parcel (slots 0-2 north
@@ -941,6 +970,23 @@ def make_material(atlas, rough):
 
 def to_object(b, name, mat):
     ao = bake_ao(b)
+    # Foliage: one occlusion value per position (averaged over its faces), so
+    # smooth-shaded crowns read as soft volumes, not facets.
+    acc = {}
+    for fi, f in enumerate(b.faces):
+        if f["cell"] != "foliage":
+            continue
+        for k, i in enumerate(f["idx"]):
+            p = b.verts[i]
+            key = (round(p.x, 3), round(p.y, 3), round(p.z, 3))
+            acc.setdefault(key, []).append(ao[fi][k])
+    for fi, f in enumerate(b.faces):
+        if f["cell"] != "foliage":
+            continue
+        for k, i in enumerate(f["idx"]):
+            p = b.verts[i]
+            vals = acc[(round(p.x, 3), round(p.y, 3), round(p.z, 3))]
+            ao[fi][k] = sum(vals) / len(vals)
     # Merge coincident positions (the exporter splits by normal/uv/colour).
     index, verts, faces, keep, seen = {}, [], [], [], set()
     for fi, f in enumerate(b.faces):
@@ -979,8 +1025,9 @@ def to_object(b, name, mat):
             a = ao[fi][k]
             col.data[loop].color = (tint[0] * a, tint[1] * a, tint[2] * a, 1.0)
     me.materials.append(mat)
-    for p in me.polygons:
-        p.use_smooth = False
+    # Foliage is smooth-shaded (soft volumes); architecture stays crisp.
+    for pi, p in enumerate(me.polygons):
+        p.use_smooth = b.faces[keep[pi]]["cell"] == "foliage"
     obj = bpy.data.objects.new(name, me)
     bpy.context.scene.collection.objects.link(obj)
     return obj, len(faces)  # faces actually exported
