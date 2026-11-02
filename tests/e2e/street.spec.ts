@@ -130,7 +130,9 @@ test('the last child: her garden and words follow the plan; rewriting the plan c
   expect(after!.happy).toBe(true);
   expect(after!.lines[0]).toMatch(/favorite place. Did you help make it/);
 
-  // Same inputs, same words.
+  // Same inputs, same outcome and words (which line she is saying right now
+  // depends on elapsed time, so it is not compared).
   const again = await visit2050();
-  expect(again).toEqual(after);
+  const outcome = (c: C) => c && { happy: c.happy, state: c.state, garden: c.garden, lines: c.lines };
+  expect(outcome(again)).toEqual(outcome(after));
 });

@@ -129,8 +129,8 @@ def town_building(c, x0, x1, y0, y1, storeys, roof, tint, shopfront_side=None, o
     b = c.b
     z0 = TOWN_GROUND
     h = storeys * STOREY
-    b.box(x0, x1, y0, y1, z0, z0 + STOREY, "stone", lin((0.92, 0.88, 0.80)))
-    b.box(x0, x1, y0, y1, z0 + STOREY, z0 + h, "stucco", tint)
+    b.wall_box(x0, x1, y0, y1, z0, z0 + STOREY, "stone", lin((0.92, 0.88, 0.80)), top=False)
+    b.wall_box(x0, x1, y0, y1, z0 + STOREY, z0 + h, "stucco", tint)
     b.box(x0 - 0.15, x1 + 0.15, y0 - 0.15, y1 + 0.15, z0 + STOREY - 0.15, z0 + STOREY + 0.15, "plain", lin((0.93, 0.91, 0.86)))  # string course
     c.wall_tint = tint
     vd.windows_on(c, x0, x1, y0, y1, z0 + STOREY, storeys - 1, list(others), front_door=False)
@@ -550,7 +550,7 @@ def sprawl_house(k):
     tint = CONCRETE[k]
     x0, x1, y0, y1 = -w / 2, w / 2, -d / 2, d / 2
     h = st * STOREY
-    b.box(x0, x1, y0, y1, z0, z0 + h, "stucco", tint)
+    b.wall_box(x0, x1, y0, y1, z0, z0 + h, "stucco", tint)
     b.box(x0 - 0.2, x1 + 0.2, y0 - 0.2, y1 + 0.2, z0 + h, z0 + h + 0.4, "plain", lin((0.6, 0.6, 0.58)))
     simple_windows(c, x0, x1, y0, y1, z0, st, size=(1.0, 1.2), spacing=3.6)
     b.poly([(-0.7, y0 - 0.09, z0), (0.7, y0 - 0.09, z0), (0.7, y0 - 0.09, z0 + 2.2), (-0.7, y0 - 0.09, z0 + 2.2)], "plain", lin((0.35, 0.33, 0.3)))

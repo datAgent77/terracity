@@ -79,3 +79,32 @@ giving *the last child* (three street visits, two plans) a 180 s budget — it
 took 1.8 min under software rendering, beyond the 90 s default; the new mood
 assertions pass (sad before the rewrite, smiling after). IWER hand scripts exit
 0; IWER Mira and Become Small hand flows pass; build OK.
+
+## Iteration 3 — buildings and plinths
+
+- **Plinths**: the square 1.6 mm tray under every structure is now a rounded
+  plinth whose edges slope softly down into the land (`structure-models.ts`,
+  one shared geometry); the homes' connected/unconnected tint still applies.
+- **Walls**: every villa and town wall is built with chamfered vertical corners
+  and a soft chamfer along the top edge (`Builder.wall_box`), so corners catch
+  the light and volumes read as built rather than as boxes.
+- **Windows**: glazing bars — white timber crosses on traditional homes, slim
+  dark aluminium mullions on modern ones — in addition to the existing stone
+  surrounds, sills and shutters.
+- **Stone ground floors**: run the full storey height (an open-top wall no
+  longer loses its top chamfer band, which had left a dark gap) and meet the
+  plaster above at a string course.
+- A street lamp that stood right in the *At the gate* viewpoint moved aside.
+
+Cost: district 5.8 k → 6.5 k triangles per era; town block 4: 2.9 k → 4.0 k;
+city-kit.glb 4.5 MB → 5.2 MB (quantized).
+
+Evidence: `docs/visual/bp-compare-gate.png` (street, left before / right after),
+`bp-compare-close.png` (tabletop close-up), `bp4-*`.
+
+Tests (iteration 3): unit 168 / 168; Playwright 29 passed, 3 skipped, 1 failed
+in the full run — *the last child*'s determinism check compared which line Mira
+was saying at that moment (time-dependent) as well as the outcome; it now
+compares the outcome and words only, and the street spec passes (3 / 3). IWER
+hand scripts exit 0; GODMODE demo path 0 page errors; IWER stereo tabletop
+224 calls / 219 k triangles; build 10 MB.
