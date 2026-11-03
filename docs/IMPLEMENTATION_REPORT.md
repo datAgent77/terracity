@@ -195,3 +195,73 @@ real hand tracking unverified.
 **11. Acceptance**: met for C — aligned dual-future comparison from the
 scenario projections, working desktop interaction, hand interaction in the
 emulator, performance measured, XR validation steps documented.
+
+## Milestone D — Mira and the hero neighbourhood
+
+**1. Implemented**
+
+- **Character** (`scripts/assets/build_people.py` → `public/models/people.glb`,
+  quantized 467 KB): Mira now has a head with its pivot at the neck, eyelids,
+  a calm neutral mouth besides the smile and the frown, and a left arm with
+  its own shoulder pivot. In the street (`street-system.ts`): her head follows
+  your eyes (pitch / yaw limited), she nods as each line starts, blinks on a
+  steady rhythm, and **points at the place a line is about** (the park, the
+  unplanned houses) — the real tile, converted to street coordinates.
+  Reduced motion: no nod / blink / sway.
+- **Expressions** (`expressionFor`): happy where her neighbourhood thrives,
+  calm and thoughtful otherwise — never staged misery.
+- **Grounded lines** (`mira-dialogue.ts`), each only when its facts hold:
+  "The trees in our park have grown so much." (park nearby, nature on target),
+  "I can walk to the park with my friends." (her homes, road-connected, park
+  nearby), "We have to walk farther to find somewhere shady." (no park nearby,
+  ≥ 25 % trees lost), "My friends live in the houses around here." (no planned
+  street here, unplanned houses nearby). At most six lines.
+- **The unplanned future is credible, not propaganda**: residents stand
+  outside the unplanned houses (the model puts its sprawl residents there),
+  dry grass on worn yards instead of sand, a grey smog haze instead of a
+  desert tint (`street-dressing.ts` `createDryGrass`, yard material, haze colours).
+- **Occlusion**: `miraOccluded()` casts rays from your eyes to her head and
+  chest against everything solid in the street.
+
+**2. Files changed**: `scripts/assets/build_people.py`,
+`public/models/people.glb`, `src/world/child.ts`, `src/world/mira-dialogue.ts`,
+`src/world/street-system.ts`, `src/world/street-dressing.ts`,
+`scripts/visual/mira2.mjs`; tests `tests/unit/mira-dialogue.test.ts`,
+`tests/e2e/street.spec.ts`.
+
+**3. Found and fixed**: the unplanned future read as a desert (sand-coloured
+yard texture + brown haze) although the model computes poor air and dry land,
+not desertification; Mira frowned in every non-thriving future; nobody else
+lived in the unplanned street although the projection houses thousands there.
+
+**4. Tests**: unit (+3): what she points at is a real park / sprawl tile
+within two tiles and matches the line; the brief's lines appear only with
+their facts; expressions. E2E "Mira 2.0" now also checks: no occlusion in both
+futures, happy vs neutral, residents present where nobody planned, pointing
+during a line about a place.
+
+Evidence (desktop): `docs/visual/md1-3-talk-other-future.png` (pointing at the
+park), `md1-5-future-B-other.png`, `md-*` (clean run).
+
+**5–6. Results (clean run)**
+
+| Check | Status |
+|---|---|
+| `tsc --noEmit` | PASS |
+| Unit (216) | PASS |
+| E2E desktop (36 passed, 4 skipped env-gated) incl. extended "Mira 2.0" | PASS |
+| IWER hand scripts xr-phase1/2/3 | PASS (emulator) |
+| Mira capture, perf audit: 0 page errors; no leak over 8 visits | PASS |
+| Production build (11 MB) | PASS |
+
+**Performance (IWER, not a Quest)**: street with Mira 172 draw calls / 108 k
+triangles (was ~168 / 89 k before look-dev + D: shadows, dressing, Mira's
+extra parts); unplanned street 150 / 55 k. **7. Desktop** PASS; **8. XR**
+IWER PASS, Quest NOT TESTED.
+
+**9–10. Limitations / risks**: conversational distance stays ~3 m (the
+composition of the garden viewpoint), closer than that she would fill the
+view on desktop; pointing uses a simple shoulder rotation (no elbow);
+gestures are not tested on a headset.
+
+**11. Acceptance**: met for D.

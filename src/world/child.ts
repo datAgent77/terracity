@@ -25,12 +25,20 @@ import { rng } from './rand.js';
 
 const mat = (color: string, flat = false) => new MeshStandardMaterial({ color, roughness: 0.8, flatShading: flat });
 
+export type Expression = 'happy' | 'neutral' | 'sad';
+
 export interface Child {
   root: Group;
-  /** Set her expression (authored model only): smiling, or sad. */
-  mood?: (happy: boolean) => void;
+  /** Set her expression (authored model only). */
+  mood?: (e: Expression) => void;
   /** Right arm pivot (waves while speaking). */
   arm: Group;
+  /** Left arm pivot (points at what she talks about). Authored model only. */
+  armL?: Object3D;
+  /** Head pivot at the neck (looks at you, nods). Authored model only. */
+  head?: Object3D;
+  /** Close / open her eyes (a blink). Authored model only. */
+  blink?: (closed: boolean) => void;
   body: Group;
 }
 
@@ -45,14 +53,29 @@ export function createChild(): Child {
     const body = new Group();
     body.add(model);
     root.add(body);
-    const smile = model.getObjectByName('mira-smile');
-    const sad = model.getObjectByName('mira-sad');
-    const mood = (happy: boolean) => {
-      if (smile) smile.visible = happy;
-      if (sad) sad.visible = !happy;
+    const mouths: Record<Expression, Object3D | undefined> = {
+      happy: model.getObjectByName('mira-smile'),
+      neutral: model.getObjectByName('mira-neutral'),
+      sad: model.getObjectByName('mira-sad'),
     };
-    mood(true);
-    return { root, arm: authoredArm as unknown as Group, body, mood };
+    const mood = (e: Expression) => {
+      for (const [k, m] of Object.entries(mouths)) if (m) m.visible = k === e;
+    };
+    mood('happy');
+    const lids = model.getObjectByName('mira-lids');
+    const blink = (closed: boolean) => {
+      if (lids) lids.visible = closed;
+    };
+    blink(false);
+    return {
+      root,
+      arm: authoredArm as unknown as Group,
+      armL: model.getObjectByName('mira-arm-l') ?? undefined,
+      head: model.getObjectByName('mira-head') ?? undefined,
+      blink,
+      body,
+      mood,
+    };
   }
   const root = new Group();
   root.name = 'mira';

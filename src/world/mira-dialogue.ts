@@ -17,7 +17,7 @@
 import { TARGETS } from '../config/balance.js';
 import type { Year } from '../config/projection.js';
 import { StructureType, TerrainType } from '../config/scenario.js';
-import type { Placement } from '../simulation/metrics.js';
+import { computeMetrics, type Placement } from '../simulation/metrics.js';
 import { projectYear, type YearMetrics } from '../simulation/projection.js';
 import { landBudget } from '../simulation/land-budget.js';
 import { CHILD_NAME, childNarrative, type ChildNarrative } from './child-narrative.js';
@@ -38,6 +38,11 @@ export interface LocalFacts {
   sprawlTiles: number;
   /** Unplanned sprawl stands on her tile itself. */
   sprawlHere: boolean;
+  /** Her neighbourhood is connected to the town by road (it houses people in the model). */
+  connected: boolean;
+  /** Nearest park / unplanned sprawl tile within two tiles (what she can point at). */
+  nearestPark: { col: number; row: number } | null;
+  nearestSprawl: { col: number; row: number } | null;
 }
 
 export interface SimulationSnapshot {
@@ -68,6 +73,13 @@ export interface DialogueLine {
   text: string;
   /** Facts that make this line true (checked by the tests). */
   support: string[];
+  /** A real tile she points at while saying it (the park, the sprawl…). */
+  point?: { col: number; row: number };
+}
+
+/** Her face: happy where her neighbourhood thrives; calm and thoughtful otherwise (never staged misery). */
+export function expressionFor(state: ChildNarrative['state']): 'happy' | 'neutral' {
+  return state === 'thriving' ? 'happy' : 'neutral';
 }
 
 const RADIUS = 2;
@@ -86,6 +98,12 @@ function snapshot(terrain: TerrainMap, plan: readonly Placement[], y: YearMetric
 
 function localFacts(terrain: TerrainMap, plan: readonly Placement[], y: YearMetrics, col: number, row: number): LocalFacts {
   const near = (c: number, r: number) => Math.abs(c - col) <= RADIUS && Math.abs(r - row) <= RADIUS;
+  const dist = (t: { col: number; row: number }) => Math.abs(t.col - col) + Math.abs(t.row - row);
+  const nearest = <T extends { col: number; row: number }>(xs: T[]) =>
+    xs.filter((t) => near(t.col, t.row)).sort((a, b) => dist(a) - dist(b) || a.row - b.row || a.col - b.col)[0] ?? null;
+  const home = plan.find((p) => p.col === col && p.row === row && p.type === StructureType.Residential);
+  const park = nearest(plan.filter((p) => p.type === StructureType.Park));
+  const sp = nearest([...y.sprawlTiles]);
   const here = plan.filter((p) => near(p.col, p.row));
   const count = (t: StructureType) => here.filter((p) => p.type === t).length;
   return {
@@ -97,6 +115,9 @@ function localFacts(terrain: TerrainMap, plan: readonly Placement[], y: YearMetr
     farmlandBuilt: here.filter((p) => tileAt(terrain, p.col, p.row)?.type === TerrainType.Farmland).length,
     sprawlTiles: y.sprawlTiles.filter((t) => near(t.col, t.row)).length,
     sprawlHere: y.sprawlTiles.some((t) => t.col === col && t.row === row),
+    connected: !!home && computeMetrics(terrain, plan).servedIds.has(home.id),
+    nearestPark: park && { col: park.col, row: park.row },
+    nearestSprawl: sp && { col: sp.col, row: sp.row },
   };
 }
 
@@ -148,16 +169,30 @@ export function miraDialogue(ctx: NarrativeContext): DialogueLine[] {
   // 2. Her place: the same verified line as her mood and garden.
   lines.push({ text: c.lines[0], support: [`state:${c.state}`] });
 
-  // 3. One local consequence she can see from here.
+  // 3. What she can see from here (at most two lines), pointing at the place.
+  const local: DialogueLine[] = [];
+  const park = L.nearestPark ?? undefined;
+  const sprawlAt = L.nearestSprawl ?? undefined;
   if (L.parks > 0 && s.environment >= TARGETS.environment) {
-    lines.push({ text: `We play in the ${plural(L.parks, 'park', 'parks')} near here. The trees there are big now.`, support: ['local.parks>0', 'environment>=target'] });
-  } else if (L.sprawlTiles > 0) {
-    lines.push({ text: 'Houses keep going up out there, without streets or parks.', support: ['local.sprawlTiles>0'] });
-  } else if (L.farmlandBuilt > 0) {
-    lines.push({ text: 'Grandpa says there used to be fields where some of these buildings are.', support: ['local.farmlandBuilt>0'] });
-  } else if (L.wind + L.solar > 0) {
-    lines.push({ text: `From here I can see ${L.wind ? 'the wind turbines' : 'the solar farm'}. They make some of our power.`, support: [L.wind ? 'local.wind>0' : 'local.solar>0'] });
+    local.push({ text: 'The trees in our park have grown so much.', support: ['local.parks>0', 'environment>=target'], point: park });
   }
+  if (L.homesHere && L.connected && L.parks > 0) {
+    local.push({ text: 'I can walk to the park with my friends.', support: ['homesHere', 'connected', 'local.parks>0'], point: park });
+  } else if (L.parks === 0 && s.treeLoss >= 0.25) {
+    local.push({ text: 'We have to walk farther to find somewhere shady.', support: ['local.parks=0', 'treeLoss>=0.25'] });
+  }
+  if (!L.homesHere && L.sprawlTiles > 0) {
+    local.push({ text: 'My friends live in the houses around here.', support: ['!homesHere', 'local.sprawlTiles>0'], point: sprawlAt });
+  } else if (L.sprawlTiles > 0) {
+    local.push({ text: 'Houses keep going up out there, without streets or parks.', support: ['local.sprawlTiles>0'], point: sprawlAt });
+  }
+  if (!local.length && L.farmlandBuilt > 0) {
+    local.push({ text: 'Grandpa says there used to be fields where some of these buildings are.', support: ['local.farmlandBuilt>0'] });
+  }
+  if (!local.length && L.wind + L.solar > 0) {
+    local.push({ text: `From here I can see ${L.wind ? 'the wind turbines' : 'the solar farm'}. They make some of our power.`, support: [L.wind ? 'local.wind>0' : 'local.solar>0'] });
+  }
+  lines.push(...local.slice(0, 2));
 
   // 4. The same place in the other future: one verified difference, both sides of the tradeoff.
   const o = ctx.other;
@@ -194,7 +229,8 @@ export function miraDialogue(ctx: NarrativeContext): DialogueLine[] {
   }
 
   // 5. Her closing line (energy / housing / thanks), then a question to the planner.
-  if (c.lines[1]) lines.push({ text: c.lines[1], support: [`second:${c.state}`] });
+  // Short by design (at most 6 lines): her energy line gives way when there is more to say about this place.
+  if (c.lines[1] && lines.length < 5) lines.push({ text: c.lines[1], support: [`second:${c.state}`] });
   // Closing: an invitation to look at the other future, or a question.
   if (o) lines.push({ text: 'Will you look at the other future too?', support: ['other'] });
   else lines.push({ text: c.state === 'thriving' ? 'Will you keep it like this?' : 'Could it have been different?', support: [`state:${c.state}`] });
@@ -208,6 +244,9 @@ export function contextFacts(ctx: NarrativeContext): Set<string> {
   const f = new Set<string>();
   f.add(L.homesHere ? 'homesHere' : '!homesHere');
   if (L.parks > 0) f.add('local.parks>0');
+  else f.add('local.parks=0');
+  if (L.connected) f.add('connected');
+  if (s.treeLoss >= 0.25) f.add('treeLoss>=0.25');
   if (L.sprawlTiles > 0) f.add('local.sprawlTiles>0');
   if (L.farmlandBuilt > 0) f.add('local.farmlandBuilt>0');
   f.add(L.sprawlHere ? 'sprawlHere' : '!sprawlHere');

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { GRID_COLS, GRID_ROWS, StructureType as S } from '../../src/config/scenario';
 import type { Placement } from '../../src/simulation/metrics';
 import { canPlace } from '../../src/simulation/placement';
-import { contextFacts, miraDialogue, narrativeContext } from '../../src/world/mira-dialogue';
+import { contextFacts, expressionFor, miraDialogue, narrativeContext } from '../../src/world/mira-dialogue';
+import { projectYear } from '../../src/simulation/projection';
 import { rng } from '../../src/world/rand';
 import { generateTerrain, tileAt } from '../../src/world/terrain-map';
 
@@ -87,4 +88,42 @@ describe('Mira 2.0 dialogue', () => {
       expect(Math.abs(d.row - 4)).toBeLessThanOrEqual(2);
     }
   });
+
+  it('Mira 3.0: what she points at is real and near (a park in her plan, unplanned houses in its projection)', () => {
+    const plans = [[], reference(), underHoused(), ...Array.from({ length: 30 }, (_, i) => randomPlan(900 + i))];
+    for (const plan of plans) {
+      for (const tag of ['B', 'none'] as const) {
+        const ctx = narrativeContext(terrain, tag === 'none' ? [] : plan, tag, 2050, 6, 4);
+        const sprawl = projectYear(terrain, tag === 'none' ? [] : plan, 2050).sprawlTiles;
+        for (const l of miraDialogue(ctx)) {
+          if (!l.point) continue;
+          expect(Math.abs(l.point.col - 6)).toBeLessThanOrEqual(2);
+          expect(Math.abs(l.point.row - 4)).toBeLessThanOrEqual(2);
+          const isPark = (tag === 'none' ? [] : plan).some((q) => q.type === S.Park && q.col === l.point!.col && q.row === l.point!.row);
+          const isSprawl = sprawl.some((t) => t.col === l.point!.col && t.row === l.point!.row);
+          expect(/(our|the) park/.test(l.text) ? isPark : isSprawl).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('Mira 3.0: the grounded lines of the brief appear only when their facts hold', () => {
+    // A park beside her connected neighbourhood, nature on target: shade and a walk to the park.
+    const green = [...reference(), p(S.Park, 6, 5)];
+    const t1 = miraDialogue(narrativeContext(terrain, green, 'B', 2050, 6, 4)).map((l) => l.text);
+    expect(t1).toContain('I can walk to the park with my friends.');
+    expect(t1).not.toContain('We have to walk farther to find somewhere shady.');
+    // Nobody planned: no park, trees lost; neighbours in the unplanned houses — people, not a ruin.
+    const t2 = miraDialogue(narrativeContext(terrain, [], 'none', 2050, 6, 4)).map((l) => l.text);
+    expect(t2).toContain('We have to walk farther to find somewhere shady.');
+    expect(t2).toContain('My friends live in the houses around here.');
+    expect(t2).not.toContain('I can walk to the park with my friends.');
+  });
+
+  it('Mira 3.0: her face is happy where she thrives and calm otherwise, never staged misery', () => {
+    expect(expressionFor('thriving')).toBe('happy');
+    expect(expressionFor('parched')).toBe('neutral');
+    expect(expressionFor('unplanned')).toBe('neutral');
+  });
 });
+

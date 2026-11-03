@@ -1,0 +1,6 @@
+A invitation: {"talking":false,"dialogue":["Hi, I'm Mira. I live on this street.","This is my favorite place. Did you help make it?","The trees in our park have grown so much.","I can walk to the park with my friends.","In the other future this street was never built. Unplanned houses went up here instead, and 16,000 people had no planned home.","Will you look at the other future too?"]}
+A after lines: talking=true index=5
+A ended: talking=false
+B groundY=0.7
+B: plan=none dialogue=["Hi, I'm Mira.","We live in the houses out here. Nobody planned a street or a garden.","We have to walk farther to find somewhere shady.","My friends live in the houses around here.","In the other future there is a planned street here, with gardens, where we have houses built without a plan.","Will you look at the other future too?"]
+page errors: 0 

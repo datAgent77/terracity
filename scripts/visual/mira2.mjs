@@ -25,7 +25,7 @@ const ui = async (panel, id) => { await page.evaluate(([p, i]) => window.__terra
 const place = async (pieces) => { for (const [s, c, r] of pieces) { await key(`Digit${s}`); const p = await page.evaluate(([c, r]) => window.__terracity.tileToScreen(c, r), [c, r]); await page.mouse.click(p.x, p.y); await frames(); } await key('Escape'); };
 await key('Enter'); await key('KeyH');
 // Your plan (balanced) vs nobody planning; enter Future A (your plan) in 2050.
-await place([[5, 6, 3], [5, 7, 3], [1, 6, 2], [1, 6, 4], [1, 2, 4], [1, 8, 3], [3, 10, 8], [3, 11, 8], [3, 12, 8], [4, 9, 3], [4, 1, 4], [2, 9, 4]]);
+await place([[5, 6, 3], [5, 7, 3], [1, 6, 2], [1, 6, 4], [1, 2, 4], [1, 8, 3], [3, 10, 8], [3, 11, 8], [3, 12, 8], [4, 9, 3], [4, 8, 2], [2, 9, 4]]);
 await key('KeyV');
 await page.waitForFunction(() => { const s = window.__terracity.split(); return s.open && s.t === 1; });
 await ui('actions-panel', 'btn-enter'); await settle();

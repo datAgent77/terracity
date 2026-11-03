@@ -1,0 +1,385 @@
+{
+  "note": "Desktop Chromium + IWER (Quest 3 profile, stereo). NOT a Quest measurement; frame times reflect this machine only.",
+  "rows": [
+    {
+      "label": "tabletop 2026",
+      "calls": 254,
+      "triangles": 273824,
+      "geometries": 123,
+      "textures": 8,
+      "objects": 971,
+      "meshes": 749,
+      "jsHeapMB": 190,
+      "visibleMeshes": 194,
+      "materials": 132,
+      "transparentDraws": 49,
+      "textureMB": 11.6,
+      "shadows": true,
+      "shadowCasters": 57,
+      "programs": 40,
+      "transparentTop": [
+        [
+          "time-dial",
+          7
+        ],
+        [
+          "HUD Panel",
+          5
+        ],
+        [
+          "btn-why",
+          4
+        ],
+        [
+          "Plan Actions",
+          4
+        ],
+        [
+          "Time Control",
+          4
+        ],
+        [
+          "exit-button",
+          3
+        ],
+        [
+          "btn-split",
+          3
+        ],
+        [
+          "btn-enter",
+          3
+        ]
+      ],
+      "frameMedianMs": 350,
+      "frameP95Ms": 1033.3
+    },
+    {
+      "label": "tabletop 2050",
+      "calls": 236,
+      "triangles": 268676,
+      "geometries": 136,
+      "textures": 8,
+      "objects": 971,
+      "meshes": 749,
+      "jsHeapMB": 190,
+      "visibleMeshes": 183,
+      "materials": 128,
+      "transparentDraws": 50,
+      "textureMB": 11.6,
+      "shadows": true,
+      "shadowCasters": 49,
+      "programs": 40,
+      "transparentTop": [
+        [
+          "time-dial",
+          7
+        ],
+        [
+          "HUD Panel",
+          5
+        ],
+        [
+          "btn-why",
+          4
+        ],
+        [
+          "Plan Actions",
+          4
+        ],
+        [
+          "Time Control",
+          4
+        ],
+        [
+          "exit-button",
+          3
+        ],
+        [
+          "btn-split",
+          3
+        ],
+        [
+          "btn-enter",
+          3
+        ]
+      ],
+      "frameMedianMs": 333.2,
+      "frameP95Ms": 983.4
+    },
+    {
+      "label": "two futures",
+      "calls": 118,
+      "triangles": 314920,
+      "geometries": 166,
+      "textures": 7,
+      "objects": 1012,
+      "meshes": 780,
+      "jsHeapMB": 190,
+      "visibleMeshes": 121,
+      "materials": 103,
+      "transparentDraws": 46,
+      "textureMB": 14.1,
+      "shadows": true,
+      "shadowCasters": 17,
+      "programs": 50,
+      "transparentTop": [
+        [
+          "HUD Panel",
+          5
+        ],
+        [
+          "btn-why",
+          4
+        ],
+        [
+          "Plan Actions",
+          4
+        ],
+        [
+          "Time Control",
+          4
+        ],
+        [
+          "exit-button",
+          3
+        ],
+        [
+          "btn-split",
+          3
+        ],
+        [
+          "btn-enter",
+          3
+        ],
+        [
+          "mesh",
+          2
+        ]
+      ],
+      "frameMedianMs": 350,
+      "frameP95Ms": 933.2
+    },
+    {
+      "label": "two futures + Causality Vision",
+      "calls": 160,
+      "triangles": 317480,
+      "geometries": 167,
+      "textures": 8,
+      "objects": 1032,
+      "meshes": 800,
+      "jsHeapMB": 190,
+      "visibleMeshes": 142,
+      "materials": 124,
+      "transparentDraws": 67,
+      "textureMB": 16.3,
+      "shadows": true,
+      "shadowCasters": 17,
+      "programs": 50,
+      "transparentTop": [
+        [
+          "future-A",
+          12
+        ],
+        [
+          "future-B",
+          8
+        ],
+        [
+          "HUD Panel",
+          5
+        ],
+        [
+          "btn-why",
+          4
+        ],
+        [
+          "Plan Actions",
+          4
+        ],
+        [
+          "Time Control",
+          4
+        ],
+        [
+          "exit-button",
+          3
+        ],
+        [
+          "btn-split",
+          3
+        ]
+      ],
+      "frameMedianMs": 333.3,
+      "frameP95Ms": 550
+    },
+    {
+      "label": "street, your plan (Mira talking)",
+      "calls": 172,
+      "triangles": 107832,
+      "geometries": 267,
+      "textures": 4,
+      "objects": 1258,
+      "meshes": 917,
+      "jsHeapMB": 190,
+      "visibleMeshes": 178,
+      "materials": 134,
+      "transparentDraws": 42,
+      "textureMB": 14.6,
+      "shadows": true,
+      "shadowCasters": 98,
+      "programs": 72,
+      "transparentTop": [
+        [
+          "street-inner",
+          6
+        ],
+        [
+          "Street Visit",
+          5
+        ],
+        [
+          "st-return",
+          3
+        ],
+        [
+          "viewpoint-0",
+          3
+        ],
+        [
+          "viewpoint-1",
+          3
+        ],
+        [
+          "viewpoint-3",
+          3
+        ],
+        [
+          "mesh",
+          2
+        ],
+        [
+          "l_handMeshNode",
+          2
+        ]
+      ],
+      "frameMedianMs": 749.9,
+      "frameP95Ms": 1933.4
+    },
+    {
+      "label": "street, nobody plans",
+      "calls": 150,
+      "triangles": 55400,
+      "geometries": 260,
+      "textures": 5,
+      "objects": 1203,
+      "meshes": 888,
+      "jsHeapMB": 190,
+      "visibleMeshes": 161,
+      "materials": 120,
+      "transparentDraws": 39,
+      "textureMB": 20,
+      "shadows": true,
+      "shadowCasters": 83,
+      "programs": 88,
+      "transparentTop": [
+        [
+          "street-inner",
+          6
+        ],
+        [
+          "Street Visit",
+          5
+        ],
+        [
+          "st-return",
+          3
+        ],
+        [
+          "viewpoint-0",
+          3
+        ],
+        [
+          "viewpoint-1",
+          3
+        ],
+        [
+          "viewpoint-3",
+          3
+        ],
+        [
+          "mesh",
+          2
+        ],
+        [
+          "l_handMeshNode",
+          2
+        ]
+      ],
+      "frameMedianMs": 366.6,
+      "frameP95Ms": 816.7
+    },
+    {
+      "label": "two futures after 8 street visits",
+      "calls": 126,
+      "triangles": 315220,
+      "geometries": 261,
+      "textures": 7,
+      "objects": 1203,
+      "meshes": 888,
+      "jsHeapMB": 190,
+      "visibleMeshes": 126,
+      "materials": 108,
+      "transparentDraws": 50,
+      "textureMB": 14.1,
+      "shadows": true,
+      "shadowCasters": 17,
+      "programs": 91,
+      "transparentTop": [
+        [
+          "HUD Panel",
+          5
+        ],
+        [
+          "btn-why",
+          4
+        ],
+        [
+          "Plan Actions",
+          4
+        ],
+        [
+          "Time Control",
+          4
+        ],
+        [
+          "exit-button",
+          3
+        ],
+        [
+          "btn-split",
+          3
+        ],
+        [
+          "btn-enter",
+          3
+        ],
+        [
+          "Tray Labels",
+          3
+        ]
+      ],
+      "frameMedianMs": 266.7,
+      "frameP95Ms": 500
+    }
+  ],
+  "leak": {
+    "geometriesBefore": 260,
+    "geometriesAfter": 261,
+    "texturesBefore": 34,
+    "texturesAfter": 36,
+    "heapBeforeMB": 190,
+    "heapAfterMB": 190
+  },
+  "pageErrors": []
+}

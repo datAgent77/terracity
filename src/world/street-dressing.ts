@@ -205,3 +205,28 @@ export function disposeDressing(g: Object3D): void {
   });
 }
 
+
+/**
+ * Dry grass tufts on open ground (where nobody planned): straw and olive
+ * clumps whose colour follows the projected dryness — dry land, not a desert.
+ */
+let DRY_GRASS_MAT: MeshStandardMaterial | null = null;
+
+export function createDryGrass(ground: (x: number, z: number) => number, st: FutureVisualState, count: number): InstancedMesh {
+  const r = rng(5150);
+  const spots: Spot[] = [];
+  const straw = new Color('#c2ae6e');
+  const olive = new Color('#8d9a55');
+  for (let i = 0; i < count; i++) {
+    const x = (r() - 0.5) * 60;
+    const z = (r() - 0.5) * 40;
+    spots.push({ x, y: ground(x, z), z, s: 0.25 + r() * 0.35, yaw: r() * 6.28, color: olive.clone().lerp(straw, Math.min(1, 0.4 + st.dryness * 0.6) * (0.7 + 0.3 * r())) });
+  }
+  // Low, rounded dry shrubs (flattened, faceted): read as tufts at any distance.
+  const geo = new DodecahedronGeometry(0.4, 0).scale(1, 0.45, 1).translate(0, 0.12, 0);
+  // Shared material: the street frees geometry per visit, not this.
+  DRY_GRASS_MAT ??= flat('#ffffff');
+  const m = instanced(geo, DRY_GRASS_MAT, spots, 'dry-grass')!;
+  m.castShadow = false;
+  return m;
+}

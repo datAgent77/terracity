@@ -138,9 +138,10 @@ test('the last child: her garden and words follow the plan; rewriting the plan c
 
 test('Mira 2.0: a user-paced conversation grounded in the simulation; the same place differs between futures', async ({ page }) => {
   test.setTimeout(180_000);
-  type C = { talking: boolean; index: number; dialogue: string[]; groundY: number } | null;
+  type C = { talking: boolean; index: number; dialogue: string[]; groundY: number; expression: string; pointing: boolean; points: Array<{ col: number; row: number } | null> } | null;
   type P = { kind: string; title: string; lines: string[]; open: boolean };
-  type S3 = Street & { plan: 'A' | 'B' | 'none'; child: C; poi: P[] };
+  type S3 = Street & { plan: 'A' | 'B' | 'none'; child: C; poi: P[]; residents: number };
+  const occluded = () => page.evaluate(() => (window as unknown as { __terracity: { miraOccluded(): string[] } }).__terracity.miraOccluded());
   const st = () => page.evaluate(() => (window as unknown as { __terracity: { street(): S3 } }).__terracity.street());
   await open(page);
   // Your plan (balanced) vs nobody planning; enter Future A in 2050.
@@ -170,6 +171,10 @@ test('Mira 2.0: a user-paced conversation grounded in the simulation; the same p
   await toggle(0);
   expect((await st()).poi.every((q) => !q.open)).toBe(true);
 
+  // Mira 3.0: in view, nothing between you and her; a smile where her street thrives.
+  expect(await occluded()).toEqual([]);
+  expect(a.child!.expression).toBe('happy');
+
   // Talk -> next -> back -> end, at the user's pace.
   await ui(page, 'street-panel', 'st-talk');
   expect((await st()).child).toMatchObject({ talking: true, index: 0 });
@@ -194,5 +199,16 @@ test('Mira 2.0: a user-paced conversation grounded in the simulation; the same p
   expect(b.child!.dialogue).not.toEqual(lines);
   expect(b.child!.groundY).toBeGreaterThan(0.5); // she stands on the sprawl slab, not inside it
   expect(b.poi.map((q) => q.kind)).toEqual(['sprawl']);
+  // Where nobody planned: calm (not staged misery), neighbours around, still in clear view.
+  expect(b.child!.expression).toBe('neutral');
+  expect(b.residents).toBeGreaterThan(0);
+  expect(await occluded()).toEqual([]);
+  // When a line is about a place, she points at it.
+  const pi = b.child!.points.findIndex((x) => !!x);
+  expect(pi).toBeGreaterThanOrEqual(0);
+  const talkTo = (a: 'next') => page.evaluate((x) => (window as unknown as { __terracity: { talk(a: string): void } }).__terracity.talk(x), a);
+  for (let i = 0; i <= pi; i++) await talkTo('next');
+  await page.waitForTimeout(300);
+  expect((await st()).child!.pointing).toBe(true);
   expect(b.poi[0].lines.join(' ')).toMatch(/newcomers without a planned home/);
 });
