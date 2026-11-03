@@ -57,6 +57,8 @@ export interface LedgerEntry {
 
 export interface Ledger {
   year: Year;
+  /** The plan this ledger was computed from. */
+  plan: readonly Placement[];
   entries: LedgerEntry[];
   projected: YearMetrics;
   /** Land consumed (km²) as computed by `landBudget`. */
@@ -151,7 +153,7 @@ export function ledger(terrain: TerrainMap, plan: readonly Placement[], year: Ye
   for (const p of plan) E.push({ rule: 'land-structures', metric: 'landUsed', amount: perTile, ...at(p) });
   for (const s of y.sprawlTiles) E.push({ rule: 'land-sprawl', metric: 'landUsed', amount: perTile, tile: s });
 
-  return { year, entries: E, projected: y, landUsed: lb.landConsumedKm2 };
+  return { year, plan, entries: E, projected: y, landUsed: lb.landConsumedKm2 };
 }
 
 /** Total of a ledger for one metric (equals the simulated value; tested). */
@@ -166,6 +168,37 @@ export interface RuleChange {
   delta: number;
   /** Tiles whose contribution changed (anchors for the 3D visualisation). */
   tiles: Array<{ col: number; row: number }>;
+  /**
+   * 'local': the change sits on specific placements (`sourceIds`).
+   * 'regional': a region-wide rule (housing shortage, maturing parks, food
+   * imports…) whose value depends on several placements together; `sourceIds`
+   * then lists every placement that feeds it, never just one.
+   */
+  scope: 'local' | 'regional';
+  /** Placements (ids in the plan after the change, else before) that contribute to this rule. */
+  sourceIds: string[];
+}
+
+/** Rules computed from the whole plan, not from one placement. */
+export const REGIONAL_RULES: ReadonlySet<RuleId> = new Set<RuleId>([
+  'housing-demand', 'sprawl-pressure', 'land-sprawl', 'park-maturity', 'food-imports', 'env-limits',
+]);
+
+/** Placements that feed a regional rule in a plan (see projection.ts). */
+function regionalSources(rule: RuleId, l: Ledger): string[] {
+  const ids = (r: RuleId) => [...new Set(l.entries.filter((e) => e.rule === r && e.placementId).map((e) => e.placementId!))];
+  switch (rule) {
+    case 'housing-demand':
+    case 'sprawl-pressure':
+    case 'land-sprawl':
+      return ids('homes-connected'); // the shortfall is demand minus all connected homes
+    case 'park-maturity':
+      return l.plan.filter((p) => p.type === StructureType.Park).map((p) => p.id); // every park matures
+    case 'food-imports':
+      return ids('farmland-converted');
+    default:
+      return [];
+  }
 }
 
 export interface CausalEffect {
@@ -179,6 +212,10 @@ export interface CausalEffect {
   supportedExplanation: string;
   /** Is a higher value better for this metric? (land used and sprawl: lower is better). */
   higherIsBetter: boolean;
+  /** Stable id of the explanation template + the rules it names (e.g. "environment:farmland-converted+structure-footprint"). */
+  explanationKey: string;
+  /** 'regional': every contributing rule is region-wide; 'mixed': some are; 'local': none. */
+  scope: 'local' | 'mixed' | 'regional';
 }
 
 export type DecisionType = 'add' | 'remove' | 'move' | 'rotate' | 'plan-change' | 'compare';
@@ -186,6 +223,12 @@ export type DecisionType = 'add' | 'remove' | 'move' | 'rotate' | 'plan-change' 
 export interface CausalEvent {
   eventId: string;
   decisionType: DecisionType;
+  /** Which scenario the event belongs to ('your-plan' unless given). */
+  scenarioId: string;
+  /** The decisions behind the event: changed placements (ids), or for a comparison the placements only in one plan. */
+  sourceDecisionIds: string[];
+  /** Board tiles ("col,row") the event touches: changed placements, rule tiles, sprawl that appears / disappears. */
+  affectedSpatialIds: string[];
   /** Placements added / removed / moved by the decision. */
   affectedEntities: Array<{ change: 'added' | 'removed' | 'moved'; placement: Placement }>;
   year: Year;
@@ -223,15 +266,21 @@ const RULE_TEXT: Record<RuleId, (d: number) => string> = {
   'land-sprawl': () => 'sprawl tiles',
 };
 
+/** Plain words for a rule's contribution (used by the causal chain card). */
+export function ruleLabel(rule: RuleId, delta: number): string {
+  return RULE_TEXT[rule](delta);
+}
+
 const signed = (n: number, digits = 0) => `${n > 0 ? '+' : n < 0 ? '-' : ''}${Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: digits })}`;
 
 function ruleChanges(a: Ledger, b: Ledger, metric: LedgerEntry['metric']): RuleChange[] {
   const group = (l: Ledger) => {
-    const m = new Map<RuleId, { total: number; tiles: Map<string, number> }>();
+    const m = new Map<RuleId, { total: number; tiles: Map<string, number>; ids: Map<string, number> }>();
     for (const e of l.entries) {
       if (e.metric !== metric) continue;
-      const g = m.get(e.rule) ?? { total: 0, tiles: new Map() };
+      const g = m.get(e.rule) ?? { total: 0, tiles: new Map(), ids: new Map() };
       g.total += e.amount;
+      if (e.placementId) g.ids.set(e.placementId, (g.ids.get(e.placementId) ?? 0) + e.amount);
       if (e.tile) {
         const k = `${e.tile.col},${e.tile.row}`;
         g.tiles.set(k, (g.tiles.get(k) ?? 0) + e.amount);
@@ -255,7 +304,16 @@ function ruleChanges(a: Ledger, b: Ledger, metric: LedgerEntry['metric']): RuleC
         tiles.push({ col, row });
       }
     }
-    out.push({ rule, delta, tiles });
+    const regional = REGIONAL_RULES.has(rule);
+    let sourceIds: string[];
+    if (regional) sourceIds = [...new Set([...regionalSources(rule, b), ...regionalSources(rule, a)])];
+    else {
+      sourceIds = [];
+      for (const id of new Set([...(x?.ids.keys() ?? []), ...(y?.ids.keys() ?? [])])) {
+        if (Math.abs((y?.ids.get(id) ?? 0) - (x?.ids.get(id) ?? 0)) > 1e-9) sourceIds.push(id);
+      }
+    }
+    out.push({ rule, delta, tiles, scope: regional ? 'regional' : 'local', sourceIds: sourceIds.sort() });
   }
   return out.sort((p, q) => Math.abs(q.delta) - Math.abs(p.delta));
 }
@@ -271,7 +329,22 @@ export function effects(a: Ledger, b: Ledger): CausalEffect[] {
   const out: CausalEffect[] = [];
   const push = (metricId: CausalMetric, prev: number, next: number, rules: RuleChange[], text: string, higherIsBetter = true) => {
     if (Math.abs(next - prev) < 1e-9) return;
-    out.push({ metricId, previousValue: prev, nextValue: next, delta: next - prev, sourceRules: rules, supportedExplanation: text, higherIsBetter });
+    const named = rules.filter((r) => r.rule !== 'env-limits').map((r) => r.rule);
+    out.push({
+      metricId,
+      previousValue: prev,
+      nextValue: next,
+      delta: next - prev,
+      sourceRules: rules,
+      supportedExplanation: text,
+      higherIsBetter,
+      explanationKey: `${metricId}:${named.join('+') || 'none'}`,
+      scope: (() => {
+        const named = rules.filter((r) => r.rule !== 'env-limits');
+        const reg = named.filter((r) => r.scope === 'regional').length;
+        return reg === 0 ? 'local' : reg === named.length ? 'regional' : 'mixed';
+      })(),
+    });
   };
   const A = a.projected;
   const B = b.projected;
@@ -325,6 +398,7 @@ export function causalEvent(
   year: Year,
   decisionType: DecisionType,
   eventId: string,
+  scenarioId = 'your-plan',
 ): CausalEvent {
   const la = ledger(terrain, before, year);
   const lb = ledger(terrain, after, year);
@@ -346,9 +420,20 @@ export function causalEvent(
     for (const p of before) if (!kb.has(placementKey(p))) affected.push({ change: 'removed', placement: p });
   }
   const fx = effects(la, lb);
+  const tiles = new Set<string>();
+  const key = (t: { col: number; row: number }) => `${t.col},${t.row}`;
+  for (const e of affected) tiles.add(key(e.placement));
+  for (const f of fx) for (const r of f.sourceRules) for (const t of r.tiles) tiles.add(key(t));
+  const sa = new Set(la.projected.sprawlTiles.map(key));
+  const sb = new Set(lb.projected.sprawlTiles.map(key));
+  for (const t of sa) if (!sb.has(t)) tiles.add(t);
+  for (const t of sb) if (!sa.has(t)) tiles.add(t);
   return {
     eventId,
     decisionType,
+    scenarioId,
+    sourceDecisionIds: [...new Set(affected.map((e) => e.placement.id))].sort(),
+    affectedSpatialIds: [...tiles].sort(),
     affectedEntities: affected,
     year,
     beforeState: la.projected,
@@ -378,4 +463,35 @@ export function summary(fx: CausalEffect[], year: Year, decisionType: DecisionTy
   if (!gains.length && !costs.length) return decisionType === 'compare' ? `In ${year} both plans give the same results.` : `No change by ${year}.`;
   const head = decisionType === 'compare' ? `${year}, the other future vs your plan` : `By ${year}`;
   return `${head}: ${gains.length ? `gains ${gains.join(', ')}` : 'no gains'}${costs.length ? `. Costs: ${costs.join(', ')}` : ''}.`;
+}
+
+/**
+ * A decision across time: what it changes now (2026), and what only appears
+ * or grows later. An effect is "later" in a year when its delta there differs
+ * from 2026 (e.g. sprawl avoided, food imports, maturing parks). The same
+ * sentence is never shown for two years unless it is true for both.
+ */
+export interface DecisionTimeline {
+  now: CausalEvent;
+  byYear: Record<Year, CausalEvent>;
+  /** Effects in `year` that are new or different from 2026. */
+  later(year: Year): CausalEffect[];
+}
+
+export function decisionTimeline(
+  terrain: TerrainMap,
+  before: readonly Placement[],
+  after: readonly Placement[],
+  decisionType: DecisionType,
+  eventId: string,
+): DecisionTimeline {
+  const byYear = {} as Record<Year, CausalEvent>;
+  for (const y of [2026, 2035, 2050] as const) byYear[y] = causalEvent(terrain, before, after, y, decisionType, `${eventId}@${y}`);
+  const now = byYear[2026];
+  const nowDelta = new Map(now.affectedMetrics.map((e) => [e.metricId, e.delta]));
+  return {
+    now,
+    byYear,
+    later: (year) => byYear[year].affectedMetrics.filter((e) => Math.abs(e.delta - (nowDelta.get(e.metricId) ?? 0)) > 1e-9),
+  };
 }

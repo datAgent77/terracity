@@ -27,11 +27,13 @@ import {
   RingGeometry,
   SphereGeometry,
   Quaternion,
+  RayInteractable,
   SRGBColorSpace,
   Vector3,
 } from '@iwsdk/core';
 import { causalityOn, futuresOpen, game, phase, planA, planVersion, streetView, viewYear } from '../core/session.js';
-import { causalEvent, type CausalEffect, type CausalEvent } from '../simulation/causality.js';
+import { causalEvent, decisionTimeline, ruleLabel, type CausalEffect, type CausalEvent, type DecisionTimeline } from '../simulation/causality.js';
+import type { Year } from '../config/projection.js';
 import { prefersReducedMotion } from '../ui/accessibility.js';
 import { tileCenter, tileTopY } from './board-coords.js';
 import { futurePair } from './futures.js';
@@ -53,6 +55,12 @@ export class CausalitySystem extends createSystem({}) {
   private card!: { mesh: Mesh; ctx: CanvasRenderingContext2D; tex: CanvasTexture; key: string };
   private last: readonly Placement[] = [];
   private event: CausalEvent | null = null;
+  /** The last decision, evaluated in every simulated year (year-specific explanations). */
+  private timeline: DecisionTimeline | null = null;
+  /** Causal chain inspection: index of the effect in focus (-1 = all). */
+  private focus = -1;
+  /** The event shown now (decision at the viewed year, or the two-futures comparison). */
+  private shown: CausalEvent | null = null;
   private anchors: Anchor[] = [];
   private origin: { col: number; row: number } | null = null;
   private counter = 0;
@@ -81,15 +89,24 @@ export class CausalitySystem extends createSystem({}) {
       this.pulses.push({ mesh: m, from: new Vector3(), to: new Vector3(), t: 1, delay: 0 });
     }
     this.card = this.makeCard();
-    this.world.scene.add(this.card.mesh);
+    // Pinch / click the card: step through the causes one at a time.
+    const cardEntity = this.world.createTransformEntity(this.card.mesh);
+    cardEntity.addComponent(RayInteractable);
+    this.card.mesh.addEventListener('click' as never, (() => this.nextCause()) as never);
 
     this.last = game.placements.map((p) => ({ ...p }));
     this.cleanupFuncs.push(
       planVersion.subscribe(() => this.onPlan()),
       causalityOn.subscribe(() => this.refresh()),
-      futuresOpen.subscribe(() => this.refresh()),
+      futuresOpen.subscribe(() => {
+        this.focus = -1;
+        this.refresh();
+      }),
       planA.subscribe(() => this.refresh()),
-      viewYear.subscribe(() => this.refresh()),
+      viewYear.subscribe(() => {
+        this.focus = -1;
+        this.refresh();
+      }),
       streetView.subscribe(() => this.refresh()),
     );
 
@@ -107,7 +124,17 @@ export class CausalitySystem extends createSystem({}) {
       ringsVisible: this.rings.filter((r) => r.visible).length,
       miniMarks: this.miniMarks.length,
       card: this.card.mesh.visible ? this.card.key : '',
+      focus: this.focus,
+      shown: this.shown && {
+        year: this.shown.year,
+        scenarioId: this.shown.scenarioId,
+        sourceDecisionIds: this.shown.sourceDecisionIds,
+        affectedSpatialIds: this.shown.affectedSpatialIds,
+        effects: this.shown.affectedMetrics.map((e) => ({ metric: e.metricId, delta: e.delta, key: e.explanationKey, scope: e.scope })),
+      },
     });
+    /** Step to the next cause in the chain (same as pinching the card). */
+    hook.nextCause = () => this.nextCause();
   }
 
   // ------------------------------------------------------------- events --
@@ -122,12 +149,15 @@ export class CausalitySystem extends createSystem({}) {
     const removed = before.filter((p) => !now.some((q) => q.id === p.id));
     const moved = now.filter((p) => byId.has(p.id) && (byId.get(p.id)!.col !== p.col || byId.get(p.id)!.row !== p.row));
     const type = added.length === 1 && !removed.length ? 'add' : removed.length === 1 && !added.length ? 'remove' : moved.length ? 'move' : 'plan-change';
-    // Consequences are explained by 2050 (the horizon of the plan).
-    this.event = causalEvent(game.terrain, before, now, 2050, type, `decision-${++this.counter}`);
+    // Evaluated in every simulated year: the card says what is true now and
+    // what only appears later, and follows the year being viewed.
+    this.timeline = decisionTimeline(game.terrain, before, now, type, `decision-${++this.counter}`);
+    this.event = this.timeline.byYear[2050];
+    this.focus = -1;
     const o = added[0] ?? moved[0] ?? removed[0];
     this.origin = o ? { col: o.col, row: o.row } : null;
     this.anchors = this.anchorsOf(this.event);
-    this.flash = 6; // the decision card shows briefly even with Vision off
+    this.flash = 7; // the decision card shows briefly even with Vision off
     this.firePulses();
     this.refresh();
   }
@@ -184,8 +214,39 @@ export class CausalitySystem extends createSystem({}) {
     });
   }
 
+  private nextCause(): void {
+    const n = this.shown?.affectedMetrics.length ?? 0;
+    if (!n || !this.card.mesh.visible) return;
+    this.focus = this.focus + 1 >= n ? -1 : this.focus + 1;
+    this.flash = Math.max(this.flash, 7);
+    this.refresh();
+  }
+
+  /** Anchors of one effect (causal chain focus), or of the whole event. */
+  private anchorsFor(ev: CausalEvent): Anchor[] {
+    const all = this.anchorsOf(ev);
+    const f = this.focus >= 0 ? ev.affectedMetrics[this.focus] : null;
+    if (!f) return all;
+    const k = (t: { col: number; row: number }) => `${t.col},${t.row}`;
+    const tiles = new Set(f.sourceRules.flatMap((r) => r.tiles.map(k)));
+    // Sprawl-driven effects point at the sprawl tiles that appear or disappear.
+    if (f.metricId === 'sprawl' || f.sourceRules.some((r) => r.rule === 'sprawl-pressure' || r.rule === 'land-sprawl' || r.rule === 'housing-demand')) {
+      const was = new Set(ev.beforeState.sprawlTiles.map(k));
+      const is = new Set(ev.afterState.sprawlTiles.map(k));
+      for (const t of was) if (!is.has(t)) tiles.add(t);
+      for (const t of is) if (!was.has(t)) tiles.add(t);
+    }
+    return all.filter((a) => tiles.has(k(a)));
+  }
+
   private refresh(): void {
     const split = !!futuresOpen.peek();
+    const year = viewYear.peek() as Year;
+    // The decision as it stands in the year being viewed.
+    if (this.timeline && !split) {
+      this.event = this.timeline.byYear[year];
+      this.anchors = this.anchorsFor(this.event);
+    }
     const show = causalityOn.peek() && !streetView.peek() && !split && phase.peek() === 'building';
     // Rings on the main board (single world).
     this.rings.forEach((r, i) => {
@@ -199,11 +260,16 @@ export class CausalitySystem extends createSystem({}) {
     this.clearMiniMarks();
     if (split && causalityOn.peek() && !streetView.peek()) {
       const ev = this.compareEvent();
+      if (this.shown?.eventId !== ev.eventId || this.shown?.year !== ev.year) this.focus = Math.min(this.focus, ev.affectedMetrics.length - 1);
+      this.shown = ev;
       this.markMinis(ev);
-      this.paintCard(ev, 'Why the two futures differ');
-    } else if ((causalityOn.peek() || this.flash > 0) && this.event && !streetView.peek() && !split) {
-      this.paintCard(this.event, 'What your decision changed');
+      this.paintCard(ev, `Why the two futures differ in ${ev.year}`, null);
+    } else if ((causalityOn.peek() || this.flash > 0) && this.event && this.timeline && !streetView.peek() && !split) {
+      this.shown = this.event;
+      if (year === 2026) this.paintCard(this.timeline.now, 'What your decision changes', this.timeline.later(2050));
+      else this.paintCard(this.event, `What your decision changed by ${year}`, null);
     } else {
+      this.shown = null;
       this.card.mesh.visible = false;
     }
   }
@@ -265,17 +331,57 @@ export class CausalitySystem extends createSystem({}) {
     return { mesh, ctx, tex, key: '' };
   }
 
-  /** WHAT CHANGED / WHY / WHAT IT COST — from the event's numbers only. */
-  private paintCard(ev: CausalEvent, title: string): void {
+  /**
+   * WHAT CHANGED / WHY / WHAT IT COST — from the event's numbers only.
+   * `later`: effects that only appear (or grow) by 2050, listed under their
+   * own heading so a sentence is never shown for a year in which it is false.
+   * With a cause in focus, the card shows that cause's chain instead.
+   */
+  private paintCard(ev: CausalEvent, title: string, later: CausalEffect[] | null): void {
     const fx = ev.affectedMetrics;
     const good = (e: CausalEffect) => (e.delta > 0) === e.higherIsBetter;
-    const gains = fx.filter(good).slice(0, 2);
-    const costs = fx.filter((e) => !good(e)).slice(0, 2);
-    const lines: Array<[string, string, string]> = [];
-    if (!fx.length) lines.push(['', 'No measurable change by ' + ev.year + '.', '#3a4a4d']);
-    for (const e of gains) lines.push(['+', e.supportedExplanation, '#0f7a6f']);
-    for (const e of costs) lines.push(['-', e.supportedExplanation, '#a85a00']);
-    const key = `${title}|${lines.map((l) => l[1]).join('|')}`;
+    const region = (e: CausalEffect) => (e.scope === 'regional' ? ' Region-wide.' : e.scope === 'mixed' ? ' Partly region-wide.' : '');
+    type Line = { mark: string; text: string; color: string; head?: boolean };
+    const lines: Line[] = [];
+    let hidden = 0;
+    const list = (effects: CausalEffect[], max: number) => {
+      // Tradeoffs both ways: the largest gain and the largest cost first.
+      const g = effects.filter(good);
+      const c = effects.filter((x) => !good(x));
+      const pick = [...g.slice(0, Math.ceil(max / 2)), ...c.slice(0, Math.floor(max / 2))];
+      for (const e of [...g, ...c]) if (pick.length < max && !pick.includes(e)) pick.push(e);
+      hidden += effects.length - pick.length;
+      for (const e of [...pick.filter(good), ...pick.filter((x) => !good(x))]) {
+        lines.push({ mark: good(e) ? '+' : '-', text: e.supportedExplanation + region(e), color: good(e) ? '#0f7a6f' : '#a85a00' });
+      }
+    };
+    const f = this.focus >= 0 ? fx[this.focus] : null;
+    let heading = title;
+    if (f) {
+      heading = `Cause ${this.focus + 1} of ${fx.length} (${ev.year})`;
+      lines.push({ mark: good(f) ? '+' : '-', text: f.supportedExplanation, color: good(f) ? '#0f7a6f' : '#a85a00' });
+      for (const r of f.sourceRules.filter((x) => x.rule !== 'env-limits').slice(0, 3)) {
+        const n = r.sourceIds.length;
+        const places = r.tiles.length || n;
+        const who = r.scope === 'regional'
+          ? n > 1 ? `a region-wide rule that ${n} of your placements feed together` : 'a region-wide rule'
+          : `${places} ${places === 1 ? 'place' : 'places'} on the map`;
+        const amount = `${r.delta > 0 ? '+' : ''}${(Math.round(r.delta * 10) / 10).toLocaleString('en-US')}`;
+        lines.push({ mark: '>', text: `${ruleLabel(r.rule, r.delta)} ${amount}, ${who}.`, color: '#3a4a4d' });
+      }
+    } else {
+      if (!fx.length && !later?.length) lines.push({ mark: '', text: `No measurable change in ${ev.year}.`, color: '#3a4a4d' });
+      if (later) {
+        if (fx.length) lines.push({ mark: '', text: 'Now (2026)', color: '#1d5f6b', head: true });
+        list(fx, later.length ? 2 : 4);
+        if (later.length) {
+          lines.push({ mark: '', text: 'By 2050', color: '#1d5f6b', head: true });
+          list(later, 2);
+        }
+      } else list(fx, 4);
+    }
+    const hint = f ? 'Pinch the card: next cause' : fx.length > 1 ? `Pinch the card to inspect each cause${hidden ? ` (${hidden} more)` : ''}` : '';
+    const key = `${heading}|${lines.map((l) => l.text).join('|')}`;
     this.card.key = key;
     const { ctx, tex } = this.card;
     const W = 1024;
@@ -286,27 +392,42 @@ export class CausalitySystem extends createSystem({}) {
     ctx.roundRect(6, 6, W - 12, H - 12, 36);
     ctx.fill();
     ctx.fillStyle = '#1d5f6b';
-    ctx.font = 'bold 44px system-ui, sans-serif';
-    ctx.fillText(title, 40, 70);
-    let y = 132;
-    for (const [mark, text, color] of lines.slice(0, 3)) {
-      ctx.fillStyle = color;
-      ctx.font = 'bold 40px system-ui, sans-serif';
-      if (mark) ctx.fillText(mark, 40, y);
-      ctx.font = '36px system-ui, sans-serif';
-      ctx.fillStyle = '#2b2620';
-      const words = text.split(' ');
+    ctx.font = 'bold 40px system-ui, sans-serif';
+    ctx.fillText(heading, 40, 62);
+    let y = 112;
+    const wrap = (text: string, x: number, size: number) => {
+      ctx.font = `${size}px system-ui, sans-serif`;
       let line = '';
-      for (const w of words) {
+      for (const w of text.split(' ')) {
         const t = line ? `${line} ${w}` : w;
-        if (ctx.measureText(t).width > W - 140) {
-          ctx.fillText(line, 84, y);
-          y += 40;
+        if (ctx.measureText(t).width > W - x - 40 && line) {
+          ctx.fillText(line, x, y);
+          y += size + 4;
           line = w;
         } else line = t;
       }
-      ctx.fillText(line, 84, y);
-      y += 52;
+      ctx.fillText(line, x, y);
+      y += size + 12;
+    };
+    for (const l of lines) {
+      if (y > H - 74) break;
+      if (l.head) {
+        ctx.fillStyle = l.color;
+        ctx.font = 'bold 28px system-ui, sans-serif';
+        ctx.fillText(l.text.toUpperCase(), 40, y);
+        y += 36;
+        continue;
+      }
+      ctx.fillStyle = l.color;
+      ctx.font = 'bold 34px system-ui, sans-serif';
+      if (l.mark) ctx.fillText(l.mark, 40, y);
+      ctx.fillStyle = '#2b2620';
+      wrap(l.text, 80, 30);
+    }
+    if (hint) {
+      ctx.fillStyle = '#6b7a7d';
+      ctx.font = '24px system-ui, sans-serif';
+      ctx.fillText(hint, 40, H - 26);
     }
     tex.needsUpdate = true;
     this.card.mesh.visible = true;

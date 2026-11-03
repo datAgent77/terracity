@@ -74,6 +74,7 @@ export class FlowSystem extends createSystem({}) {
     if (kb.getKeyDown('KeyF')) cmd.finishGame();
     if (kb.getKeyDown('KeyH')) cmd.toggleTips();
     if (kb.getKeyDown('KeyI')) cmd.replayIntro();
+    if (kb.getKeyDown('KeyN')) (window as unknown as { __terracity?: { nextCause?(): void } }).__terracity?.nextCause?.();
     if (kb.getKeyDown('KeyL')) largeText.value = !largeText.peek();
     if (kb.getKeyDown('KeyM')) cycleSound();
     if (kb.getKeyDown('Enter')) {
