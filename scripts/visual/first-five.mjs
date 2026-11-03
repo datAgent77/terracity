@@ -1,0 +1,64 @@
+/**
+ * CAUSALITY milestone F evidence: the first five minutes, beat by beat.
+ *   TAG=cf node scripts/visual/first-five.mjs
+ */
+import { writeFileSync } from 'node:fs';
+import { chromium } from 'playwright';
+
+const TAG = process.env.TAG ?? 'cf';
+const URL = process.env.URL ?? 'https://localhost:8081/';
+const out = (n) => `docs/visual/${TAG}-${n}.png`;
+const log = [];
+const browser = await chromium.launch({ args: ['--ignore-gpu-blocklist'] });
+const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 }, ignoreHTTPSErrors: true })).newPage();
+const errors = [];
+page.on('pageerror', (e) => errors.push(e.message));
+await page.addInitScript(() => { try { localStorage.clear(); } catch {} });
+await page.goto(URL);
+await page.waitForFunction(() => window.__terracity?.tileToScreen && window.__terracity?.street && window.__terracity?.talk);
+await page.waitForTimeout(2500);
+const frames = (n = 4) => page.evaluate((n) => new Promise((r) => { const s = () => (--n ? requestAnimationFrame(s) : r()); requestAnimationFrame(s); }), n);
+const key = async (k) => { await page.keyboard.press(k); await frames(); };
+const street = () => page.evaluate(() => window.__terracity.street());
+const settle = async () => { await page.waitForFunction(() => !window.__terracity.street().fading); await frames(6); await page.waitForTimeout(500); };
+const ui = async (panel, id) => { await page.evaluate(([p, i]) => window.__terracity.reveal?.(p, i), [panel, id]); await frames(3); const p = await page.evaluate(([a, b]) => window.__terracity.uiToScreen(a, b), [panel, id]); await page.mouse.click(p.x, p.y); await frames(); };
+const place = async (pieces) => { for (const [s, c, r] of pieces) { await key(`Digit${s}`); const p = await page.evaluate(([c, r]) => window.__terracity.tileToScreen(c, r), [c, r]); await page.mouse.click(p.x, p.y); await frames(); } await key('Escape'); };
+const coach = () => page.evaluate(() => window.__terracity.coachText.value);
+const overlay = () => page.evaluate(() => window.__terracity.overlay());
+log.push(`beat 1 card: ${JSON.stringify(await overlay())}`);
+await page.screenshot({ path: out('1-every-city') });
+await ui('overlay-panel', 'ov-primary'); await page.waitForTimeout(600);
+log.push(`step: ${await coach()}`);
+await page.screenshot({ path: out('2-step1') });
+await place([[1, 6, 4]]); await page.waitForTimeout(700);
+log.push(`after choice: ${JSON.stringify((await page.evaluate(() => window.__terracity.causality())).event?.explanation)} | ${await coach()}`);
+await page.screenshot({ path: out('3-choice-feedback') });
+await ui('actions-panel', 'btn-split');
+await page.waitForFunction(() => { const s = window.__terracity.split(); return s.open && s.t === 1; }); await frames(6);
+log.push(`split: ${await coach()}`);
+await page.screenshot({ path: out('4-split') });
+await ui('actions-panel', 'btn-why'); await page.waitForTimeout(600);
+log.push(`why: ${await coach()}`);
+await page.screenshot({ path: out('5-why') });
+await page.evaluate(() => window.__terracity.selectFuture('A')); await frames(4);
+await ui('actions-panel', 'btn-enter'); await settle(); await page.waitForTimeout(1000);
+let s = await street();
+log.push(`enter: plan=${s.plan} | ${await coach()}`);
+await ui('street-panel', 'st-talk'); await page.waitForTimeout(500);
+await ui('street-panel', 'st-talk'); await ui('street-panel', 'st-talk'); await page.waitForTimeout(800);
+log.push(`talk: line=${JSON.stringify((await street()).child?.dialogue?.[2])} | ${await coach()}`);
+await page.screenshot({ path: out('6-mira') });
+await ui('street-panel', 'st-talk-end');
+log.push(`talk ended: ${await coach()}`);
+await ui('street-panel', 'st-return'); await settle();
+await page.evaluate(() => window.__terracity.selectFuture('B')); await frames(4);
+await ui('actions-panel', 'btn-enter'); await settle(); await page.waitForTimeout(1000);
+log.push(`other: plan=${(await street()).plan} | coach='${await coach()}' outro=${await page.evaluate(() => window.__terracity.outroOpen.value)}`);
+await page.screenshot({ path: out('7-other-future') });
+await ui('street-panel', 'st-return'); await settle(); await page.waitForTimeout(800);
+log.push(`closing card: ${JSON.stringify(await overlay())}`);
+await page.screenshot({ path: out('8-the-future-is-built') });
+log.push(`page errors: ${errors.length} ${errors.slice(0, 3).join(' | ')}`);
+writeFileSync(`docs/visual/${TAG}-log.txt`, log.join('\n') + '\n');
+console.log(log.join('\n'));
+await browser.close();

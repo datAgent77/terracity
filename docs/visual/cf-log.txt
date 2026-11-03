@@ -1,0 +1,11 @@
+beat 1 card: {"visible":true,"title":"Every city begins with a choice."}
+step: Step 1/6: Make one choice. Pinch Homes in the tray and drop it on a glowing tile beside the town.
+after choice: "By 2050: gains housed +4,000, in sprawl -4,000, nature +3, land used (sq km) -2.3. Costs: budget -12." | Step 2/6: See what your choice changes. Bring both hands together and pull them apart (or tap Split).
+split: Step 3/6: Tap Why? (or W): rings mark where the two futures differ, and the card says why.
+why: Step 4/6: Pinch a future and pull it toward you (or tap Enter future). Someone lives there in 2050.
+enter: plan=B | Step 5/6: Meet Mira. Pinch her or tap Talk to Mira.
+talk: line="Houses keep going up out there, without streets or parks." | Step 5/6: Meet Mira. Pinch her or tap Talk to Mira.
+talk ended: Step 6/6: Return, then enter the other future: the same street, another outcome.
+other: plan=none | coach='' outro=true
+closing card: {"visible":true,"title":"The future isn't written. It's built."}
+page errors: 0 

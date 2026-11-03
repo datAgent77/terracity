@@ -95,7 +95,7 @@ export async function open(page: Page, { start = true } = {}) {
   });
   await page.waitForTimeout(1500); // let panels lay out
   if (start) {
-    await ui(page, 'overlay-panel', 'ov-primary'); // the Start button
+    await ui(page, 'overlay-panel', 'ov-primary'); // the Begin button
     expect((await snap(page)).phase).toBe('building');
     await page.waitForTimeout(300);
   }

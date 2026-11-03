@@ -35,6 +35,7 @@
       <Button id="btn-restore-a" class="button"><ButtonIcon><History></History></ButtonIcon><ButtonLabel>Restore A</ButtonLabel></Button>
       <Button id="btn-compare" class="button"><ButtonIcon><Columns2></Columns2></ButtonIcon><ButtonLabel>Compare A/B</ButtonLabel></Button>
       <Button id="btn-pause" class="button"><ButtonIcon><Pause></Pause></ButtonIcon><ButtonLabel id="pause-label">Pause</ButtonLabel></Button>
+      <Button id="btn-replay" class="button"><ButtonIcon><Play></Play></ButtonIcon><ButtonLabel>Replay intro</ButtonLabel></Button>
     </div>
   </div>
   <Button id="btn-finish" class="enter"><ButtonIcon><Flag></Flag></ButtonIcon><ButtonLabel>Finish plan</ButtonLabel></Button>

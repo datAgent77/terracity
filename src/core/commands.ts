@@ -22,6 +22,10 @@ import {
   selectedId,
   statusText,
   futuresOpen,
+  causalityOn,
+  miraTalked,
+  outroOpen,
+  planVersion,
   streetView,
   timeLeft,
   tutorial,
@@ -199,8 +203,26 @@ let tutorialFinished = false;
 /** Re-evaluate the coach after any state change. */
 export function updateTutorial(): void {
   if (!tutorial.active) return;
-  tutorial.update({ placements: game.placements, servedIds: game.metrics.servedIds, viewYear: viewYear.peek(), inStreet: !!streetView.peek(), futuresOpen: !!futuresOpen.peek() });
-  if (!tutorial.active) tutorialFinished = true;
+  const v = streetView.peek();
+  tutorial.update({
+    placements: game.placements,
+    servedIds: game.metrics.servedIds,
+    viewYear: viewYear.peek(),
+    inStreet: !!v,
+    futuresOpen: !!futuresOpen.peek(),
+    causalityOn: causalityOn.peek(),
+    streetPlan: v?.plan ?? null,
+    talked: miraTalked.peek(),
+    planVersion: planVersion.peek(),
+  });
+  if (!tutorial.active) {
+    tutorialFinished = true;
+    // Completed by the player (not skipped): the closing card.
+    if (tutorial.completed) {
+      outroOpen.value = true;
+      statusText.value = "The future isn't written. It's built. Return to the tabletop to keep planning.";
+    }
+  }
   coachText.value = phase.peek() === 'building' ? tutorial.text : '';
 }
 
@@ -209,11 +231,37 @@ export function toggleTips(): void {
     tutorial.skip();
     tutorialFinished = true;
   } else {
-    tutorial.reset();
+    tutorial.reset(planVersion.peek());
     tutorialFinished = false;
   }
   updateTutorial();
   coachText.value = phase.peek() === 'building' ? tutorial.text : '';
+}
+
+/**
+ * Replay the first five minutes on the current plan (nothing is cleared):
+ * back to one world on the tabletop; step 1 waits for a new choice.
+ */
+export function replayIntro(): void {
+  outroOpen.value = false;
+  exitCity();
+  closeFutures();
+  causalityOn.value = false;
+  tutorial.reset(planVersion.peek());
+  tutorialFinished = false;
+  updateTutorial();
+  statusText.value = 'Every city begins with a choice.';
+}
+
+/** Close the closing card; planning continues. */
+export function closeOutro(): void {
+  outroOpen.value = false;
+}
+
+/** Start without the guided journey: straight to the full planning tools. */
+export function startWithoutIntro(): void {
+  startGame();
+  if (tutorial.active) toggleTips();
 }
 
 export function startGame(): void {

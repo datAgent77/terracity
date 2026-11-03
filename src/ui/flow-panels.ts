@@ -6,7 +6,7 @@ import { createSystem, UIKit, UIKitMLAsset } from '@iwsdk/core';
 import { TARGETS } from '../config/balance.js';
 import { YEARS } from '../config/projection.js';
 import * as cmd from '../core/commands.js';
-import { coachText, compareOpen, game, paused, phase, planA, planVersion, result, tutorial, viewYear } from '../core/session.js';
+import { coachText, compareOpen, game, outroOpen, paused, phase, planA, planVersion, result, streetView, tutorial, viewYear } from '../core/session.js';
 import { onHover, pulse } from './hover.js';
 import { SESSION_SECONDS } from '../gameplay/challenge.js';
 import { comparePlans, METRIC_KEYS, type MetricKey } from '../simulation/compare.js';
@@ -126,34 +126,57 @@ export class FlowPanelSystem extends createSystem({}) {
     const setLines = (texts: string[]) =>
       lines.forEach((l, i) => l?.setProperties({ text: texts[i] ?? '', display: texts[i] ? 'flex' : 'none' }));
 
+    let shownTitle = '';
+    const setTitle = (t: string) => {
+      shownTitle = t;
+      title?.setProperties({ text: t });
+    };
+    // Test hook: the overlay card's title and whether it is shown.
+    const hook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
+    hook.overlay = () => ({ visible: this.world.getSceneObject('overlay-panel')?.visible ?? null, title: shownTitle });
     const render = () => {
       const ph = phase.value;
       const isPaused = paused.value;
       const r = result.value;
       // While comparing after the game, the card steps aside for the two cities;
       // the Plan pad's Compare button brings it back.
-      if ((ph === 'building' && !isPaused) || (ph === 'finished' && compareOpen.value)) {
+      // The closing card of the first five minutes waits for the tabletop.
+      const outro = ph === 'building' && !isPaused && outroOpen.value && !streetView.value;
+      if ((ph === 'building' && !isPaused && !outro) || (ph === 'finished' && compareOpen.value)) {
         setPanelVisible(this.world, 'overlay-panel', false);
         return;
       }
       setPanelVisible(this.world, 'overlay-panel', true);
       if (ph === 'intro') {
-        title?.setProperties({ text: 'TerraCity - Shape Tomorrow' });
+        // Beat 1 of the first five minutes: the miniature coast, and one line.
+        setTitle('Every city begins with a choice.');
         body?.setProperties({
-          text: `Costa Verde will need homes for ${fmt(TARGETS.population)} people by 2050. You have ${SESSION_SECONDS / 60} minutes to plan.`,
+          text: `Costa Verde, 2026. By 2050 it needs homes for ${fmt(TARGETS.population)} people. Your plan decides how they will live.`,
         });
         setLines([
-          '1. Pinch a piece from the tray and drop it on the map.',
-          '2. Watch the numbers react, then tap 2035 or 2050 to see the future.',
-          '3. Save Plan A, try a Plan B, and compare.',
-          `Goal for 2050: ${fmt(TARGETS.population)} housed, environment ${TARGETS.environment}+, ${TARGETS.renewableCoverage}% renewable, budget not overspent.`,
+          'Make one choice, split the city into two futures, see why they differ, and meet someone who lives there.',
+          `Then plan freely: ${SESSION_SECONDS / 60} minutes to balance homes, nature (${TARGETS.environment}+), ${TARGETS.renewableCoverage}% clean power and the budget.`,
         ]);
-        primaryLabel?.setProperties({ text: 'Start' });
+        primaryLabel?.setProperties({ text: 'Begin' });
         primaryAction = cmd.startGame;
-        secondary?.setProperties({ display: 'none' });
-        secondaryAction = null;
+        secondary?.setProperties({ display: 'flex' });
+        secondaryLabel?.setProperties({ text: 'Skip intro' });
+        secondaryAction = cmd.startWithoutIntro;
+      } else if (outro) {
+        // Beat 6: the question, then the planning tools are all yours.
+        setTitle("The future isn't written. It's built.");
+        body?.setProperties({ text: 'You made a choice, split the city, saw why the futures differ and met Mira in both of them.' });
+        setLines([
+          'Keep planning: more homes, clean power and parks. Tap Finish plan when Costa Verde is balanced.',
+          'Replay intro (Plan pad, More) walks the six steps again on your current plan.',
+        ]);
+        primaryLabel?.setProperties({ text: 'Keep planning' });
+        primaryAction = cmd.closeOutro;
+        secondary?.setProperties({ display: 'flex' });
+        secondaryLabel?.setProperties({ text: 'Replay intro' });
+        secondaryAction = cmd.replayIntro;
       } else if (ph === 'building' && isPaused) {
-        title?.setProperties({ text: 'Paused' });
+        setTitle('Paused');
         body?.setProperties({ text: 'The clock is stopped.' });
         setLines([]);
         primaryLabel?.setProperties({ text: 'Resume' });
@@ -166,7 +189,7 @@ export class FlowPanelSystem extends createSystem({}) {
         };
       } else if (ph === 'finished' && r) {
         const m = r.metrics2050;
-        title?.setProperties({ text: r.success ? 'Balanced city - you did it!' : 'Not balanced yet' });
+        setTitle(r.success ? 'Balanced city - you did it!' : 'Not balanced yet');
         body?.setProperties({
           text: `${r.timedOut ? "Time's up. " : ''}Your 2050 projection: ${fmt(m.population)} housed, environment ${m.environment}, ${m.renewableCoverage}% renewable, budget ${m.budgetLeft}.`,
         });
@@ -192,7 +215,7 @@ export class FlowPanelSystem extends createSystem({}) {
         secondaryAction = hasA ? cmd.toggleCompare : null;
       }
     };
-    for (const s of [phase, paused, result, compareOpen, planA] as const) {
+    for (const s of [phase, paused, result, compareOpen, planA, outroOpen, streetView] as const) {
       this.cleanupFuncs.push((s as { subscribe(f: () => void): () => void }).subscribe(render));
     }
   }

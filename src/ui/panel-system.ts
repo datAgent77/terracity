@@ -35,13 +35,13 @@ const ARMED_BG = '#ffd36b';
 const IDLE_BG = 'rgba(0,0,0,0)';
 const ACTION_IDS = [
   'btn-undo', 'btn-redo', 'btn-rotate', 'btn-remove', 'btn-restart',
-  'btn-save-a', 'btn-restore-a', 'btn-compare', 'btn-pause', 'btn-finish', 'btn-split', 'btn-enter', 'btn-why',
+  'btn-save-a', 'btn-restore-a', 'btn-compare', 'btn-pause', 'btn-finish', 'btn-split', 'btn-enter', 'btn-why', 'btn-replay',
 ];
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
 
 /** Tray slot the current tutorial tip asks for (1 = Homes, 3 = Wind). */
-const TIP_SLOT: Partial<Record<string, number>> = { homes: 1, wind: 3 };
+const TIP_SLOT: Partial<Record<string, number>> = { homes: 1 };
 
 /** Panels enlarged by the "Larger text" preference. */
 const SCALABLE_PANELS = ['hud-panel', 'actions-panel', 'time-panel', 'overlay-panel', 'compare-panel', 'street-panel'];
@@ -291,6 +291,7 @@ export class PanelSystem extends createSystem({}) {
       'btn-restore-a': cmd.restorePlanA,
       'btn-compare': cmd.toggleCompare,
       'btn-pause': cmd.togglePause,
+      'btn-replay': cmd.replayIntro,
       'btn-finish': () => cmd.finishGame(),
       'btn-enter': () => (futuresOpen.peek() ? cmd.enterFuture(futuresOpen.peek()!.selected ?? 'A') : cmd.enterCity()),
       'btn-split': cmd.toggleFutures,
@@ -325,7 +326,7 @@ export class PanelSystem extends createSystem({}) {
       pauseLabel?.setProperties({ text: paused.value ? 'Resume' : 'Pause' });
       splitLabel?.setProperties({ text: futuresOpen.value ? 'Merge the futures' : 'Split into two futures' });
       whyLabel?.setProperties({ text: causalityOn.value ? 'Hide causality' : 'Why? Causality Vision' });
-      buttons.get('btn-why')?.setProperties({ backgroundColor: causalityOn.value ? '#0f7a6f' : undefined });
+      buttons.get('btn-why')?.setProperties({ backgroundColor: causalityOn.value ? '#0f7a6f' : tutorial.active && tutorial.step === 'why' ? '#b87500' : undefined });
       dim('btn-split', phase.value !== 'intro');
       dim('btn-enter', !!futuresOpen.value || game.placements.some((p) => p.type === 'residential'));
       enterLabel?.setProperties({ text: futuresOpen.value ? `Enter future ${futuresOpen.value.selected ?? 'A'}` : 'Enter your city' });
@@ -385,7 +386,7 @@ export class PanelSystem extends createSystem({}) {
     hook.uiWorldPosition = (panelId: string, elementId: string) => locate(panelId, elementId)?.toArray();
     /** Open whatever information layer contains this element (what a user does with "Details"). */
     hook.reveal = (panelId: string, elementId: string) => {
-      const layer3 = new Set(['btn-redo', 'btn-rotate', 'btn-remove', 'btn-restart', 'btn-restore-a', 'btn-compare', 'btn-pause']);
+      const layer3 = new Set(['btn-redo', 'btn-rotate', 'btn-remove', 'btn-restart', 'btn-restore-a', 'btn-compare', 'btn-pause', 'btn-replay']);
       if ((panelId === 'actions-panel' && layer3.has(elementId)) || (panelId === 'street-panel' && /^st-(plan|line|c\d)/.test(elementId))) {
         detailsOpen.value = true;
       }

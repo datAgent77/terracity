@@ -35,7 +35,7 @@ import {
 import { BOARD_CENTER, GRID_COLS, TILE_SIZE } from '../config/scenario.js';
 import { sfx } from '../audio/sfx.js';
 import * as cmd from '../core/commands.js';
-import { futuresOpen, game, phase, planA, streetView, tutorial, viewYear } from '../core/session.js';
+import { futuresOpen, game, outroOpen, phase, planA, streetView, tutorial, viewYear } from '../core/session.js';
 import { Placeable } from '../interactions/placeable-component.js';
 import { initialGesture, stepGesture, type GestureState, type HandSample, type Vec3 } from '../interactions/two-hand-gesture.js';
 import { checkTargets, projectYear } from '../simulation/projection.js';
@@ -642,7 +642,8 @@ export class SplitSystem extends createSystem({
     this.pulse.visible = this.pulseT < 1;
     // The comparison strip: in front of the two futures, below them, once they are apart.
     if (this.comparison) {
-      const show = !!futuresOpen.peek() && !streetView.peek() && this.t > 0.9 && !this.diving;
+      // (Hidden under the first-five-minutes closing card, which sits in front of it.)
+      const show = !!futuresOpen.peek() && !streetView.peek() && this.t > 0.9 && !this.diving && !outroOpen.peek();
       this.comparison.mesh.visible = show;
       if (show) {
         const xr = this.world.renderer.xr.isPresenting;

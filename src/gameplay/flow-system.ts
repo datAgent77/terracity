@@ -10,7 +10,7 @@ import { game } from '../core/session.js';
 import { projectYear } from '../simulation/projection.js';
 import type { Year } from '../config/projection.js';
 import { cycleSound, largeText, soundOn } from '../ui/accessibility.js';
-import { challenge, coachText, compareOpen, planVersion, causalityOn, detailsOpen, futuresOpen, paused, phase, planA, result, streetView, timeLeft, viewYear } from '../core/session.js';
+import { challenge, coachText, outroOpen, compareOpen, planVersion, causalityOn, detailsOpen, futuresOpen, paused, phase, planA, result, streetView, timeLeft, viewYear } from '../core/session.js';
 
 
 export class FlowSystem extends createSystem({}) {
@@ -23,7 +23,8 @@ export class FlowSystem extends createSystem({}) {
     Object.assign(hook, {
       /** Projection of the current plan (read-only; used by tests and the video recorder). */
       project: (year: Year) => projectYear(game.terrain, game.placements, year, game.metrics),
-      viewYear, phase, planA, compareOpen, result, timeLeft, paused, challenge, coachText, largeText, soundOn });
+      placements: () => game.placements,
+      viewYear, phase, planA, compareOpen, result, timeLeft, paused, challenge, coachText, outroOpen, largeText, soundOn });
     // Dev only: state trace so CLI-driven XR tests (which cannot read JS) can assert on it.
     if (import.meta.env.DEV) {
       const trace = () =>
@@ -72,6 +73,7 @@ export class FlowSystem extends createSystem({}) {
     if (kb.getKeyDown('KeyP')) cmd.togglePause();
     if (kb.getKeyDown('KeyF')) cmd.finishGame();
     if (kb.getKeyDown('KeyH')) cmd.toggleTips();
+    if (kb.getKeyDown('KeyI')) cmd.replayIntro();
     if (kb.getKeyDown('KeyL')) largeText.value = !largeText.peek();
     if (kb.getKeyDown('KeyM')) cycleSound();
     if (kb.getKeyDown('Enter')) {

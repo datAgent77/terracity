@@ -271,3 +271,50 @@ Tests (E, clean run): `tsc` OK; unit **187 / 187** (new
 opening / closing them); IWER hand scripts `xr-phase1/2/3` exit 0; human-scale
 and Mira captures 0 page errors; build OK, 10 MB. Performance: two boards add
 6 small meshes and 2 canvas textures to the street; no headset measurement.
+
+## Milestone F — The first five minutes
+
+**Files**: `src/gameplay/tutorial.ts` (rewritten: six steps), `src/core/commands.ts`
+(`updateTutorial` context, `replayIntro`, `closeOutro`, `startWithoutIntro`),
+`src/core/session.ts` (`miraTalked`, `outroOpen`), `src/ui/flow-panels.ts`
+(intro and closing cards, `overlay` test hook), `src/ui/panel-system.ts`
+(Why? cue, Replay intro), `public/ui/actions.uikitml` (Replay intro under
+More), `src/gameplay/tutorial-system.ts`, `src/gameplay/flow-system.ts`
+(I key, hooks), `src/world/street-system.ts` (Talk cue, `miraTalked`),
+`src/world/split-system.ts` (strip hidden under the closing card); tests
+`tests/unit/tutorial.test.ts`, `tests/e2e/polish.spec.ts`; capture
+`scripts/visual/first-five.mjs`.
+
+The old five tips (homes → wind → split → enter → merge) became the brief's
+six beats. Each step waits for the player's own action — nothing plays by
+itself — and the full planning tools stay available the whole time.
+
+| Beat | What the player does | What answers |
+|---|---|---|
+| 1 The city | sees the miniature coast; **"Every city begins with a choice."**; Begin / Skip intro | intro card |
+| 2 The decision | Step 1/6: places one Homes beside the town (glowing tiles) | the simulation's own card, e.g. "By 2050: gains housed +4,000, in sprawl -4,000, nature +3 … Costs: budget -12" |
+| 3 The split | Step 2/6: pulls the city apart (or Split) | your plan vs nobody planning, side by side |
+| 4 The consequence | Step 3/6: Why? / W | rings on the differences; "Why the two futures differ" card |
+| 5 The human story | Step 4/6 enter a future; Step 5/6 talk to Mira (step ends when the conversation ends — no push to leave while she talks) | her lines from Milestone D, incl. the other future at this place |
+| 6 The question | Step 6/6: return and enter the other future | then, back on the tabletop: **"The future isn't written. It's built."** — Keep planning / Replay intro |
+
+- **Skip and replay**: Skip intro on the first card, Skip tips / Show tips (H)
+  any time, Replay intro under More on the Plan pad (or I) and on the closing
+  card. Replay never clears the plan: it returns to one world on the tabletop
+  and step 1 waits for a *new* choice. Skipping is not completing: no closing
+  card.
+- **Truthful feedback**: beat 2's card is the causality event of that very
+  placement (tested: "housed +4,000" after one connected Homes).
+
+Evidence (desktop Chromium): `docs/visual/cf-1-every-city.png` …
+`cf-8-the-future-is-built.png`, `cf-log.txt`; `docs/evidence/causality-f-outro.png`.
+
+Limitations: the steps are text cues plus amber highlights on the next
+control (as before), no voice-over; beat timing on a headset is not measured.
+
+Tests (F, clean run): `tsc` OK; unit **188 / 188** (`tutorial.test.ts` rewritten,
+5 tests: order, one action per step, Causality already on, replay asks for a new
+choice, skip is not completion); Playwright **34 passed**, 3 skipped (new: the
+six beats end to end with the closing card and replay; the intro card and Skip
+intro); IWER hand scripts `xr-phase1/2/3` exit 0 (Start → Begin by id, Skip
+tips by hand ray still pass); first-five capture 0 page errors; build OK, 10 MB.

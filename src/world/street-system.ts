@@ -57,7 +57,7 @@ import { GRID_COLS, StructureType, TerrainType, TILE_SIZE } from '../config/scen
 import { projectYear, type YearMetrics } from '../simulation/projection.js';
 import { TARGETS } from '../config/balance.js';
 import * as cmd from '../core/commands.js';
-import { coachText, detailsOpen, futuresOpen, game, planA, planVersion, streetView, tutorial, viewYear } from '../core/session.js';
+import { coachText, detailsOpen, futuresOpen, game, miraTalked, planA, planVersion, streetView, tutorial, viewYear } from '../core/session.js';
 import { Placeable } from '../interactions/placeable-component.js';
 import { sfx, streetAmbience } from '../audio/sfx.js';
 import { prefersReducedMotion, soundOn } from '../ui/accessibility.js';
@@ -269,7 +269,8 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       const tip = coachText.peek();
       tipEl?.setProperties({ text: tip || '-', display: tip ? 'flex' : 'none' });
       const cue = tutorial.active ? tutorial.step : null;
-      panel.getElementById('st-return')?.setProperties({ backgroundColor: cue === 'back' ? '#b87500' : undefined });
+      panel.getElementById('st-return')?.setProperties({ backgroundColor: cue === 'other' ? '#b87500' : undefined });
+      panel.getElementById('st-talk')?.setProperties({ backgroundColor: cue === 'talk' && !this.convo.active ? '#b87500' : undefined });
       // Compare futures (only with a saved Plan A): the four differences that matter here.
       const a = planA.peek();
       compare?.setProperties({ display: a && v.plan !== 'none' ? 'flex' : 'none' });
@@ -353,6 +354,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
 
   private enter(col: number, row: number, viewpoint: number): void {
     this.visit = { col, row };
+    miraTalked.value = false; // a new visit: she has not been talked to yet
     this.build(col, row);
     // Hide the tabletop: board, placed pieces and tray, comparison dioramas, panels.
     const hidden: Object3D[] = [];
@@ -771,6 +773,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   talkEnd(): void {
     if (!this.convo.active) return;
     this.convo = { active: false, index: 0, t: 0 };
+    miraTalked.value = true; // a conversation was had (the first-five-minutes step moves on)
     this.paintPanel?.();
   }
 

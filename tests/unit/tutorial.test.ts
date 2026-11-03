@@ -1,70 +1,84 @@
 import { describe, expect, it } from 'vitest';
 import { StructureType as S } from '../../src/config/scenario';
 import { GameState } from '../../src/core/game-state';
-import { Tutorial } from '../../src/gameplay/tutorial';
+import { Tutorial, type TutorialContext } from '../../src/gameplay/tutorial';
 
-const ctx = (g: GameState, viewYear: 2026 | 2035 | 2050 = 2026, inStreet = false, futuresOpen = false) => ({
+const ctx = (g: GameState, extra: Partial<TutorialContext> = {}): TutorialContext => ({
   placements: g.placements,
   servedIds: g.metrics.servedIds,
-  viewYear,
-  inStreet,
-  futuresOpen,
+  viewYear: 2026,
+  ...extra,
 });
 
-describe('tutorial', () => {
-  it('walks homes -> wind -> split -> enter a future -> back to one world -> done', () => {
+describe('the first five minutes', () => {
+  it('walks: one choice -> split -> why -> enter -> talk to Mira -> the other future -> done', () => {
     const g = new GameState();
     const t = new Tutorial();
     expect(t.step).toBe('homes');
-    expect(t.text).toMatch(/1\/5/);
-    g.add(S.Residential, 9, 3); // not connected: does not count
+    expect(t.text).toMatch(/^Step 1\/6: Make one choice/);
+    g.add(S.Residential, 9, 3); // not connected to the town: not yet a home for anyone
     expect(t.update(ctx(g))).toBe(false);
-    g.add(S.Residential, 6, 4); // next to the town
-    expect(t.update(ctx(g))).toBe(true);
-    expect(t.step).toBe('wind');
-    g.add(S.Wind, 12, 8);
+    g.add(S.Residential, 6, 4);
     t.update(ctx(g));
     expect(t.step).toBe('split');
-    t.update(ctx(g, 2050, false, true)); // two futures held apart
+    t.update(ctx(g, { futuresOpen: true }));
+    expect(t.step).toBe('why');
+    t.update(ctx(g, { futuresOpen: true, causalityOn: true }));
     expect(t.step).toBe('enter');
-    t.update(ctx(g, 2050, true, true)); // inside a future
-    expect(t.step).toBe('back');
-    t.update(ctx(g, 2050, false, true));
-    expect(t.step).toBe('back'); // back at the futures, not merged yet
-    t.update(ctx(g, 2026, false, false));
+    t.update(ctx(g, { futuresOpen: true, inStreet: true, streetPlan: 'B', viewYear: 2050 }));
+    expect(t.step).toBe('talk');
+    expect(t.firstPlan).toBe('B');
+    t.update(ctx(g, { futuresOpen: true, inStreet: true, streetPlan: 'B', talked: true, viewYear: 2050 }));
+    expect(t.step).toBe('other');
+    // Back in the same future: not yet.
+    t.update(ctx(g, { futuresOpen: true, inStreet: true, streetPlan: 'B', viewYear: 2050 }));
+    expect(t.step).toBe('other');
+    t.update(ctx(g, { futuresOpen: true, inStreet: true, streetPlan: 'none', viewYear: 2050 }));
     expect(t.step).toBe('done');
-    expect(t.active).toBe(false);
+    expect(t.completed).toBe(true);
     expect(t.text).toBe('');
   });
 
-  it('a built plan does not skip the GODMODE steps', () => {
+  it('every step waits for its own action (a built plan does not skip ahead)', () => {
     const g = new GameState();
     g.add(S.Residential, 6, 4);
-    g.add(S.Wind, 12, 8);
     const t = new Tutorial();
-    t.update(ctx(g));
-    expect(t.step).toBe('split');
-    t.update(ctx(g, 2050, false, true));
-    expect(t.step).toBe('enter'); // splitting does not also count as entering
+    t.update(ctx(g, { futuresOpen: true, inStreet: true, streetPlan: 'B', talked: true }));
+    expect(t.step).toBe('split'); // the choice counts, nothing after it
+    t.update(ctx(g, { futuresOpen: true, inStreet: true, streetPlan: 'B', talked: true }));
+    expect(t.step).toBe('why');
   });
 
-  it('hint tiles: free town-adjacent tiles, then free ridge tiles', () => {
+  it('Causality Vision already on when splitting counts for the why step', () => {
+    const g = new GameState();
+    g.add(S.Residential, 6, 4);
+    const t = new Tutorial();
+    t.update(ctx(g));
+    t.update(ctx(g, { futuresOpen: true, causalityOn: true }));
+    expect(t.step).toBe('enter');
+  });
+
+  it('replay on an existing plan asks for a new choice; skip is not completion', () => {
+    const g = new GameState();
+    g.add(S.Residential, 6, 4);
+    const t = new Tutorial();
+    t.reset(5);
+    t.update(ctx(g, { planVersion: 5 }));
+    expect(t.step).toBe('homes');
+    t.update(ctx(g, { planVersion: 6 }));
+    expect(t.step).toBe('split');
+    t.skip();
+    expect(t.active).toBe(false);
+    expect(t.completed).toBe(false);
+  });
+
+  it('hint tiles: free tiles beside the town on step 1 only', () => {
     const g = new GameState();
     const t = new Tutorial();
     expect(t.hintTiles(g.terrain, g.placements)).toHaveLength(3);
     g.add(S.Residential, 6, 4);
     expect(t.hintTiles(g.terrain, g.placements)).toHaveLength(2);
     t.update(ctx(g));
-    const ridge = t.hintTiles(g.terrain, g.placements);
-    expect(ridge.length).toBeGreaterThan(3);
-    for (const r of ridge) expect(g.terrain[r.row * 14 + r.col].elevation).toBeGreaterThanOrEqual(2);
-  });
-
-  it('skip and reset', () => {
-    const t = new Tutorial();
-    t.skip();
-    expect(t.active).toBe(false);
-    t.reset();
-    expect(t.step).toBe('homes');
+    expect(t.hintTiles(g.terrain, g.placements)).toHaveLength(0);
   });
 });

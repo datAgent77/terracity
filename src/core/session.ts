@@ -56,3 +56,7 @@ export const streetView = signal<{
 export const tutorial = new Tutorial();
 /** Current coach line ('' when tips are finished or skipped). */
 export const coachText = signal(tutorial.text);
+/** A conversation with Mira was had (and ended) during the current street visit (first-five-minutes step 5). */
+export const miraTalked = signal(false);
+/** The closing card of the first five minutes ("The future isn't written. It's built."). */
+export const outroOpen = signal(false);
