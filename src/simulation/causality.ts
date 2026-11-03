@@ -376,6 +376,6 @@ export function summary(fx: CausalEffect[], year: Year, decisionType: DecisionTy
   const gains = fx.filter(good).map(show);
   const costs = fx.filter((e) => !good(e)).map(show);
   if (!gains.length && !costs.length) return decisionType === 'compare' ? `In ${year} both plans give the same results.` : `No change by ${year}.`;
-  const head = decisionType === 'compare' ? `${year}, Plan B vs Plan A` : `By ${year}`;
+  const head = decisionType === 'compare' ? `${year}, the other future vs your plan` : `By ${year}`;
   return `${head}: ${gains.length ? `gains ${gains.join(', ')}` : 'no gains'}${costs.length ? `. Costs: ${costs.join(', ')}` : ''}.`;
 }

@@ -25,8 +25,9 @@ import { formatClock } from '../gameplay/challenge.js';
 import { causalityOn, coachText, detailsOpen, futuresOpen, streetView, tutorial } from '../core/session.js';
 import { cycleSound, largeText, prefersReducedMotion, soundLevel } from './accessibility.js';
 import { onHover, pulse } from './hover.js';
+import { viewLabel } from './view-label.js';
 import { landBudget } from '../simulation/land-budget.js';
-import { projectYear, type YearMetrics } from '../simulation/projection.js';
+import { explainYear, projectYear, type YearMetrics } from '../simulation/projection.js';
 import { sfx } from '../audio/sfx.js';
 
 const MET = '#1f8a4c';
@@ -105,20 +106,14 @@ export class PanelSystem extends createSystem({}) {
       this.applyTextSize(largeText.peek());
     };
     const paintMode = () => {
-      const f = futuresOpen.value;
       const st = streetView.value;
-      const plan = planA.value ? 'Plan B (now)' : 'Your plan';
-      const m = phase.value === 'intro'
-        ? 'Ready to start'
-        : phase.value === 'finished'
-          ? 'Plan submitted'
-          : st
-            ? `Visiting the street - ${st.title ?? plan}`
-            : f
-              ? 'Two futures side by side'
-              : viewYear.value === 2026
-                ? `${plan} - building`
-                : `${plan} - viewing the future`;
+      const m = viewLabel({
+        phase: phase.value,
+        year: viewYear.value,
+        futuresOpen: !!futuresOpen.value,
+        hasSaved: !!planA.value,
+        street: st ? st.plan : null,
+      }).text;
       mode?.setProperties({ text: m });
     };
     const relayout = () => this.applyTextSize(largeText.peek());
@@ -164,7 +159,7 @@ export class PanelSystem extends createSystem({}) {
     const land = text('m-land');
     text('t-population')?.setProperties({ text: `goal ${fmt(TARGETS.population)}` });
     text('t-environment')?.setProperties({ text: `goal ${TARGETS.environment}+` });
-    text('t-budget')?.setProperties({ text: `of ${BALANCE.startBudget}` });
+    text('t-budget')?.setProperties({ text: `of ${BALANCE.startBudget}, one-off` });
     text('t-renewable')?.setProperties({ text: `goal ${TARGETS.renewableCoverage}%` });
 
     // Colour-independent status: the goal label reads "met" once a target is reached.
@@ -209,11 +204,10 @@ export class PanelSystem extends createSystem({}) {
       set(env, y.environment);
       set(budget, y.budgetLeft);
       set(renew, y.renewableCoverage);
+      // What the four numbers mean, from the same projection (TEMPORAL_SIMULATION_SPEC.md).
+      const ex = explainYear(y);
       const unserved = game.metrics.unservedHomes;
-      const extra = [
-        unserved ? `${unserved} homes not connected by road` : '',
-        y.sprawlResidents ? `+${fmt(y.sprawlResidents)} in unplanned sprawl` : '',
-      ].filter(Boolean);
+      const extra = [ex.housing, ex.power, unserved ? `${unserved} homes not connected by road` : ''].filter(Boolean);
       sprawl?.setProperties({ text: extra.join(' / ') });
       const lb = landBudget(game.terrain, game.placements, y);
       land?.setProperties({

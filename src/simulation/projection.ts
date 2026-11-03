@@ -136,6 +136,25 @@ export function projectYear(
   };
 }
 
+/**
+ * Plain-language meaning of a projected year, from its own numbers:
+ * housed vs demand (the rest live in unplanned sprawl), and clean power as
+ * supply vs demand (the share is capped at 100 %, so a surplus is stated).
+ */
+export function explainYear(m: YearMetrics): { demand: number; housing: string; power: string } {
+  const demand = m.population + m.sprawlResidents;
+  const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
+  const housing = m.sprawlResidents
+    ? `${fmt(demand)} want to live here: ${fmt(m.population)} in planned homes, ${fmt(m.sprawlResidents)} in unplanned sprawl`
+    : `${fmt(demand)} want to live here, all in planned homes`;
+  const supply = Math.round(m.renewableSupply * 10) / 10;
+  const need = Math.round(m.energyDemand * 10) / 10;
+  const power = m.renewableSupply >= m.energyDemand
+    ? `clean power ${supply} units for ${need} needed (surplus)`
+    : `clean power ${supply} units for ${need} needed`;
+  return { demand, housing, power };
+}
+
 export function checkTargets(m: YearMetrics): TargetCheck {
   return {
     population: m.population >= TARGETS.population,

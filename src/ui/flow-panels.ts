@@ -211,7 +211,7 @@ export class FlowPanelSystem extends createSystem({}) {
         primaryAction = cmd.playAgain;
         const hasA = !!planA.value;
         secondary?.setProperties({ display: hasA ? 'flex' : 'none' });
-        secondaryLabel?.setProperties({ text: compareOpen.value ? 'Hide comparison' : 'Compare A/B' });
+        secondaryLabel?.setProperties({ text: compareOpen.value ? 'Hide comparison' : 'Compare with saved' });
         secondaryAction = hasA ? cmd.toggleCompare : null;
       }
     };
@@ -229,7 +229,7 @@ export class FlowPanelSystem extends createSystem({}) {
       const open = compareOpen.value && !!a;
       setPanelVisible(this.world, 'compare-panel', open);
       if (!open || !a) return;
-      const c = comparePlans(game.terrain, a, game.placements, 2050);
+      const c = comparePlans(game.terrain, a, game.placements, 2050, { A: 'The saved plan', B: 'Your plan' });
       headline?.setProperties({ text: c.headline });
       for (const k of METRIC_KEYS) {
         const tk = TARGET_OF[k];

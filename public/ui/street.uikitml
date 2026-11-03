@@ -59,8 +59,8 @@
   <div id="st-compare" class="compare">
     <div class="crow">
       <div class="cname">Compare futures</div>
-      <div id="st-plan-a" class="plan"><div id="st-plan-a-label" class="plabel">Plan A</div></div>
-      <div id="st-plan-b" class="plan"><div id="st-plan-b-label" class="plabel">Plan B (now)</div></div>
+      <div id="st-plan-a" class="plan"><div id="st-plan-a-label" class="plabel">Saved plan</div></div>
+      <div id="st-plan-b" class="plan"><div id="st-plan-b-label" class="plabel">Your plan</div></div>
     </div>
     <div class="crow"><div id="st-c0-l" class="cname">-</div><div id="st-c0-a" class="cval">-</div><div id="st-c0-b" class="cval">-</div></div>
     <div class="crow"><div id="st-c1-l" class="cname">-</div><div id="st-c1-a" class="cval">-</div><div id="st-c1-b" class="cval">-</div></div>

@@ -21,7 +21,7 @@
       <Button id="btn-undo" class="button"><ButtonIcon><Undo2></Undo2></ButtonIcon><ButtonLabel>Undo</ButtonLabel></Button>
     </div>
     <div class="col">
-      <Button id="btn-save-a" class="button"><ButtonIcon><Save></Save></ButtonIcon><ButtonLabel>Save Plan A</ButtonLabel></Button>
+      <Button id="btn-save-a" class="button"><ButtonIcon><Save></Save></ButtonIcon><ButtonLabel>Save plan</ButtonLabel></Button>
     </div>
   </div>
   <div id="act-more" class="cols">
@@ -32,8 +32,8 @@
       <Button id="btn-restart" class="button"><ButtonIcon><RefreshCw></RefreshCw></ButtonIcon><ButtonLabel>Clear map</ButtonLabel></Button>
     </div>
     <div class="col">
-      <Button id="btn-restore-a" class="button"><ButtonIcon><History></History></ButtonIcon><ButtonLabel>Restore A</ButtonLabel></Button>
-      <Button id="btn-compare" class="button"><ButtonIcon><Columns2></Columns2></ButtonIcon><ButtonLabel>Compare A/B</ButtonLabel></Button>
+      <Button id="btn-restore-a" class="button"><ButtonIcon><History></History></ButtonIcon><ButtonLabel>Restore saved</ButtonLabel></Button>
+      <Button id="btn-compare" class="button"><ButtonIcon><Columns2></Columns2></ButtonIcon><ButtonLabel>Compare saved</ButtonLabel></Button>
       <Button id="btn-pause" class="button"><ButtonIcon><Pause></Pause></ButtonIcon><ButtonLabel id="pause-label">Pause</ButtonLabel></Button>
       <Button id="btn-replay" class="button"><ButtonIcon><Play></Play></ButtonIcon><ButtonLabel>Replay intro</ButtonLabel></Button>
     </div>

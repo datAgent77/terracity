@@ -141,22 +141,22 @@ export function savePlanA(): void {
   const snapshot = game.placements.map((p) => ({ ...p }));
   planA.value = snapshot;
   persist();
-  statusText.value = `Plan A saved (${snapshot.length} pieces). Change the map to make Plan B, then Compare.`;
+  statusText.value = `Plan saved (${snapshot.length} pieces). Keep changing your plan, then compare it with the saved one.`;
 }
 
 export function restorePlanA(): void {
   const a = planA.peek();
   if (!a || !canEdit()) {
-    if (!a) statusText.value = 'No Plan A saved yet.';
+    if (!a) statusText.value = 'No saved plan yet.';
     return;
   }
   clearSelection();
-  game.load(a, 'Plan A');
+  game.load(a, 'The saved plan');
 }
 
 export function toggleCompare(): void {
   if (!planA.peek()) {
-    statusText.value = 'Save Plan A first, then change the map to build Plan B.';
+    statusText.value = 'Save your plan first, then change it and compare.';
     return;
   }
   clearSelection();
@@ -374,13 +374,13 @@ export function setStreetPlan(plan: 'A' | 'B'): void {
   const v = streetView.peek();
   if (!v || v.plan === plan || v.plan === 'none') return;
   if (plan === 'A' && !planA.peek()) {
-    statusText.value = 'Save Plan A on the tabletop first, then change the map to make Plan B.';
+    statusText.value = 'Save your plan on the tabletop first, then change it to compare.';
     return;
   }
   // Comparing futures: 2026 is the same for both plans, so show 2050.
   if (viewYear.peek() === 2026) viewYear.value = 2050;
   streetView.value = { ...v, plan };
-  statusText.value = plan === 'A' ? 'Plan A in the same place.' : 'Plan B (your current map) in the same place.';
+  statusText.value = plan === 'A' ? 'The saved plan, in the same place.' : 'Your plan, in the same place.';
 }
 
 // ---------------------------------------------------------- split reality --
@@ -392,7 +392,7 @@ export function openFutures(): void {
   compareOpen.value = false;
   futuresOpen.value = { selected: null };
   statusText.value = planA.peek()
-    ? 'Two futures: Plan A in your left hand, Plan B (now) in your right. Bring your hands together to merge.'
+    ? 'Two futures: your plan on the left, the saved plan on the right. Bring your hands together to merge.'
     : 'Two futures: your plan on the left, the same coast if nobody plans on the right. Bring your hands together to merge.';
 }
 
@@ -401,7 +401,7 @@ export function closeFutures(): void {
   futuresOpen.value = null;
   // Merging closes the comparison; it never combines two plans.
   statusText.value = planA.peek()
-    ? 'One world again: you are back on Plan B, your current map. Plans are compared, never combined; Restore A brings Plan A back.'
+    ? 'One world again: you are back on your plan. Plans are compared, never combined; Restore saved brings the saved plan back.'
     : 'One world again: your plan, unchanged. The other future was only a comparison.';
 }
 
@@ -424,7 +424,8 @@ export function enterFuture(side: 'A' | 'B'): void {
   if (!futuresOpen.peek() || streetView.peek()) return;
   const a = planA.peek();
   const pair = futurePair(a, game.placements, viewYear.peek());
-  const plan: 'A' | 'B' | 'none' = a ? side : side === 'A' ? 'B' : 'none';
+  // Future A is always your (current) plan; B is the saved plan or nobody planning.
+  const plan: 'A' | 'B' | 'none' = side === 'A' ? 'B' : a ? 'A' : 'none';
   const homes = (ps: readonly { type: StructureType; col: number; row: number; id: string }[]) => ps.find((p) => p.type === StructureType.Residential);
   const target = homes(game.placements) ?? homes(pair[side].plan) ?? (a ? homes(a) : undefined);
   futuresOpen.value = { selected: side };

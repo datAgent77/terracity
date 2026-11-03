@@ -1,10 +1,10 @@
 /**
  * Which two futures "Split reality" shows (pure; tests/unit/futures.test.ts).
  *
- * With a saved Plan A: left hand = Plan A, right hand = Plan B (the current
- * map) — the existing Plan A/B logic. Without one: left = your plan, right = the
- * same region if nobody plans (no structures: newcomers end up in unplanned
- * sprawl). Both come from the same terrain and the same deterministic
+ * Future A (left) is always YOUR PLAN — the editable map. Future B (right) is
+ * the comparison: the plan you saved, or, without one, the documented
+ * baseline "if nobody plans" (no structures: every newcomer ends up in
+ * unplanned sprawl; SIMULATION_ASSUMPTIONS.md). Both come from the same terrain and the same deterministic
  * projection, so the same plans always give the same two futures.
  */
 import type { Year } from '../config/projection.js';
@@ -22,6 +22,6 @@ export interface FuturePair {
 export function futurePair(planA: readonly Placement[] | null, current: readonly Placement[], viewYear: Year): FuturePair {
   const year: Year = viewYear === 2026 ? 2050 : viewYear;
   return planA
-    ? { A: { title: 'Plan A', plan: planA }, B: { title: 'Plan B (now)', plan: current }, year }
+    ? { A: { title: 'Your plan', plan: current }, B: { title: 'Saved plan', plan: planA }, year }
     : { A: { title: 'Your plan', plan: current }, B: { title: 'If nobody plans', plan: [] }, year };
 }

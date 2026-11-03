@@ -123,6 +123,6 @@ describe('causal events', () => {
     const ev2 = causalEvent(terrain, a, b, 2050, 'compare', 'cmp');
     expect(ev1).toEqual(ev2);
     expect(ev1.affectedEntities.map((e) => `${e.change}:${e.placement.type}`).sort()).toEqual(['added:park', 'added:park']);
-    expect(ev1.explanation).toMatch(/^2050, Plan B vs Plan A: /);
+    expect(ev1.explanation).toMatch(/^2050, the other future vs your plan: /);
   });
 });

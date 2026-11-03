@@ -48,12 +48,12 @@ test('split reality: two futures from the same plan, editing blocked, merge rest
   // Merging is explained: it closes the comparison, it never combines plans.
   expect(String((await snap(page)).statusText ?? (await page.evaluate(() => (window as unknown as { __terracity: { statusText: { value: string } } }).__terracity.statusText.value)))).toMatch(/only a comparison/);
 
-  // With a saved Plan A the futures are Plan A (left) and Plan B (right).
+  // With a saved plan: your plan on the left (A), the saved plan on the right (B).
   await key(page, 'KeyS');
   await buildPlan(page, [[1, 8, 3]]);
   await key(page, 'KeyV');
   await settled(page);
-  expect((await split(page)).built).toMatch(/\|Plan A:.+\|Plan B \(now\):.+/);
+  expect((await split(page)).built).toMatch(/\|Your plan:.+\|Saved plan:.+/);
   await key(page, 'KeyV');
   await settled(page);
   expect(await page.evaluate(() => (window as unknown as { __terracity: { statusText: { value: string } } }).__terracity.statusText.value)).toMatch(/never combined/);

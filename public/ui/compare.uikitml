@@ -14,9 +14,9 @@
   .head:dark { color: #7fe3ea; }
 </style>
 <Panel id="root" class="root">
-  <div id="cmp-headline" class="headline">Plan A vs Plan B in 2050</div>
-  <div class="row"><div class="name">2050</div><div class="head">Plan A</div><div class="head">Plan B (now)</div></div>
-  <div class="row"><div class="name">Population</div><div id="a-population" class="cell">-</div><div id="b-population" class="cell">-</div></div>
+  <div id="cmp-headline" class="headline">Saved plan vs your plan in 2050</div>
+  <div class="row"><div class="name">2050</div><div class="head">Saved plan</div><div class="head">Your plan</div></div>
+  <div class="row"><div class="name">Housed</div><div id="a-population" class="cell">-</div><div id="b-population" class="cell">-</div></div>
   <div class="row"><div class="name">Environment</div><div id="a-environment" class="cell">-</div><div id="b-environment" class="cell">-</div></div>
   <div class="row"><div class="name">Renewable</div><div id="a-renewableCoverage" class="cell">-</div><div id="b-renewableCoverage" class="cell">-</div></div>
   <div class="row"><div class="name">Budget left</div><div id="a-budgetLeft" class="cell">-</div><div id="b-budgetLeft" class="cell">-</div></div>

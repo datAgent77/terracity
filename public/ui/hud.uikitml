@@ -24,7 +24,7 @@
   .year:dark { color: #ffffff; }
   .clock { font-size: 16px; font-weight: 700; color: #1d5f6b; }
   .clock:dark { color: #7fe3ea; }
-  .sprawl { font-size: 12px; color: #b5651d; margin-left: 30px; }
+  .sprawl { font-size: 12px; color: #b5651d; margin-left: 30px; width: 90%; }
   .land { font-size: 12px; color: #4f6b55; margin-top: 6px; width: 100%; }
   .land:dark { color: rgba(220, 240, 225, 0.85); }
   .coach { font-size: 15px; font-weight: 600; color: #3a2c00; background-color: #ffe9a8; border-radius: 10px;
@@ -56,11 +56,11 @@
     <div class="tagline">Plan Costa Verde for 2050.</div>
     <div class="row">
       <Users class="icon"></Users>
-      <div class="label">Population</div>
+      <div class="label">Housed</div>
       <div id="m-population" class="value">12,000</div>
       <div id="t-population" class="target">goal 28,000</div>
     </div>
-    <div id="m-sprawl" class="sprawl"></div>
+    <div id="m-sprawl" class="sprawl">-</div>
     <div class="row">
       <Leaf class="icon"></Leaf>
       <div class="label">Environment</div>
