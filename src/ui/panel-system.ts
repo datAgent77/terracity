@@ -269,13 +269,24 @@ export class PanelSystem extends createSystem({}) {
     }
     this.onClick(xrButton, () => this.world.launchXR());
     this.onClick(exitButton, () => this.world.exitXR());
-    this.cleanupFuncs.push(
-      this.world.visibilityState.subscribe((visibilityState) => {
-        const is2D = visibilityState === VisibilityState.NonImmersive;
-        xrButton.setProperties({ display: is2D ? 'flex' : 'none' });
-        exitButton.setProperties({ display: is2D ? 'none' : 'flex' });
-      }),
-    );
+    // XR capability fallback: offer "Enter Mixed Reality" only where the
+    // browser can start an immersive-ar session; everywhere else the desktop
+    // (mouse + keyboard) experience is complete on its own.
+    let supported = false;
+    const xrHook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
+    const paint = () => {
+      const is2D = this.world.visibilityState.peek() === VisibilityState.NonImmersive;
+      xrButton.setProperties({ display: is2D && supported ? 'flex' : 'none' });
+      xrHook.xrButtonShown = is2D && supported;
+      exitButton.setProperties({ display: is2D ? 'none' : 'flex' });
+    };
+    const xr = (navigator as Navigator & { xr?: { isSessionSupported(mode: string): Promise<boolean> } }).xr;
+    void (xr ? xr.isSessionSupported('immersive-ar').catch(() => false) : Promise.resolve(false)).then((ok) => {
+      supported = ok;
+      xrHook.xrSupported = ok;
+      paint();
+    });
+    this.cleanupFuncs.push(this.world.visibilityState.subscribe(paint));
   }
 
   private bindActions(): void {

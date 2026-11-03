@@ -457,7 +457,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   update(delta: number): void {
     this.clock += delta;
     this.stepChild(delta);
-    if (this.root.visible) this.pois.update(this.world.camera.getWorldPosition(new Vector3()));
+    if (this.root.visible) this.pois.update(this.world.camera.getWorldPosition(this.eyeScratch));
     if (this.root.visible) {
       for (const c of this.cyclists) {
         c.obj.position.x += c.dir * c.speed * delta;
@@ -471,10 +471,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       }
     }
     if (this.root.visible && this.birds.count) {
-      const m = new Matrix4();
-      const q = new Quaternion();
-      const up = new Vector3(0, 1, 0);
-      const v = new Vector3();
+      const { m, q, up, v } = this.birdScratch;
       for (let i = 0; i < this.birds.count; i++) {
         const flock = i % 2;
         const a = this.clock * (flock ? 0.12 : -0.09) + (i >> 1) * 0.11 + flock * 2.1;
@@ -707,6 +704,11 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   // ------------------------------------------------ points of interest --
 
   private pois!: PoiMarkers;
+  /** Per-frame scratch objects: no allocation in the frame loop (Milestone G audit). */
+  private eyeScratch = new Vector3();
+  private camScratch = new Vector3();
+  private localScratch = new Vector3();
+  private birdScratch = { m: new Matrix4(), q: new Quaternion(), up: new Vector3(0, 1, 0), v: new Vector3() };
 
   /**
    * One or two places near Mira that explain a modelled consequence, chosen
@@ -782,8 +784,8 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const c = this.child;
     const n = this.narrative;
     if (!c || !n || !this.root.visible) return;
-    const cam = this.world.camera.getWorldPosition(new Vector3());
-    const local = this.childGroup.worldToLocal(cam.clone());
+    const cam = this.world.camera.getWorldPosition(this.camScratch);
+    const local = this.childGroup.worldToLocal(this.localScratch.copy(cam));
     const dx = local.x - c.root.position.x;
     const dz = local.z - c.root.position.z;
     const near = Math.hypot(dx, dz) < 8;
@@ -927,10 +929,13 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   /**
    * Parched gardens: a copy of the kit atlas whose vegetation cells (lawn,
    * foliage, green roof) are shifted toward dry ochre by the projected dryness.
-   * Walls, roofs and paving keep their colours. Rebuilt in coarse steps.
+   * Walls, roofs and paving keep their colours. Built once per coarse step and
+   * kept (at most 8): switching futures reuses them instead of leaking a new
+   * texture per visit (Milestone G audit).
    */
   private droughtKey = -1;
   private wetMap: Texture | null = null;
+  private droughtTex = new Map<number, Texture>();
   private applyDrought(dryness: number): void {
     const mat = this.streetMat;
     if (!mat?.map) return;
@@ -938,8 +943,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const step = Math.round(Math.max(0, dryness - 0.12) * 8) / 8; // 0 = no change
     if (step === this.droughtKey) return;
     this.droughtKey = step;
-    if (step === 0) {
-      mat.map = this.wetMap;
+    const cached = step === 0 ? this.wetMap : this.droughtTex.get(step);
+    if (cached) {
+      mat.map = cached;
       mat.needsUpdate = true;
       return;
     }
@@ -975,7 +981,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     tex.flipY = this.wetMap.flipY;
     tex.colorSpace = this.wetMap.colorSpace;
     tex.anisotropy = this.wetMap.anisotropy;
-    if (mat.map !== this.wetMap) mat.map.dispose();
+    this.droughtTex.set(step, tex);
     mat.map = tex;
     mat.needsUpdate = true;
   }

@@ -318,3 +318,91 @@ choice, skip is not completion); Playwright **34 passed**, 3 skipped (new: the
 six beats end to end with the closing card and replay; the intro card and Skip
 intro); IWER hand scripts `xr-phase1/2/3` exit 0 (Start → Begin by id, Skip
 tips by hand ray still pass); first-five capture 0 page errors; build OK, 10 MB.
+
+## Milestone G — Quest validation (emulator audit + hardware checklist)
+
+**No physical Quest was available.** Everything below is desktop Chromium and
+the IWER emulator (Quest 3 profile, stereo). Frame times measured here reflect
+this machine's software rendering only and are **not** Quest frame rates. The
+headset half is a checklist for the person with the device:
+[QUEST_VALIDATION_CHECKLIST.md](QUEST_VALIDATION_CHECKLIST.md).
+
+**Files**: `scripts/visual/perf-audit.mjs` (new), `src/index.ts`
+(`gpuBudget`, `liveTextures` debug hooks; quality preset applied),
+`src/config/quality.ts` (new), `src/world/ambient-system.ts` (shadow pass
+skipped at street level; preset), `src/world/street-system.ts` (drought texture
+cache, no per-frame allocation), `src/world/poi-markers.ts`,
+`src/ui/panel-system.ts` (XR capability fallback); tests
+`tests/e2e/fallback.spec.ts` (new), `tests/unit/game-state.test.ts` (Plan A/B
+isolation); `docs/QUEST_VALIDATION_CHECKLIST.md` (new).
+
+**Profile** (`docs/visual/cg-perf.json`, IWER stereo, reference plan):
+
+| State | Draw calls | Triangles | Materials | Transparent draws | Textures (MB, upper est.) | Shader programs |
+|---|---|---|---|---|---|---|
+| Tabletop 2026 | 254 | 274 k | 128 | 49 | 11.6 | 38 |
+| Tabletop 2050 | 236 | 269 k | 124 | 50 | 11.6 | 40 |
+| Two futures | 116 | 314 k | 97 | 44 | 14.1 | 50 |
+| + Causality Vision | 158 | 317 k | 118 | 65 | 16.3 | 50 |
+| Street, your plan, Mira talking | 168 | 89 k | 124 | 42 | 14.6 | 64 |
+| Street, nobody plans | 142 | 40 k | 116 | 39 | 14.6 | 80 |
+
+Readings: the tabletop is the most draw-call-heavy state, the two futures the
+most triangle-heavy (two full boards). Transparent draws are mostly UIKit
+panels and buttons (HUD 5, Plan pad 4+, time control 4, time dial 7) and the
+Causality rings — inherent to the UI, kept for legibility. Shader programs grow
+as new states are first seen (cached, not per frame).
+
+**Optimizations, each from a finding above**
+
+- *Texture leak* (found by the enter / exit cycle check): the parched-garden
+  atlas copy was rebuilt on every visit to a dry future and never freed when
+  returning to a green one (textures +4 after 4 cycles). Now built once per
+  dryness step and reused: +2 after 6 cycles **and** +2 after 14 (a bounded,
+  one-time cache), heap flat (190 → 190 MB); it also removes a per-pixel CPU
+  loop from every visit.
+- *Shadow pass in the street*: the 2048² sun shadow map was still rendered
+  every frame at street level (13 casters) although nothing there receives it.
+  The sun stops casting while a street is visited.
+- *Garbage in the frame loop*: the street's per-frame code (birds, Mira's
+  facing, POI boards) allocated vectors / matrices every frame; it now reuses
+  scratch objects.
+- *Quality preset* `?quality=low` (1024² shadow map, hard filter, 85 % XR
+  resolution, fixed foveation 1) as the first lever for the headset test —
+  default unchanged, because no device measurement justifies changing it.
+- Not changed without device evidence: LOD, texture compression, instancing
+  beyond what exists (trees, birds, people), particle density.
+
+**XR capability fallback**: "Enter Mixed Reality" is offered only where the
+browser can start an `immersive-ar` session (`navigator.xr.isSessionSupported`);
+everywhere else it is hidden and the desktop loop is complete with mouse and
+keyboard. Tested against the production build, which has no emulator.
+
+**QA coverage (Part 12)**
+
+| # | Area | Tests |
+|---|---|---|
+| 1 | Plan A/B state isolation | unit `game-state` (new: editing B never changes A or its projection), `futures`; e2e `split` |
+| 2 | Split and merge | e2e `split` (merge restores table and plan), IWER `godmode-flow`/`xr-phase*` |
+| 3 | Timeline changes | unit `projection`, `time-dial`; e2e `game-loop`, `time-travel-visuals`, `time-dial` |
+| 4 | Simulation determinism | unit `projection`, `futures`, `game-state` replay, `mira-dialogue`, `points-of-interest` |
+| 5 | Causality event generation | unit `causality` (ledger sums exactly, 42 plans × 3 years); e2e `causality` |
+| 6 | Unsupported causal claims | unit `causality` (unchanged rules never named), `mira-dialogue` (every line's support holds), `points-of-interest` (every amount is a ledger entry) |
+| 7 | Mira dialogue consistency | unit `mira-dialogue`; e2e `street` "Mira 2.0" |
+| 8 | Same-location comparison | e2e `street` (same viewpoint, A vs B), `split` become small |
+| 9 | UI mode transitions | e2e `polish` (first five minutes end to end), `street`, `split`, `game-loop` |
+| 10 | Save / reload | unit `persistence`; e2e `split` save / reload |
+| 11 | Desktop input fallback | every e2e (mouse + keyboard), `desktop-placement`, `fallback` |
+| 12 | XR capability fallback | e2e `fallback` (production build) |
+
+Cannot run here: anything on a physical Quest (frame rate, thermal, real
+hand-tracking, fingertip poke, comfort, legibility at headset resolution,
+Quest Browser audio) — see the checklist.
+
+**Tests (G, clean run)**: `tsc` OK; unit **189 / 189**; Playwright on the dev
+server **34 passed**, 4 skipped (3 env-gated + `fallback`, which needs a browser
+without the emulator); Playwright on the **production build** (`vite preview`,
+`E2E_BASE_URL`) **35 passed**, 3 skipped (includes `fallback`); IWER hand
+scripts `xr-phase1/2/3` exit 0; perf audit 0 page errors; build OK, 10 MB.
+
+**Quest results**: none yet (to be filled from the checklist).

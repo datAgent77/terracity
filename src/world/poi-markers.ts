@@ -121,9 +121,11 @@ export class PoiMarkers {
   }
 
   /** Face the viewer (yaw only) and keep a constant apparent size. */
+  private p = new Vector3();
+  private ws = new Vector3();
+
   update(eye: Vector3): void {
-    const p = new Vector3();
-    const ws = new Vector3();
+    const { p, ws } = this;
     for (const m of this.markers) {
       if (!m.poi || !m.root.visible) continue;
       m.sign.getWorldPosition(p);
