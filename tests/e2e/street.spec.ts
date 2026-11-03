@@ -139,7 +139,8 @@ test('the last child: her garden and words follow the plan; rewriting the plan c
 test('Mira 2.0: a user-paced conversation grounded in the simulation; the same place differs between futures', async ({ page }) => {
   test.setTimeout(180_000);
   type C = { talking: boolean; index: number; dialogue: string[]; groundY: number } | null;
-  type S3 = Street & { plan: 'A' | 'B' | 'none'; child: C };
+  type P = { kind: string; title: string; lines: string[]; open: boolean };
+  type S3 = Street & { plan: 'A' | 'B' | 'none'; child: C; poi: P[] };
   const st = () => page.evaluate(() => (window as unknown as { __terracity: { street(): S3 } }).__terracity.street());
   await open(page);
   // Your plan (balanced) vs nobody planning; enter Future A in 2050.
@@ -159,6 +160,15 @@ test('Mira 2.0: a user-paced conversation grounded in the simulation; the same p
   expect(lines[0]).toBe("Hi, I'm Mira. I live on this street.");
   expect(lines.join(' ')).toMatch(/In the other future this street was never built/);
   expect(lines.at(-1)).toBe('Will you look at the other future too?');
+
+  // Points of interest near her come from this plan only (no sprawl in yours).
+  expect(a.poi.length).toBeGreaterThan(0);
+  expect(a.poi.map((q) => q.kind)).not.toContain('sprawl');
+  const toggle = (i: number) => page.evaluate((k) => (window as unknown as { __terracity: { poi(i: number): void } }).__terracity.poi(k), i);
+  await toggle(0);
+  expect((await st()).poi.map((q) => q.open)[0]).toBe(true);
+  await toggle(0);
+  expect((await st()).poi.every((q) => !q.open)).toBe(true);
 
   // Talk -> next -> back -> end, at the user's pace.
   await ui(page, 'street-panel', 'st-talk');
@@ -183,4 +193,6 @@ test('Mira 2.0: a user-paced conversation grounded in the simulation; the same p
   expect(b.child!.dialogue.join(' ')).toMatch(/In the other future there is a planned street here/);
   expect(b.child!.dialogue).not.toEqual(lines);
   expect(b.child!.groundY).toBeGreaterThan(0.5); // she stands on the sprawl slab, not inside it
+  expect(b.poi.map((q) => q.kind)).toEqual(['sprawl']);
+  expect(b.poi[0].lines.join(' ')).toMatch(/newcomers without a planned home/);
 });

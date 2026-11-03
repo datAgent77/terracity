@@ -213,3 +213,61 @@ Tests (D, clean run): `tsc` OK; unit **184 / 184** (new `mira-dialogue.test.ts`
 → back → end, grounded lines, same place differs between futures, Mira on the
 slab); IWER hand scripts `xr-phase1/2/3` exit 0; Mira capture 0 page errors;
 build OK, 10 MB.
+
+## Milestone E — Human-scale world polish
+
+**Files**: `src/world/points-of-interest.ts` (new, pure), `src/world/poi-markers.ts`
+(new), `src/world/street-system.ts` (clear standing spot, POI boards, hooks);
+tests `tests/unit/points-of-interest.test.ts`, `tests/e2e/street.spec.ts`;
+capture `scripts/visual/human-scale.mjs` (every viewpoint, both futures).
+
+**Audit first** (`human-scale.mjs`, all four viewpoints × both futures, 2050).
+Your-plan views were sound. In the future where nobody planned, the
+viewpoints stood at ground level *inside* the 0.7 m sprawl slab and, at "At
+the gate", inside a house: the frame was a wall.
+
+- **Composition — a clear place to stand**: without a planned district the
+  viewer now stands on what is really there (open ground or the sprawl slab,
+  never a roof), at the nearest spot within 12 m whose surroundings are level
+  and whose view (±40°, 8 m) is not blocked by a wall — found by downward rays
+  against the built street. Planned streets keep their authored viewpoints.
+- **Meaningful points of interest** (6.3): one or two places near Mira, chosen
+  only from what exists in this plan / future, each explaining one consequence
+  with the exact amounts the causality ledger attributes to it:
+  - *Neighbourhood park* — "Next to 1 neighbourhood: nature +1. Its trees grow
+    every year: by 2050, 2 parks add nature +4." (`park-neighbours`,
+    `park-maturity`)
+  - *Solar farm / Wind turbines* — "Makes 4 of the 27 units of clean power the
+    region has." (+ farmland converted, windy ridge when they apply)
+  - *Planned neighbourhood* — people housed (`homes-connected`), wind noise and
+    farmland when they apply.
+  - *Unplanned houses* (nobody plans) — "One of 8 places where 16,000
+    newcomers without a planned home built, without streets or parks.
+    Unplanned building costs nature -24 across the region."
+  They are info boards on her street (south sidewalk by the gate, north
+  sidewalk toward the start), never in the garden viewpoint's view of Mira; an
+  arrow on the post points at the real place. Collapsed they show the title
+  ("why?"); pinch / click opens the explanation (one at a time). Signs face the
+  viewer and keep a constant apparent size; they read over haze and roofs.
+  Tested: every point's tile holds that structure / sprawl in that plan, every
+  signed amount is a supporting ledger entry, at most two of different kinds,
+  deterministic; the same place gives a park + solar farm in your plan and
+  unplanned houses where nobody planned.
+- **Transition** (6.1), reviewed, unchanged: teleport fade of ~0.2 s per half
+  (instant with reduced motion), the street placed under the viewer's own head
+  and yaw (no camera motion, no scale animation), Return always on the street
+  panel. Street ambience was already present.
+
+Evidence (desktop Chromium): `docs/visual/ce-A-vp0..3.png`,
+`ce-B-vp0..3.png`, `ce-A-poi-open.png`, `ce-B-poi-open.png`, `ce-log.txt`.
+
+Limitations: no new materials or assets in this milestone (the audit found
+composition, not materials, to be the main problem); boards of far places are
+on the street, so distance is shown only by the arrow; not tried on a Quest.
+
+Tests (E, clean run): `tsc` OK; unit **187 / 187** (new
+`points-of-interest.test.ts` 3); Playwright **33 passed**, 3 skipped (the
+"Mira 2.0" street test now also checks the points of interest per future and
+opening / closing them); IWER hand scripts `xr-phase1/2/3` exit 0; human-scale
+and Mira captures 0 page errors; build OK, 10 MB. Performance: two boards add
+6 small meshes and 2 canvas textures to the street; no headset measurement.

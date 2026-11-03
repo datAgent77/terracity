@@ -49,7 +49,8 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import { UIKit, type Entity, type UIKitMLAsset } from '@iwsdk/core';
-import { YEARS } from '../config/projection.js';
+import { YEARS, type Year } from '../config/projection.js';
+import type { Placement } from '../simulation/metrics.js';
 // Addon not re-exported by @iwsdk/core (imports the same `three` alias).
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GRID_COLS, StructureType, TerrainType, TILE_SIZE } from '../config/scenario.js';
@@ -75,15 +76,26 @@ import { PAINTED, PAINTED_FLAT } from './palette.js';
 import { Bubble, createChild, createGarden, disposeTree, type Child } from './child.js';
 import { CHILD_AGE, CHILD_NAME, childNarrative, type ChildNarrative } from './child-narrative.js';
 import { miraDialogue, narrativeContext, type DialogueLine } from './mira-dialogue.js';
+import { PoiMarkers } from './poi-markers.js';
+import { pointsOfInterest } from './points-of-interest.js';
 import { compareRows } from './street-compare.js';
 import { streetStory } from './street-story.js';
-import { CHILD_SPOT, GARDEN, streetPose, STREET_SCALE, VIEWPOINTS } from './street-view.js';
+import { CHILD_SPOT, GARDEN, streetPose, STREET_SCALE, type Viewpoint, VIEWPOINTS } from './street-view.js';
 import { createStructureModel, setDistrictLinks, setRoadArms, structureLook } from './structure-models.js';
 import { tileAt } from './terrain-map.js';
 import { createTownTile, setEra } from './villas.js';
 
 const TABLETOP_PANELS = ['hud-panel', 'actions-panel', 'time-panel', 'overlay-panel', 'compare-panel', 'tray-labels'];
 const RADIUS = 2; // tiles around the district (5 x 5)
+/**
+ * Info boards for the points of interest (street-inner metres): south sidewalk
+ * between the gate and her garden, north sidewalk toward the street's start.
+ * Both stay out of the garden viewpoint's view of Mira.
+ */
+const POI_BOARDS = [
+  { x: 3.2, z: -3.6 },
+  { x: -9, z: 3.6 },
+];
 const FADE = 0.22; // seconds per half of a teleport fade
 const DRY_TINT = new Color('#b98f58');
 const LUSH_TINT = new Color('#7fbf5c');
@@ -130,6 +142,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.inner.add(this.hood);
     const rootEntity = this.world.createTransformEntity(this.root);
     this.innerEntity = this.world.createTransformEntity(this.inner, { parent: rootEntity });
+    this.pois = new PoiMarkers(this.world, this.innerEntity);
     this.buildSky();
     this.buildMarkers();
     // Birds over a recovering region (count follows `greening`).
@@ -181,7 +194,11 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const hook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
     /** Talk to Mira: 'next' (start / next line), 'back', 'end'. Same as the panel and pinching her. */
     hook.talk = (a: 'next' | 'back' | 'end') => (a === 'next' ? this.talkNext() : a === 'back' ? this.talkBack() : this.talkEnd());
+    /** Open / close point of interest i near Mira (same as pinching its sign). */
+    hook.poi = (i: number) => this.pois.toggle(i);
     hook.street = () => ({
+      poi: this.pois.info(),
+      tile: this.visit ? `${this.visit.col},${this.visit.row}` : null,
       active: !!streetView.peek(),
       viewpoint: streetView.peek()?.viewpoint ?? null,
       name: streetView.peek() ? VIEWPOINTS[streetView.peek()!.viewpoint].name : null,
@@ -426,8 +443,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const head = cam.getWorldPosition(new Vector3());
     const fwd = cam.getWorldDirection(new Vector3());
     const headYaw = Math.atan2(-fwd.x, -fwd.z);
-    // Without a district here (e.g. Plan A left this tile empty) stand on the ground.
-    const pose = streetPose(this.districtHere ? v : { ...v, ground: 0 }, head.y);
+    // Without a district here (e.g. Plan A left this tile empty) stand on what
+    // is really there: open ground or an unplanned sprawl slab, never inside a house.
+    const pose = streetPose(this.districtHere ? v : this.clearStand(v), head.y);
     this.root.position.set(head.x, pose.y, head.z);
     this.root.rotation.set(0, pose.yaw + headYaw, 0);
     this.inner.position.set(pose.offsetX, 0, pose.offsetZ);
@@ -437,6 +455,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   update(delta: number): void {
     this.clock += delta;
     this.stepChild(delta);
+    if (this.root.visible) this.pois.update(this.world.camera.getWorldPosition(new Vector3()));
     if (this.root.visible) {
       for (const c of this.cyclists) {
         c.obj.position.x += c.dir * c.speed * delta;
@@ -561,6 +580,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.story = streetStory(projected, st, { sprawlNearby, beachesNearby, homesHere: !!home });
     this.buildLife(st, !!home);
     this.buildChild(projected, st, !!home);
+    this.buildPois(plan, year, col, row, hood);
     this.applyAtmosphere();
   }
 
@@ -626,8 +646,40 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.paintPanel?.();
   }
 
+  /** Nearest clear standing spot to viewpoint `v` when no district stands here. */
+  private clearStand(v: Viewpoint): Viewpoint {
+    for (const r of [0, 2, 4, 6, 9, 12]) {
+      for (let k = 0; k < (r ? 8 : 1); k++) {
+        const a = (k / 8) * Math.PI * 2;
+        const x = v.x + Math.cos(a) * r;
+        const z = v.z + Math.sin(a) * r;
+        const tops = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => this.surfaceAt(x + dx, z + dz));
+        const g = tops[0];
+        if (g > 1.2 || !tops.every((t) => t < g + 0.25)) continue; // ground or a slab, never a roof
+        // A clear view ahead: no wall within 8 m across the view (+-40 deg).
+        const len = Math.hypot(v.lookX - x, v.lookZ - z) || 1;
+        const ux = (v.lookX - x) / len;
+        const uz = (v.lookZ - z) / len;
+        const ahead = [-0.7, -0.35, 0, 0.35, 0.7].every((a) => {
+          const c = Math.cos(a);
+          const s = Math.sin(a);
+          const dx = ux * c - uz * s;
+          const dz = ux * s + uz * c;
+          return [1, 2, 3, 4, 5, 6, 8].every((d) => this.surfaceAt(x + dx * d, z + dz * d) < g + 1);
+        });
+        if (ahead) return { ...v, x, z, ground: g };
+      }
+    }
+    return { ...v, ground: 0 };
+  }
+
   /** Highest surface of the built neighbourhood under (x, z), in street-inner metres. */
-  private groundAt(x: number, z: number): number {
+  private surfaceAt(x: number, z: number): number {
+    const hits = this.rayDown(x, z);
+    return hits.length ? Math.max(0, this.inner.worldToLocal(hits[0].point.clone()).y) : 0;
+  }
+
+  private rayDown(x: number, z: number): Intersection[] {
     this.inner.updateMatrixWorld(true);
     const origin = this.inner.localToWorld(new Vector3(x, 40, z));
     const down = this.inner.localToWorld(new Vector3(x, 0, z)).sub(origin).normalize();
@@ -638,13 +690,42 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.hood.traverseVisible((o) => {
       if ((o as Mesh).isMesh) (Object.getPrototypeOf(o) as Mesh).raycast.call(o, rc, hits);
     });
-    hits.sort((a, b) => a.distance - b.distance);
-    // First surface below head height (skips canopies and roofs).
-    for (const hit of hits) {
+    return hits.sort((a, b) => a.distance - b.distance);
+  }
+
+  /** First surface below head height under (x, z) (skips canopies and roofs). */
+  private groundAt(x: number, z: number): number {
+    for (const hit of this.rayDown(x, z)) {
       const y = this.inner.worldToLocal(hit.point.clone()).y;
       if (y < 1.2) return Math.max(0, y);
     }
     return 0;
+  }
+
+  // ------------------------------------------------ points of interest --
+
+  private pois!: PoiMarkers;
+
+  /**
+   * One or two places near Mira that explain a modelled consequence, chosen
+   * from this plan / future only (points-of-interest.ts). Each is an info board
+   * on her street (human scale, never in front of her) whose arrow points at
+   * the real place: the park, the solar farm, the unplanned houses.
+   */
+  private buildPois(plan: readonly Placement[], year: Year, col: number, row: number, hood: Group): void {
+    const pois = pointsOfInterest(game.terrain, plan, year, col, row);
+    hood.updateMatrixWorld(true);
+    this.inner.updateMatrixWorld(true);
+    const at: Vector3[] = [];
+    const targets: Array<Vector3 | null> = [];
+    pois.forEach((poi, i) => {
+      const b = POI_BOARDS[i];
+      at.push(new Vector3(b.x, this.groundAt(b.x, b.z), b.z));
+      const dc = poi.tile.col - col;
+      const dr = poi.tile.row - row;
+      targets.push(dc || dr ? this.inner.worldToLocal(hood.localToWorld(new Vector3(dc * TILE_SIZE, 0, dr * TILE_SIZE))) : null);
+    });
+    this.pois.set(pois, at, targets);
   }
 
   // ------------------------------------------------- conversation (user-paced) --
