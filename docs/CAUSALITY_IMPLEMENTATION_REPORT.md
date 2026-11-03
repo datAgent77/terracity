@@ -123,3 +123,42 @@ Evidence: `docs/visual/cb-1-decision-pulse.png`, `cb-2-vision-road.png`,
   event (test hook) but not yet browsable in the UI.
 - Pulses travel in board space only; in the two-futures view the rings are
   static (no pulse between the boards).
+
+## Milestone C — Split Reality polish
+
+**Files**: `src/world/split-system.ts`, `src/index.ts` (local clipping),
+`src/core/commands.ts` (merge message), `scripts/visual/split.mjs`,
+`tests/e2e/split.spec.ts`.
+
+- **The split moment** — the table really splits. At the start both futures lie
+  exactly where the table is, each clipped to its half by a seam fixed in the
+  world (per-future material copies with a clipping plane): the left half is
+  Future A, the right half Future B, so the user sees one board whose two
+  halves already belong to two different futures. The halves pull apart,
+  shrink and turn toward the viewer; each slides out of the seam and becomes
+  whole (they never overlap); the seam glows while they part; a ring of light
+  runs over the table when they are apart. Clipping is switched off once
+  separated. Reduced motion skips straight to the result.
+- **Distinct identities** come only from each future's own projection (sprawl,
+  parched land, smog, lost trees, reforestation, solar / wind, flooded
+  beaches) — nothing is recoloured.
+- **Compact comparison**: the two large metric plates are replaced by small
+  title tags ("A  Your plan · 4 of 4 targets") that appear once apart, and one
+  strip in front of the futures: Housed, Nature (goal 60), Renewable, Land used,
+  A | B, the better value ticked (✓; lower land use counts as better). Details
+  on request: Causality Vision (W) explains *why* they differ.
+- **Merge, honestly**: merging closes the comparison and never combines plans —
+  the status says so ("Plans are compared, never combined; Restore A brings
+  Plan A back" / "The other future was only a comparison").
+
+Evidence: `docs/visual/cc-2a-seam.png` (the table split at the seam: green
+half = your plan, parched half = nobody planning), `cc-2b-parting.png`,
+`cc-2c-apart.png`, `cc-3-two-futures-2050.png` (tags + comparison strip), IWER
+`cc-4..7-*`. The transition lasts ~0.8 s; for the evidence it is frozen at
+t = 0.05 / 0.35 / 0.65 with a debug hook (`splitFreeze`), because software
+rendering produces too few frames to catch it live.
+
+Tests (C, clean run): unit 178 / 178; Playwright 32 passed, 3 skipped (split
+spec now also checks the comparison strip and the merge message); IWER hand
+scripts exit 0; IWER split → pinch-select → merge and Become Small flows pass;
+Causality Vision in the two-futures view passes; build OK.

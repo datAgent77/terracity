@@ -24,6 +24,8 @@ World.create(
   // warm sun roll off into rich highlights instead of flat clipped colour.
   world.renderer.toneMapping = NeutralToneMapping;
   world.renderer.toneMappingExposure = 0.92;
+  // Split Reality clips each future to its half of the table while they part.
+  world.renderer.localClippingEnabled = true;
   // Soft key light for the diorama's miniature shadows.
   const sun = new DirectionalLight('#ffe0b0', 1.7); // warm, low Mediterranean sun
   sun.position.set(0.6, 2.2, 0.4);

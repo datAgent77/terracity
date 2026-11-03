@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { buildPlan, key, open, snap } from './helpers';
 
-type Split = { open: boolean; t: number; boardVisible: boolean | null; selected: 'A' | 'B' | null; built: string };
+type Split = { open: boolean; t: number; boardVisible: boolean | null; selected: 'A' | 'B' | null; built: string; comparison: string };
 const split = (page: import('@playwright/test').Page) =>
   page.evaluate(() => (window as unknown as { __terracity: { split(): Split } }).__terracity.split());
 const settled = (page: import('@playwright/test').Page) =>
@@ -26,6 +26,9 @@ test('split reality: two futures from the same plan, editing blocked, merge rest
   expect(s.boardVisible).toBe(false);
   expect(s.built).toMatch(/^2050\|Your plan:.+\|If nobody plans:$/); // left: your plan, right: nobody plans
   expect(await year(page)).toBe(2050);
+  // One compact comparison between the futures, from the simulation (A | B per row).
+  await page.waitForFunction(() => (window as unknown as { __terracity: { split(): Split } }).__terracity.split().comparison !== '');
+  expect((await split(page)).comparison).toMatch(/^2050\|Housed:[\d,]+\/[\d,]+:(A|B|tie)\|Nature/);
 
   // Editing is blocked while split; the clock does not run.
   const t0 = (await snap(page)).timeLeft;
@@ -42,6 +45,8 @@ test('split reality: two futures from the same plan, editing blocked, merge rest
   expect(await year(page)).toBe(2026);
   const after = JSON.stringify((await snap(page)).placements ?? (await page.evaluate(() => (window as unknown as { __terracity: { game: { placements: unknown } } }).__terracity.game.placements)));
   expect(after).toBe(before);
+  // Merging is explained: it closes the comparison, it never combines plans.
+  expect(String((await snap(page)).statusText ?? (await page.evaluate(() => (window as unknown as { __terracity: { statusText: { value: string } } }).__terracity.statusText.value)))).toMatch(/only a comparison/);
 
   // With a saved Plan A the futures are Plan A (left) and Plan B (right).
   await key(page, 'KeyS');
@@ -51,6 +56,7 @@ test('split reality: two futures from the same plan, editing blocked, merge rest
   expect((await split(page)).built).toMatch(/\|Plan A:.+\|Plan B \(now\):.+/);
   await key(page, 'KeyV');
   await settled(page);
+  expect(await page.evaluate(() => (window as unknown as { __terracity: { statusText: { value: string } } }).__terracity.statusText.value)).toMatch(/never combined/);
 });
 
 test('become small: enter each future at the same place, return to the futures, merge; plan unchanged', async ({ page }) => {

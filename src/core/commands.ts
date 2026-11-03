@@ -351,7 +351,10 @@ export function openFutures(): void {
 export function closeFutures(): void {
   if (!futuresOpen.peek()) return;
   futuresOpen.value = null;
-  statusText.value = 'One world again. Your plan is unchanged.';
+  // Merging closes the comparison; it never combines two plans.
+  statusText.value = planA.peek()
+    ? 'One world again: you are back on Plan B, your current map. Plans are compared, never combined; Restore A brings Plan A back.'
+    : 'One world again: your plan, unchanged. The other future was only a comparison.';
 }
 
 export function toggleFutures(): void {

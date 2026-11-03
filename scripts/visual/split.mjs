@@ -35,8 +35,14 @@ await page.screenshot({ path: out('1-one-world') });
 
 // Desktop fallback: the Plan pad button.
 await ui('actions-panel', 'btn-split');
-await page.waitForTimeout(350);
-await page.screenshot({ path: out('2-splitting') });
+// The transition is ~0.8 s; software rendering takes few frames, so freeze it for the evidence.
+for (const [t, name] of [[0.05, '2a-seam'], [0.35, '2b-parting'], [0.65, '2c-apart']]) {
+  await page.evaluate((t) => window.__terracity.splitFreeze(t), t);
+  await frames(6);
+  await page.screenshot({ path: out(name) });
+}
+await page.evaluate(() => window.__terracity.splitFreeze(null));
+await frames(4);
 await settle();
 log.push(`desktop split: ${JSON.stringify(await split())}`);
 await page.screenshot({ path: out('3-two-futures-2050') });
