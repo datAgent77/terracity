@@ -31,6 +31,7 @@ desktop + IWER, stereo): these are the scene's cost, **not** frame times.
 | P2 | Reference plan, 2050 | | | | |
 | P3 | Two futures apart (Split) | | | | |
 | P4 | Two futures + Causality Vision (rings, card) | | | | |
+| P4b | Reality Seam open, seam swept across the board | | | | |
 | P5 | Street, your plan, Mira talking | | | | |
 | P6 | Street, nobody plans (sprawl, haze) | | | | |
 | P7 | Transitions: split, enter street, return, merge — hitches? (stale frames) | — | | | |
@@ -64,6 +65,8 @@ desktop + IWER, stereo): these are the scene's cost, **not** frame times.
 | H8 | Pinch Mira / Talk to Mira, Next / Back / End | ≥ 9/10 | |
 | H9 | Pinch a POI board ("why?") opens / closes it | ≥ 9/10 | |
 | H10 | Hands near the board while placing do not trigger UI | no false presses | |
+| H11 | Reality Seam: pinch the golden handle on the near edge and sweep left / right | seam follows the hand smoothly, ≥ 9/10 grabs | |
+| H12 | Reality Seam: release, then grab again; no accidental grabs of the futures | seam stays where released | |
 
 ## 4. Controllers (hands off)
 

@@ -39,6 +39,12 @@ export const detailsOpen = signal(false);
 export const timeScrub = signal<number | null>(null);
 /** "Split reality": two futures held side by side (null = one world on the table). */
 export const futuresOpen = signal<{ selected: 'A' | 'B' | null } | null>(null);
+/**
+ * Reality Seam: while the two futures are open, they can lie on the table at
+ * the same place with a movable boundary; `u` (0..1, west to east) is where
+ * Future A (left) gives way to Future B (right). null = side by side.
+ */
+export const seamPos = signal<number | null>(null);
 /** "Enter your city": the garden district being visited at street level (null = tabletop). */
 export const streetView = signal<{
   id: string;

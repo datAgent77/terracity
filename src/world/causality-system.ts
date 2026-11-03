@@ -37,6 +37,7 @@ import type { Year } from '../config/projection.js';
 import { prefersReducedMotion } from '../ui/accessibility.js';
 import { tileCenter, tileTopY } from './board-coords.js';
 import { futurePair } from './futures.js';
+import { seamClipPlanes } from './split-system.js';
 import { tileAt } from './terrain-map.js';
 import type { Placement } from '../simulation/metrics.js';
 
@@ -296,6 +297,8 @@ export class CausalitySystem extends createSystem({}) {
     const ring = (parent: Object3D | undefined, col: number, row: number, gain: boolean) => {
       if (!parent) return;
       const m = new Mesh(this.miniRingGeo, new MeshBasicMaterial({ color: gain ? GAIN : COST, transparent: true, opacity: 0.85, depthWrite: false, blending: AdditiveBlending }));
+      // Cut by the same seam as the future it marks (Reality Seam).
+      (m.material as MeshBasicMaterial).clippingPlanes = [seamClipPlanes[parent === find('A') ? 'A' : 'B']];
       m.position.copy(this.local(col, row, 0.006));
       m.raycast = () => {};
       m.renderOrder = 4;

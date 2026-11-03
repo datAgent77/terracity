@@ -30,12 +30,14 @@ import {
   Plane,
   RingGeometry,
   SRGBColorSpace,
+  SphereGeometry,
   Vector3,
 } from '@iwsdk/core';
 import { BOARD_CENTER, GRID_COLS, TILE_SIZE } from '../config/scenario.js';
 import { sfx } from '../audio/sfx.js';
 import * as cmd from '../core/commands.js';
-import { futuresOpen, game, outroOpen, phase, planA, streetView, tutorial, viewYear } from '../core/session.js';
+import { futuresOpen, game, outroOpen, phase, planA, seamPos, streetView, tutorial, viewYear } from '../core/session.js';
+import { localXFromSeam, seamFromLocalX, seamReport } from '../interactions/reality-seam.js';
 import { Placeable } from '../interactions/placeable-component.js';
 import { initialGesture, stepGesture, type GestureState, type HandSample, type Vec3 } from '../interactions/two-hand-gesture.js';
 import { checkTargets, projectYear } from '../simulation/projection.js';
@@ -54,10 +56,19 @@ const OPEN_TIME = 0.8;
 const ENTER_DISTANCE = 0.35;
 /** Duration (s) of the dive into a future. */
 const DIVE_TIME = 0.45;
+/** Reality Seam: height of the handle and of the ray / mouse drag surface above the board centre. */
+const SEAM_KNOB_Y = 0.05;
+const SEAM_DRAG_Y = 0.045;
 const BOARD_W = GRID_COLS * TILE_SIZE;
 const BOARD_D = 10 * TILE_SIZE;
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
+
+/**
+ * Clipping planes of the two futures (shared so that anything drawn on a
+ * future, e.g. Causality Vision rings, is cut by the same seam).
+ */
+export const seamClipPlanes: Record<Side, Plane> = { A: new Plane(new Vector3(-1, 0, 0), 0), B: new Plane(new Vector3(1, 0, 0), 0) };
 
 export class SplitSystem extends createSystem({
   placeables: { required: [Placeable] },
@@ -104,7 +115,7 @@ export class SplitSystem extends createSystem({
       streetView.subscribe((v) => {
         if (!futuresOpen.peek()) return;
         // Inside a future the miniatures are hidden and must not catch rays.
-        this.setPickable(!v);
+        this.setPickable(!v && seamPos.peek() === null);
         for (const side of ['A', 'B'] as Side[]) {
           const r = this.sides[side]?.root;
           if (r) r.visible = !v;
@@ -119,11 +130,31 @@ export class SplitSystem extends createSystem({
       planA.subscribe(() => {
         if (futuresOpen.peek()) this.buildFutures();
       }),
+      // Reality Seam: lay both futures on the table, aligned; side by side again when closed.
+      seamPos.subscribe((u) => {
+        if (!futuresOpen.peek()) return;
+        this.target = u === null ? 1 : 0;
+        if (prefersReducedMotion()) {
+          this.t = this.target;
+          this.layout();
+        }
+        this.setPickable(u === null && !streetView.peek());
+        this.updateClipping();
+      }),
     );
+    this.buildSeam();
 
     const hook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
     /** Test hook: select a future (what a pinch / tap on it does). */
     hook.selectFuture = (side: Side) => cmd.selectFuture(side);
+    /** Page pixel of the seam drag surface at seam position u (desktop drag tests). */
+    hook.seamToScreen = (u: number) => {
+      const v = new Vector3(BOARD_CENTER[0] + localXFromSeam(u), BOARD_CENTER[1] + SEAM_DRAG_Y, BOARD_CENTER[2] + BOARD_D * 0.25).project(this.world.camera);
+      const r = this.world.renderer.domElement.getBoundingClientRect();
+      return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+    };
+    /** World position of the seam handle at u (hand tests). */
+    hook.seamHandleAt = (u: number) => [BOARD_CENTER[0] + localXFromSeam(u), BOARD_CENTER[1] + SEAM_KNOB_Y, BOARD_CENTER[2] + BOARD_D / 2 + 0.03];
     /** Visual evidence only: freeze the split transition at t (0..1); null resumes. */
     hook.splitFreeze = (t: number | null) => {
       this.frozen = t;
@@ -148,6 +179,10 @@ export class SplitSystem extends createSystem({
       diving: this.diving?.side ?? null,
       grabbable: (['A', 'B'] as Side[]).filter((x) => this.sides[x]?.entity.hasComponent(OneHandGrabbable)),
       hands: this.hands().map((h) => (h.pos ? h.pos.map((v) => +v.toFixed(3)) : null)),
+      seam: seamPos.peek(),
+      seamVisible: this.seamGroup?.visible ?? false,
+      seamReport: this.seamKey,
+      seamHeld: this.seamHandleEntity?.hasComponent(Grabbed) ?? false,
       /** World centres of the two futures (for hand-ray tests). */
       centres: (['A', 'B'] as Side[]).map((s) => this.sides[s]?.root.getWorldPosition(new Vector3()).toArray() ?? null),
     });
@@ -228,8 +263,14 @@ export class SplitSystem extends createSystem({
     ctx.fillStyle = fg;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = `bold ${size}px system-ui, sans-serif`;
-    lines.forEach((l, i) => ctx.fillText(l, w / 2, h / 2 + (i - (lines.length - 1) / 2) * size * 1.15));
+    // Shrink to fit the widest line (never cut a sentence).
+    let px = size;
+    ctx.font = `bold ${px}px system-ui, sans-serif`;
+    while (px > 18 && Math.max(...lines.map((l) => ctx.measureText(l).width)) > w - 60) {
+      px -= 2;
+      ctx.font = `bold ${px}px system-ui, sans-serif`;
+    }
+    lines.forEach((l, i) => ctx.fillText(l, w / 2, h / 2 + (i - (lines.length - 1) / 2) * px * 1.15));
     c.tex.needsUpdate = true;
   }
 
@@ -367,7 +408,7 @@ export class SplitSystem extends createSystem({
 
   // ---------------------------------------------- split moment, comparison --
 
-  private clipPlanes: Record<Side, Plane> = { A: new Plane(new Vector3(-1, 0, 0), 0), B: new Plane(new Vector3(1, 0, 0), 0) };
+  private clipPlanes = seamClipPlanes;
   private clipMats: Material[] = [];
 
   /** Give a future its own material copies, clipped to its half while splitting. */
@@ -395,7 +436,9 @@ export class SplitSystem extends createSystem({
    * overlap. Once apart, clipping is off.
    */
   private updateClipping(): void {
-    const seam = BOARD_CENTER[0];
+    // Reality Seam: the boundary sits where the user put it; else the middle.
+    const u = seamPos.peek();
+    const seam = BOARD_CENTER[0] + (u === null ? 0 : localXFromSeam(u));
     const off = this.t >= 1 ? 1e3 : 0;
     this.clipPlanes.A.set(new Vector3(-1, 0, 0), seam + off);
     this.clipPlanes.B.set(new Vector3(1, 0, 0), -seam + off);
@@ -573,6 +616,127 @@ export class SplitSystem extends createSystem({
     }
   }
 
+  // ------------------------------------------------------- reality seam --
+
+  private seamGroup!: Group;
+  private seamKnob!: Mesh;
+  private seamDrag!: Mesh;
+  private seamHandle!: Mesh;
+  private seamHandleEntity!: Entity;
+  private seamLabel!: { mesh: Mesh; ctx: CanvasRenderingContext2D; tex: CanvasTexture; key: string };
+  private seamTags!: Record<Side, { mesh: Mesh; ctx: CanvasRenderingContext2D; tex: CanvasTexture; key: string }>;
+  private seamKey = '';
+  private seamDragging = false;
+
+  /**
+   * The seam: a thin wall of light across the table, a golden handle on the
+   * near edge (pinch it and move your hand sideways), a drag surface for rays
+   * and the mouse, labels for the two sides, and a line that says what differs
+   * in the column under the seam (from the two projections only).
+   */
+  private buildSeam(): void {
+    const g = new Group();
+    g.name = 'reality-seam';
+    g.visible = false;
+    const wallMat = new MeshBasicMaterial({ color: '#fff3d1', transparent: true, opacity: 0.35, depthWrite: false, blending: AdditiveBlending });
+    const wall = new Mesh(new BoxGeometry(0.0025, 0.07, BOARD_D + 0.02).translate(0, 0.035, 0), wallMat);
+    const edge = new Mesh(new BoxGeometry(0.0012, 0.0012, BOARD_D + 0.02).translate(0, 0.07, 0), new MeshBasicMaterial({ color: '#ffffff' }));
+    this.seamKnob = new Mesh(new SphereGeometry(0.012, 16, 12), new MeshBasicMaterial({ color: '#ffd36b' }));
+    this.seamKnob.position.set(0, SEAM_KNOB_Y, BOARD_D / 2 + 0.03);
+    const halo = new Mesh(new SphereGeometry(0.02, 16, 12), new MeshBasicMaterial({ color: '#ffe6a6', transparent: true, opacity: 0.3, depthWrite: false, blending: AdditiveBlending }));
+    this.seamKnob.add(halo);
+    const stem = new Mesh(new BoxGeometry(0.002, 0.002, 0.03).translate(0, SEAM_KNOB_Y, BOARD_D / 2 + 0.015), new MeshBasicMaterial({ color: '#ffd36b' }));
+    for (const o of [wall, edge, this.seamKnob, halo, stem]) o.raycast = () => {};
+    g.add(wall, edge, this.seamKnob, stem);
+    // Labels: which future is on which side, and what the seam reveals.
+    const shown = (c: { mesh: Mesh }) => {
+      // Seam labels are always readable while the seam is: full opacity, on top.
+      (c.mesh.material as MeshBasicMaterial).opacity = 1;
+      (c.mesh.material as MeshBasicMaterial).depthTest = false;
+      c.mesh.visible = true;
+      c.mesh.renderOrder = 9;
+    };
+    // What differs under the seam: in front of the near edge, below the handle (never over the panels).
+    this.seamLabel = this.card(1300, 230);
+    shown(this.seamLabel);
+    this.seamLabel.mesh.scale.setScalar(0.06);
+    this.seamLabel.mesh.position.set(0, -0.005, BOARD_D / 2 + 0.11);
+    g.add(this.seamLabel.mesh);
+    this.seamTags = { A: this.card(700, 120), B: this.card(700, 120) };
+    for (const side of ['A', 'B'] as Side[]) {
+      shown(this.seamTags[side]);
+      this.seamTags[side].mesh.scale.setScalar(0.035);
+      g.add(this.seamTags[side].mesh);
+    }
+    this.world.scene.add(g);
+    this.seamGroup = g;
+
+    // Hand: an invisible pinchable handle that rides on the knob.
+    this.seamHandle = new Mesh(new SphereGeometry(0.035, 10, 8), new MeshBasicMaterial({ visible: false }));
+    this.seamHandle.name = 'reality-seam-handle';
+    this.seamHandleEntity = this.world.createTransformEntity(this.seamHandle);
+    this.seamHandleEntity.addComponent(OneHandGrabbable, { rotate: false });
+
+    // Ray / mouse: press anywhere over the table to bring the seam there, drag to move it.
+    this.seamDrag = new Mesh(new PlaneGeometry(BOARD_W + 0.06, BOARD_D + 0.06).rotateX(-Math.PI / 2), new MeshBasicMaterial({ visible: false }));
+    this.seamDrag.name = 'reality-seam-surface';
+    this.seamDrag.position.set(BOARD_CENTER[0], BOARD_CENTER[1] + SEAM_DRAG_Y, BOARD_CENTER[2]);
+    const dragEntity = this.world.createTransformEntity(this.seamDrag);
+    dragEntity.addComponent(RayInteractable);
+    const toU = (p: Vector3) => seamFromLocalX(p.x - BOARD_CENTER[0]);
+    this.seamDrag.addEventListener('pointerdown' as never, ((e: { point: Vector3; pointerId?: number; target?: { setPointerCapture?(id: number): void } }) => {
+      if (!this.seamGroup.visible) return;
+      if (e.pointerId !== undefined) e.target?.setPointerCapture?.(e.pointerId);
+      this.seamDragging = true;
+      cmd.setSeam(toU(e.point));
+    }) as never);
+    this.seamDrag.addEventListener('pointermove' as never, ((e: { point: Vector3 }) => {
+      if (this.seamDragging) cmd.setSeam(toU(e.point));
+    }) as never);
+    const end = () => (this.seamDragging = false);
+    this.seamDrag.addEventListener('pointerup' as never, end as never);
+    window.addEventListener('pointerup', end);
+    this.cleanupFuncs.push(() => window.removeEventListener('pointerup', end));
+    this.seamDrag.raycast = () => {};
+  }
+
+  private stepSeam(): void {
+    const u = seamPos.peek();
+    const on = u !== null && !!futuresOpen.peek() && !streetView.peek() && this.t < 0.05 && !this.diving;
+    if (on !== this.seamGroup.visible) {
+      this.seamGroup.visible = on;
+      this.seamDrag.raycast = on ? Mesh.prototype.raycast : () => {};
+    }
+    const held = this.seamHandleEntity.hasComponent(Grabbed);
+    if (!on) {
+      if (!held) this.seamHandle.position.set(0, -10, 0); // out of reach
+      return;
+    }
+    // The hand moves the seam sideways (only x matters; the handle snaps back to the knob on release).
+    if (held) cmd.setSeam(seamFromLocalX(this.seamHandle.getWorldPosition(new Vector3()).x - BOARD_CENTER[0]));
+    const x = localXFromSeam(seamPos.peek()!);
+    this.seamGroup.position.set(BOARD_CENTER[0] + x, BOARD_CENTER[1], BOARD_CENTER[2]);
+    if (!held) this.seamHandle.position.copy(this.seamKnob.getWorldPosition(new Vector3()));
+    // Side labels sit just either side of the seam, over the far edge.
+    const cam = this.world.camera.getWorldPosition(new Vector3());
+    for (const side of ['A', 'B'] as Side[]) {
+      const m = this.seamTags[side].mesh;
+      m.position.set(side === 'A' ? -0.115 : 0.115, 0.06, -BOARD_D / 2 + 0.02);
+      m.lookAt(cam);
+    }
+    this.seamLabel.mesh.lookAt(cam);
+    // What differs under the seam (recomputed only when the column, year or plans change).
+    const pair = futurePair(planA.peek(), game.placements, viewYear.peek());
+    const rep = seamReport(game.terrain, pair.A.plan, pair.B.plan, pair.year, seamPos.peek()!, { A: pair.A.title, B: pair.B.title });
+    const key = `${rep.lines.join("|")}`;
+    if (key !== this.seamKey) {
+      this.seamKey = key;
+      this.paintCard(this.seamLabel, rep.lines, 46, 'rgba(15,42,48,0.85)', '#ffffff');
+      this.paintCard(this.seamTags.A, [`< A  ${pair.A.title}`], 52, 'rgba(15,42,48,0.8)', '#8fd3ff');
+      this.paintCard(this.seamTags.B, [`B  ${pair.B.title} >`], 52, 'rgba(15,42,48,0.8)', '#ffd36b');
+    }
+  }
+
   private setPickable(on: boolean): void {
     for (const side of ['A', 'B'] as Side[]) {
       const h = this.sides[side]?.hit;
@@ -653,6 +817,7 @@ export class SplitSystem extends createSystem({
       }
     }
     this.stepGesture(delta);
+    this.stepSeam();
     this.stepCards(delta);
     this.stepHeld(delta);
     this.stepDive(delta);
@@ -667,7 +832,7 @@ export class SplitSystem extends createSystem({
       // The seam glows while the halves part; a ring of light runs over the table when they are apart.
       if (this.target === 1) this.fractureGlow = Math.max(this.fractureGlow, 1 - this.t * 1.6);
       if (was < 1 && this.t === 1 && !prefersReducedMotion()) this.pulseT = 0;
-      if (this.t === 0 && this.target === 0) {
+      if (this.t === 0 && this.target === 0 && seamPos.peek() === null) {
         this.futures.visible = false;
         this.disposeFutures();
         this.builtKey = '';

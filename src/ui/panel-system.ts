@@ -22,7 +22,7 @@ import {
   viewYear,
 } from '../core/session.js';
 import { formatClock } from '../gameplay/challenge.js';
-import { causalityOn, coachText, detailsOpen, futuresOpen, streetView, tutorial } from '../core/session.js';
+import { causalityOn, coachText, detailsOpen, futuresOpen, seamPos, streetView, tutorial } from '../core/session.js';
 import { cycleSound, largeText, prefersReducedMotion, soundLevel } from './accessibility.js';
 import { onHover, pulse } from './hover.js';
 import { viewLabel } from './view-label.js';
@@ -36,7 +36,7 @@ const ARMED_BG = '#ffd36b';
 const IDLE_BG = 'rgba(0,0,0,0)';
 const ACTION_IDS = [
   'btn-undo', 'btn-redo', 'btn-rotate', 'btn-remove', 'btn-restart',
-  'btn-save-a', 'btn-restore-a', 'btn-compare', 'btn-pause', 'btn-finish', 'btn-split', 'btn-enter', 'btn-why', 'btn-replay',
+  'btn-save-a', 'btn-restore-a', 'btn-compare', 'btn-pause', 'btn-finish', 'btn-split', 'btn-enter', 'btn-why', 'btn-replay', 'btn-seam',
 ];
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
@@ -111,6 +111,7 @@ export class PanelSystem extends createSystem({}) {
         phase: phase.value,
         year: viewYear.value,
         futuresOpen: !!futuresOpen.value,
+        seam: seamPos.value !== null,
         hasSaved: !!planA.value,
         street: st ? st.plan : null,
       }).text;
@@ -121,7 +122,7 @@ export class PanelSystem extends createSystem({}) {
     this.cleanupFuncs.push(
       () => window.removeEventListener('terracity-relayout', relayout),
       detailsOpen.subscribe(apply),
-      ...[futuresOpen, streetView, planA, phase, viewYear].map((s) => (s as { subscribe(f: () => void): () => void }).subscribe(paintMode)),
+      ...[futuresOpen, streetView, planA, phase, viewYear, seamPos].map((s) => (s as { subscribe(f: () => void): () => void }).subscribe(paintMode)),
     );
   }
 
@@ -300,6 +301,7 @@ export class PanelSystem extends createSystem({}) {
       'btn-finish': () => cmd.finishGame(),
       'btn-enter': () => (futuresOpen.peek() ? cmd.enterFuture(futuresOpen.peek()!.selected ?? 'A') : cmd.enterCity()),
       'btn-split': cmd.toggleFutures,
+      'btn-seam': cmd.toggleSeam,
       'btn-why': () => (causalityOn.value = !causalityOn.peek()),
     };
     const buttons = new Map<string, Settable>();
@@ -314,6 +316,7 @@ export class PanelSystem extends createSystem({}) {
     const splitLabel = panel.getElementById<UIKit.Text>('split-label');
     const enterLabel = panel.getElementById<UIKit.Text>('enter-label');
     const whyLabel = panel.getElementById<UIKit.Text>('why-label');
+    const seamLabel = panel.getElementById<UIKit.Text>('seam-label');
     const dim = (id: string, on: boolean) => buttons.get(id)?.setProperties({ opacity: on ? 1 : 0.4 });
     const refresh = () => {
       const editing = phase.value === 'building' && viewYear.value === 2026 && !paused.value;
@@ -330,13 +333,16 @@ export class PanelSystem extends createSystem({}) {
       buttons.get('btn-split')?.setProperties({ backgroundColor: tutorial.active && tutorial.step === 'split' ? '#b87500' : undefined });
       pauseLabel?.setProperties({ text: paused.value ? 'Resume' : 'Pause' });
       splitLabel?.setProperties({ text: futuresOpen.value ? 'Merge the futures' : 'Split into two futures' });
+      // Contextual: the seam belongs to the comparison of the two futures.
+      buttons.get('btn-seam')?.setProperties({ display: futuresOpen.value ? 'flex' : 'none', backgroundColor: seamPos.value !== null ? '#0f7a6f' : undefined });
+      seamLabel?.setProperties({ text: seamPos.value !== null ? 'Side by side' : 'Reality Seam' });
       whyLabel?.setProperties({ text: causalityOn.value ? 'Hide causality' : 'Why? Causality Vision' });
       buttons.get('btn-why')?.setProperties({ backgroundColor: causalityOn.value ? '#0f7a6f' : tutorial.active && tutorial.step === 'why' ? '#b87500' : undefined });
       dim('btn-split', phase.value !== 'intro');
       dim('btn-enter', !!futuresOpen.value || game.placements.some((p) => p.type === 'residential'));
       enterLabel?.setProperties({ text: futuresOpen.value ? `Enter future ${futuresOpen.value.selected ?? 'A'}` : 'Enter your city' });
     };
-    for (const s of [planVersion, phase, viewYear, paused, planA, coachText, futuresOpen, causalityOn] as const) {
+    for (const s of [planVersion, phase, viewYear, paused, planA, coachText, futuresOpen, causalityOn, seamPos] as const) {
       this.cleanupFuncs.push((s as { subscribe(f: () => void): () => void }).subscribe(refresh));
     }
   }

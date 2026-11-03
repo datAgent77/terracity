@@ -8,6 +8,7 @@ import { StructureType } from '../config/scenario.js';
 import { STRUCTURES } from '../config/structures.js';
 import { projectYear } from '../simulation/projection.js';
 import { futurePair } from '../world/futures.js';
+import { clampSeam, stepSeam } from '../interactions/reality-seam.js';
 import { GARDEN_VIEWPOINT, nextViewpoint } from '../world/street-view.js';
 import {
   armedType,
@@ -22,6 +23,7 @@ import {
   selectedId,
   statusText,
   futuresOpen,
+  seamPos,
   causalityOn,
   miraTalked,
   outroOpen,
@@ -398,11 +400,44 @@ export function openFutures(): void {
 
 export function closeFutures(): void {
   if (!futuresOpen.peek()) return;
+  seamPos.value = null;
   futuresOpen.value = null;
   // Merging closes the comparison; it never combines two plans.
   statusText.value = planA.peek()
     ? 'One world again: you are back on your plan. Plans are compared, never combined; Restore saved brings the saved plan back.'
     : 'One world again: your plan, unchanged. The other future was only a comparison.';
+}
+
+/**
+ * Reality Seam on / off: lay the two futures on the table at the same place,
+ * divided by a movable seam (opens the futures first if needed). Off: back
+ * to side by side.
+ */
+export function toggleSeam(): void {
+  if (streetView.peek() || phase.peek() === 'intro') return;
+  if (seamPos.peek() !== null) {
+    seamPos.value = null;
+    statusText.value = 'The two futures side by side again.';
+    return;
+  }
+  if (!futuresOpen.peek()) openFutures();
+  if (!futuresOpen.peek()) return;
+  seamPos.value = 0.5;
+  statusText.value = planA.peek()
+    ? 'Reality Seam: your plan on the left of the seam, the saved plan on the right. Pinch the glowing handle (or drag, or use the arrow keys) to move it.'
+    : 'Reality Seam: your plan on the left of the seam, the same place if nobody plans on the right. Pinch the glowing handle (or drag, or use the arrow keys) to move it.';
+}
+
+/** Move the seam (0..1 across the board). */
+export function setSeam(u: number): void {
+  if (seamPos.peek() === null) return;
+  const v = clampSeam(u);
+  if (v !== seamPos.peek()) seamPos.value = v;
+}
+
+export function nudgeSeam(dir: -1 | 1): void {
+  const u = seamPos.peek();
+  if (u !== null) setSeam(stepSeam(u, dir));
 }
 
 export function toggleFutures(): void {

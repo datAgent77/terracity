@@ -10,7 +10,7 @@ import { game } from '../core/session.js';
 import { projectYear } from '../simulation/projection.js';
 import type { Year } from '../config/projection.js';
 import { cycleSound, largeText, soundOn } from '../ui/accessibility.js';
-import { challenge, coachText, outroOpen, compareOpen, planVersion, causalityOn, detailsOpen, futuresOpen, paused, phase, planA, result, streetView, timeLeft, viewYear } from '../core/session.js';
+import { challenge, coachText, outroOpen, seamPos, compareOpen, planVersion, causalityOn, detailsOpen, futuresOpen, paused, phase, planA, result, streetView, timeLeft, viewYear } from '../core/session.js';
 
 
 export class FlowSystem extends createSystem({}) {
@@ -67,6 +67,10 @@ export class FlowSystem extends createSystem({}) {
       return; // tabletop shortcuts are off while visiting the street
     }
     if (kb.getKeyDown('KeyV')) cmd.toggleFutures();
+    if (seamPos.peek() !== null) {
+      if (kb.getKeyDown('ArrowRight')) cmd.nudgeSeam(1);
+      if (kb.getKeyDown('ArrowLeft')) cmd.nudgeSeam(-1);
+    }
     if (kb.getKeyDown('KeyT')) cmd.nextYear();
     if (kb.getKeyDown('KeyS')) cmd.savePlanA();
     if (kb.getKeyDown('KeyC')) cmd.toggleCompare();
@@ -74,6 +78,7 @@ export class FlowSystem extends createSystem({}) {
     if (kb.getKeyDown('KeyF')) cmd.finishGame();
     if (kb.getKeyDown('KeyH')) cmd.toggleTips();
     if (kb.getKeyDown('KeyI')) cmd.replayIntro();
+    if (kb.getKeyDown('KeyG')) cmd.toggleSeam();
     if (kb.getKeyDown('KeyN')) (window as unknown as { __terracity?: { nextCause?(): void } }).__terracity?.nextCause?.();
     if (kb.getKeyDown('KeyL')) largeText.value = !largeText.peek();
     if (kb.getKeyDown('KeyM')) cycleSound();

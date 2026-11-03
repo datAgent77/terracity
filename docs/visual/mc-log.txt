@@ -1,0 +1,12 @@
+seam open: u=0.5 t=0 report=Under the seam: the same in both futures
+mode: 0.5
+mouse drag -> u=0.300 report=Under the seam: the same in both futures
+arrows -> u=0.464 report=A Your plan: homes x2, road, open land
+vision: miniMarks=10 card=Why the two futures differ in 2050
+side by side: seam=null t=1
+merged: board=true planUnchanged=true
+xr pinch on handle: held=true
+xr hand drag -> u=0.738 held=true
+xr released: u=0.738 held=false
+xr stats: {"calls":128,"triangles":254432,"geometries":172,"textures":36,"objects":952,"meshes":755,"jsHeapMB":190,"transparent":49}
+page errors: 0 

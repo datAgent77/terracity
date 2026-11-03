@@ -126,3 +126,45 @@ test('save / reload: Plan A and the current map survive a reload; the two future
   await settled(page);
   expect((await split(page)).built).toBe(before); // same Plan A, same Plan B, same futures
 });
+
+test('reality seam: both futures aligned on the table, a movable boundary (mouse, keys), what differs under it; plan unchanged', async ({ page }) => {
+  test.setTimeout(150_000);
+  type Sp = { open: boolean; t: number; seam: number | null; seamVisible: boolean; seamReport: string; boardVisible: boolean };
+  const sp = () => page.evaluate(() => (window as unknown as { __terracity: { split(): Sp } }).__terracity.split());
+  await open(page);
+  await buildPlan(page, [[5, 6, 3], [1, 6, 4], [1, 6, 2]]);
+  const before = await page.evaluate(() => JSON.stringify((window as unknown as { __terracity: { placements(): unknown } }).__terracity.placements()));
+  // From the tabletop, the seam opens the futures and lays them on the table.
+  await key(page, 'KeyG');
+  await page.waitForFunction(() => (window as unknown as { __terracity: { split(): Sp } }).__terracity.split().seamVisible);
+  let s = await sp();
+  expect(s).toMatchObject({ open: true, t: 0, seam: 0.5, boardVisible: false });
+  expect(await page.evaluate(() => (window as unknown as { __terracity: { viewYear: { value: number } } }).__terracity.viewYear.value)).toBe(2050);
+
+  // Mouse: drag it west.
+  const at = (u: number) => page.evaluate((v) => (window as unknown as { __terracity: { seamToScreen(u: number): { x: number; y: number } } }).__terracity.seamToScreen(v), u);
+  const a = await at(0.5);
+  const b = await at(0.25);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  for (let k = 1; k <= 5; k++) await page.mouse.move(a.x + ((b.x - a.x) * k) / 5, a.y + ((b.y - a.y) * k) / 5);
+  await page.mouse.up();
+  s = await sp();
+  expect(s.seam!).toBeGreaterThan(0.2);
+  expect(s.seam!).toBeLessThan(0.3);
+
+  // Keys: onto column 6, where your neighbourhoods stand.
+  while (Math.floor((await sp()).seam! * 14) < 6) await key(page, 'ArrowRight');
+  s = await sp();
+  expect(Math.floor(s.seam! * 14)).toBe(6);
+  expect(s.seamReport).toMatch(/^A Your plan: .*homes.*\|B If nobody plans: /);
+
+  // Side by side again, then merge: the plan never changed.
+  await key(page, 'KeyG');
+  await page.waitForFunction(() => (window as unknown as { __terracity: { split(): Sp } }).__terracity.split().t === 1);
+  expect((await sp()).seam).toBeNull();
+  await key(page, 'KeyV');
+  await page.waitForFunction(() => { const x = (window as unknown as { __terracity: { split(): Sp } }).__terracity.split(); return !x.open && x.t === 0; });
+  expect((await sp()).boardVisible).toBe(true);
+  expect(await page.evaluate(() => JSON.stringify((window as unknown as { __terracity: { placements(): unknown } }).__terracity.placements()))).toBe(before);
+});

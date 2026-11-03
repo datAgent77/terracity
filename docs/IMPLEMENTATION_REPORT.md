@@ -136,3 +136,62 @@ the two miniature futures are static (no pulses there).
 **11. Acceptance**: met for B — every shown claim comes from ledger
 differences, regional changes carry all their sources, explanations are
 year-specific, causes are inspectable one by one, regression tests pass.
+
+## Milestone C — Reality Seam
+
+**1. Implemented**: [XR_INTERACTION_SPEC.md](XR_INTERACTION_SPEC.md). Both
+futures lie on the table aligned tile for tile; a movable boundary shows
+Future A west of it and Future B east of it. Hand pinch on a golden handle,
+ray / mouse drag over the table, ← / → keys, and a contextual Plan-pad button
+(only while the futures are open); G toggles. Under the near edge, a two-line
+label says what differs in the column under the seam, from the two
+projections only. Causality Vision rings on the futures are cut by the same
+seam. The HUD mode line names it ("Reality Seam: A Your plan | B … - 2050
+projection").
+
+**2. Files changed**: `src/interactions/reality-seam.ts` (new),
+`src/world/split-system.ts`, `src/world/causality-system.ts`,
+`src/core/session.ts`, `src/core/commands.ts`, `src/gameplay/flow-system.ts`,
+`src/ui/panel-system.ts`, `src/ui/view-label.ts`, `public/ui/actions.uikitml`;
+tests `tests/unit/reality-seam.test.ts`, `tests/e2e/split.spec.ts`;
+`scripts/visual/reality-seam.mjs`; docs above + checklist rows H11–H12, P4b.
+
+**3. Bugs found while building it**: seam labels were created invisible and
+transparent (shared card factory) — given full opacity; the comparison strip
+sat on the board in seam mode — hidden there (the seam label replaces it);
+long seam lines were cut — text now shrinks to fit.
+
+**4. Tests**: unit `reality-seam.test.ts` (4: mapping both ways and clamping,
+one-column steps, report grounded in the plans and sprawl, identical plans →
+no difference anywhere); e2e "reality seam" (open from the tabletop, mouse
+drag, keys onto your neighbourhoods, report text, side by side, merge, plan
+unchanged); IWER hand pass in `reality-seam.mjs` (pinch handle, sweep,
+release).
+
+Evidence: `docs/visual/mc-1-seam-middle.png`, `mc-2-seam-dragged-west.png`,
+`mc-3-seam-causality.png`, `mc-4-xr-hand-drag.png`, `mc-log.txt`.
+
+**5–6. Results (clean run)**
+
+| Check | Status |
+|---|---|
+| `tsc --noEmit` | PASS |
+| Unit (213) | PASS |
+| E2E desktop (36 passed, 4 skipped env-gated) incl. "reality seam" | PASS |
+| IWER hand scripts xr-phase1/2/3 | PASS (emulator) |
+| IWER Reality Seam hand pinch-drag (pinch held, u 0.50 → 0.74, release keeps it) | PASS (emulator) |
+| Production build | PASS |
+
+**7. Desktop**: PASS. **8. XR**: IWER PASS (hand); controller and Quest NOT TESTED.
+
+**Performance (IWER, not a Quest)**: seam mode 128 draw calls / 254 k
+triangles (side by side ~116 / 314 k). No further optimisation without
+device evidence (levers listed in the spec).
+
+**9–10. Limitations / risks**: the seam is vertical (north–south) only; the
+seam label summarises one column (not the whole half); controller grab and
+real hand tracking unverified.
+
+**11. Acceptance**: met for C — aligned dual-future comparison from the
+scenario projections, working desktop interaction, hand interaction in the
+emulator, performance measured, XR validation steps documented.

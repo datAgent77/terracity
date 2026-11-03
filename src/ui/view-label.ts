@@ -23,6 +23,8 @@ export interface ViewInput {
   phase: 'intro' | 'building' | 'finished';
   year: Year;
   futuresOpen: boolean;
+  /** Reality Seam open (the two futures lie on the table, divided by the seam). */
+  seam?: boolean;
   hasSaved: boolean;
   street: StreetPlanTag | null;
 }
@@ -47,7 +49,8 @@ export function viewLabel(v: ViewInput): ViewLabel {
   }
   if (v.futuresOpen) {
     const other = v.hasSaved ? SCENARIO_NAMES.saved : SCENARIO_NAMES.baseline;
-    return { scenario: `${SCENARIO_NAMES.yours} vs ${other}`, year, editable: false, projection: true, text: `A ${SCENARIO_NAMES.yours} vs B ${other} - ${when}` };
+    const text = v.seam ? `Reality Seam: A ${SCENARIO_NAMES.yours} | B ${other} - ${when}` : `A ${SCENARIO_NAMES.yours} vs B ${other} - ${when}`;
+    return { scenario: `${SCENARIO_NAMES.yours} vs ${other}`, year, editable: false, projection: true, text };
   }
   if (v.phase === 'finished') return { scenario: SCENARIO_NAMES.yours, year, editable: false, projection, text: `${SCENARIO_NAMES.yours} - submitted - ${when}` };
   const editable = !projection;
