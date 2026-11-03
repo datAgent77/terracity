@@ -26,6 +26,8 @@ import {
   ConeGeometry,
   createSystem,
   CylinderGeometry,
+  DirectionalLight,
+  HemisphereLight,
   Euler,
   Float32BufferAttribute,
   Fog,
@@ -77,6 +79,8 @@ import { Bubble, createChild, createGarden, disposeTree, type Child } from './ch
 import { CHILD_AGE, CHILD_NAME, childNarrative, type ChildNarrative } from './child-narrative.js';
 import { miraDialogue, narrativeContext, type DialogueLine } from './mira-dialogue.js';
 import { PoiMarkers } from './poi-markers.js';
+import { createStreetDressing, disposeDressing } from './street-dressing.js';
+import { QUALITY, QUALITY_SETTINGS } from '../config/quality.js';
 import { pointsOfInterest } from './points-of-interest.js';
 import { compareRows } from './street-compare.js';
 import { streetStory } from './street-story.js';
@@ -92,6 +96,8 @@ const RADIUS = 2; // tiles around the district (5 x 5)
  * between the gate and her garden, north sidewalk toward the street's start.
  * Both stay out of the garden viewpoint's view of Mira.
  */
+/** Sky (IBL) fill at street level, against the street sun (tabletop: 0.7). */
+const STREET_IBL = 0.32;
 const POI_BOARDS = [
   { x: 3.2, z: -3.6 },
   { x: -9, z: 3.6 },
@@ -144,6 +150,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.innerEntity = this.world.createTransformEntity(this.inner, { parent: rootEntity });
     this.pois = new PoiMarkers(this.world, this.innerEntity);
     this.buildSky();
+    this.buildStreetSun();
     this.buildMarkers();
     // Birds over a recovering region (count follows `greening`).
     const wingA = new BoxGeometry(0.5, 0.05, 0.14).translate(0.24, 0, 0).rotateY(0.5);
@@ -194,6 +201,14 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const hook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
     /** Talk to Mira: 'next' (start / next line), 'back', 'end'. Same as the panel and pinching her. */
     hook.talk = (a: 'next' | 'back' | 'end') => (a === 'next' ? this.talkNext() : a === 'back' ? this.talkBack() : this.talkEnd());
+    /** Go to viewpoint i (same as pinching its ring). */
+    hook.gotoViewpoint = (i: number) => cmd.gotoViewpoint(i);
+    /** Screenshots only: hide the street panel (the world is unchanged). */
+    hook.photoMode = (on: boolean) => {
+      setPanelVisible(this.world, 'street-panel', !on);
+      this.pois.setHidden(on);
+      this.photo = on;
+    };
     /** Open / close point of interest i near Mira (same as pinching its sign). */
     hook.poi = (i: number) => this.pois.toggle(i);
     hook.street = () => ({
@@ -387,6 +402,16 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     };
     this.world.scene.fog = new FogExp2('#dce8ec', 0.006);
     this.root.visible = true;
+    // One sun at a time: the tabletop's key light rests while the street's own
+    // low sun (with a shadow map fitted to the street) lights the visit.
+    this.tableSun = this.findTableSun();
+    if (this.tableSun) {
+      this.tableSunIntensity = this.tableSun.intensity;
+      this.tableSun.intensity = 0;
+    }
+    this.streetSun.visible = true;
+    this.streetFill.visible = true;
+    this.tableIbl = this.world.scene.environmentIntensity;
     // The real HDR sky (Poly Haven, CC0) behind the street; the dome stays as fallback.
     this.savedBackground = this.world.scene.background;
     void this.loadSky().then(() => this.applyAtmosphere());
@@ -412,6 +437,10 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
 
   private leave(): void {
     this.root.visible = false;
+    this.streetSun.visible = false;
+    this.streetFill.visible = false;
+    if (this.tableSun) this.tableSun.intensity = this.tableSunIntensity;
+    this.world.scene.environmentIntensity = this.tableIbl;
     this.world.scene.background = this.savedBackground as never;
     this.sky.visible = true;
     setPanelVisible(this.world, 'street-panel', false);
@@ -457,6 +486,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   update(delta: number): void {
     this.clock += delta;
     this.stepChild(delta);
+    // Street light: less sky fill, so the low sun's shadows read crisply (the
+    // tabletop's IBL level is restored on return).
+    if (this.root.visible) this.world.scene.environmentIntensity = STREET_IBL;
     if (this.root.visible) this.pois.update(this.world.camera.getWorldPosition(this.eyeScratch));
     if (this.root.visible) {
       for (const c of this.cyclists) {
@@ -561,8 +593,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     hood.scale.setScalar(STREET_SCALE);
     const kitTint = new Color('#ffffff').lerp(DRY_TINT, st.dryness * 0.55);
     hood.traverse((o) => {
-      o.castShadow = false; // the sun's shadow map only covers the tabletop
-      o.receiveShadow = false;
+      // The street's own low sun (buildStreetSun) casts long shadows here.
+      o.castShadow = true;
+      o.receiveShadow = true;
       o.raycast = () => {};
       // Kit models use a street copy of the atlas material, tinted toward dry
       // ochre with the projected dryness (lawns, gardens and trees parch).
@@ -580,6 +613,8 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.buildLife(st, !!home);
     this.buildChild(projected, st, !!home);
     this.buildPois(plan, year, col, row, hood);
+    this.buildDressing(st, !!home);
+    this.castStreetShadows();
     this.applyAtmosphere();
   }
 
@@ -706,6 +741,8 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   private pois!: PoiMarkers;
   /** Per-frame scratch objects: no allocation in the frame loop (Milestone G audit). */
   private eyeScratch = new Vector3();
+  /** Screenshots only (`photoMode`): no UI in the frame. */
+  private photo = false;
   private camScratch = new Vector3();
   private localScratch = new Vector3();
   private birdScratch = { m: new Matrix4(), q: new Quaternion(), up: new Vector3(0, 1, 0), v: new Vector3() };
@@ -810,7 +847,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       line ? `${CHILD_NAME}, ${CHILD_AGE}  (${this.convo.index + 1}/${this.dialogue.length})` : `${CHILD_NAME}, ${CHILD_AGE}`,
       line ?? (this.dialogue.length ? 'Hi! Pinch me or tap Talk to Mira.' : ''),
     );
-    const target = near && (line || this.dialogue.length) ? 1 : 0;
+    const target = near && !this.photo && (line || this.dialogue.length) ? 1 : 0;
     const op = (this.bubble.mesh.material as MeshBasicMaterial).opacity;
     this.bubble.opacity = op + (target - op) * Math.min(1, delta * 4);
     this.bubble.mesh.lookAt(this.childGroup.localToWorld(new Vector3(local.x, this.bubble.mesh.position.y, local.z)));
@@ -1167,6 +1204,86 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       hill.raycast = () => {};
       this.root.add(hill);
     }
+  }
+
+  /**
+   * Street sun: a warm, low afternoon sun from over the sea side, whose shadow
+   * map covers the visited street (±34 m) so houses, trees and people throw
+   * long, crisp shadows at human scale. Lives in street coordinates.
+   */
+  private streetSun!: DirectionalLight;
+  private streetFill!: HemisphereLight;
+  private tableSun: DirectionalLight | null = null;
+  private tableSunIntensity = 0;
+  private tableIbl = 0.7;
+  private buildStreetSun(): void {
+    const sun = new DirectionalLight('#ffd9a6', 3.4);
+    sun.name = 'street-sun';
+    // Low, from the sea end of the street and across it: long shadows that
+    // run over the road and sidewalks toward the viewer.
+    sun.position.set(34, 22, 24);
+    sun.target.position.set(0, 0, -2);
+    sun.castShadow = true;
+    const size = QUALITY_SETTINGS[QUALITY].shadowMapSize;
+    sun.shadow.mapSize.set(size, size);
+    const cam = sun.shadow.camera;
+    cam.left = -34;
+    cam.right = 34;
+    cam.top = 34;
+    cam.bottom = -34;
+    cam.near = 1;
+    cam.far = 140;
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.04;
+    sun.visible = false;
+    this.inner.add(sun, sun.target);
+    this.streetSun = sun;
+    // Soft fill: blue sky from above, warm bounce from the paving, so shade
+    // reads as cool colour (Mediterranean afternoon) instead of black.
+    const fill = new HemisphereLight('#bcd8f0', '#e8c9a0', 1.15);
+    fill.name = 'street-fill';
+    fill.visible = false;
+    this.inner.add(fill);
+    this.streetFill = fill;
+  }
+
+  /** Bougainvillea, lamps, palms, crossings: only on a planned street; flowers follow greening / dryness. */
+  private dressing: Group | null = null;
+  private buildDressing(st: FutureVisualState, homesHere: boolean): void {
+    if (this.dressing) {
+      disposeDressing(this.dressing);
+      this.inner.remove(this.dressing);
+      this.dressing = null;
+    }
+    if (!homesHere) return;
+    this.dressing = createStreetDressing((x, z) => this.surfaceAt(x, z), st, VIEWPOINTS);
+    this.inner.add(this.dressing);
+  }
+
+  /** Everything solid in the street casts and receives the street sun's shadow (not UI, rings or glass). */
+  private castStreetShadows(): void {
+    const skip = (o: Object3D): boolean => {
+      for (let a: Object3D | null = o; a && a !== this.inner; a = a.parent) {
+        if (/^(viewpoint-|poi-|mira-talk|mira-subtitle|street-sky)/.test(a.name)) return true;
+      }
+      return false;
+    };
+    this.inner.traverse((o) => {
+      const m = o as Mesh;
+      if (!m.isMesh) return;
+      const mat = m.material as MeshStandardMaterial;
+      const solid = !Array.isArray(mat) && !mat.transparent && !skip(o);
+      m.castShadow = solid;
+      m.receiveShadow = solid;
+    });
+  }
+
+  private findTableSun(): DirectionalLight | null {
+    let found: DirectionalLight | null = null;
+    this.world.scene.traverse((o) => {
+      if (!found && (o as DirectionalLight).isDirectionalLight && o !== this.streetSun) found = o as DirectionalLight;
+    });
+    return found;
   }
 
   /** Glowing standing spots at the other viewpoints: point and pinch to teleport. */

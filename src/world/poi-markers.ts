@@ -137,6 +137,11 @@ export class PoiMarkers {
     }
   }
 
+  /** Screenshots only: hide / show the boards without changing them. */
+  setHidden(hidden: boolean): void {
+    for (const m of this.markers) m.root.visible = !hidden && !!m.poi;
+  }
+
   hide(): void {
     for (const m of this.markers) {
       m.poi = null;
