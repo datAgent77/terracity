@@ -26,12 +26,15 @@ import {
   ConeGeometry,
   createSystem,
   CylinderGeometry,
+  DirectionalLight,
+  HemisphereLight,
   Euler,
   Float32BufferAttribute,
   Fog,
   FogExp2,
   Group,
   IcosahedronGeometry,
+  type Intersection,
   InstancedMesh,
   Matrix4,
   Mesh,
@@ -39,6 +42,7 @@ import {
   MeshStandardMaterial,
   type Object3D,
   Quaternion,
+  Raycaster,
   RayInteractable,
   RingGeometry,
   SphereGeometry,
@@ -47,14 +51,15 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import { UIKit, type Entity, type UIKitMLAsset } from '@iwsdk/core';
-import { YEARS } from '../config/projection.js';
+import { YEARS, type Year } from '../config/projection.js';
+import type { Placement } from '../simulation/metrics.js';
 // Addon not re-exported by @iwsdk/core (imports the same `three` alias).
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GRID_COLS, StructureType, TerrainType, TILE_SIZE } from '../config/scenario.js';
 import { projectYear, type YearMetrics } from '../simulation/projection.js';
 import { TARGETS } from '../config/balance.js';
 import * as cmd from '../core/commands.js';
-import { coachText, game, planA, planVersion, streetView, tutorial, viewYear } from '../core/session.js';
+import { coachText, detailsOpen, futuresOpen, game, miraTalked, planA, planVersion, streetView, tutorial, viewYear } from '../core/session.js';
 import { Placeable } from '../interactions/placeable-component.js';
 import { sfx, streetAmbience } from '../audio/sfx.js';
 import { prefersReducedMotion, soundOn } from '../ui/accessibility.js';
@@ -72,22 +77,39 @@ import { decorPrototype } from './terrain-decor.js';
 import { PAINTED, PAINTED_FLAT } from './palette.js';
 import { Bubble, createChild, createGarden, disposeTree, type Child } from './child.js';
 import { CHILD_AGE, CHILD_NAME, childNarrative, type ChildNarrative } from './child-narrative.js';
+import { expressionFor, miraDialogue, narrativeContext, type DialogueLine } from './mira-dialogue.js';
+import { PoiMarkers } from './poi-markers.js';
+import { createDryGrass, createStreetDressing, disposeDressing } from './street-dressing.js';
+import { QUALITY, QUALITY_SETTINGS } from '../config/quality.js';
+import { pointsOfInterest } from './points-of-interest.js';
 import { compareRows } from './street-compare.js';
 import { streetStory } from './street-story.js';
-import { CHILD_SPOT, GARDEN, streetPose, STREET_SCALE, VIEWPOINTS } from './street-view.js';
+import { CHILD_SPOT, GARDEN, streetPose, STREET_SCALE, type Viewpoint, VIEWPOINTS } from './street-view.js';
 import { createStructureModel, setDistrictLinks, setRoadArms, structureLook } from './structure-models.js';
 import { tileAt } from './terrain-map.js';
 import { createTownTile, setEra } from './villas.js';
 
 const TABLETOP_PANELS = ['hud-panel', 'actions-panel', 'time-panel', 'overlay-panel', 'compare-panel', 'tray-labels'];
 const RADIUS = 2; // tiles around the district (5 x 5)
+/**
+ * Info boards for the points of interest (street-inner metres): south sidewalk
+ * between the gate and her garden, north sidewalk toward the street's start.
+ * Both stay out of the garden viewpoint's view of Mira.
+ */
+/** Sky (IBL) fill at street level, against the street sun (tabletop: 0.7). */
+const STREET_IBL = 0.32;
+const POI_BOARDS = [
+  { x: 3.2, z: -3.6 },
+  { x: -9, z: 3.6 },
+];
 const FADE = 0.22; // seconds per half of a teleport fade
 const DRY_TINT = new Color('#b98f58');
 const LUSH_TINT = new Color('#7fbf5c');
 const MURKY = new Color('#8e9468');
 const CLEAR_AIR = new Color('#dce8ec');
-const SMOG_AIR = new Color('#a8957a');
-const SMOG_SKY = new Color('#c9b48f');
+// Dusty grey haze (smog), not a desert tint: the model computes poor air, not sand.
+const SMOG_AIR = new Color('#b3ad9f');
+const SMOG_SKY = new Color('#cfc8b4');
 const WHITE = new Color('#ffffff');
 const BIRDS = 14;
 /** Module-level materials shared by procedural models (never disposed). */
@@ -127,7 +149,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.inner.add(this.hood);
     const rootEntity = this.world.createTransformEntity(this.root);
     this.innerEntity = this.world.createTransformEntity(this.inner, { parent: rootEntity });
+    this.pois = new PoiMarkers(this.world, this.innerEntity);
     this.buildSky();
+    this.buildStreetSun();
     this.buildMarkers();
     // Birds over a recovering region (count follows `greening`).
     const wingA = new BoxGeometry(0.5, 0.05, 0.14).translate(0.24, 0, 0).rotateY(0.5);
@@ -176,7 +200,24 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     );
 
     const hook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
+    /** Talk to Mira: 'next' (start / next line), 'back', 'end'. Same as the panel and pinching her. */
+    hook.talk = (a: 'next' | 'back' | 'end') => (a === 'next' ? this.talkNext() : a === 'back' ? this.talkBack() : this.talkEnd());
+    /** Occlusion check: is anything solid between your eyes and Mira's face / chest? */
+    hook.miraOccluded = () => this.miraOccluded();
+    /** Go to viewpoint i (same as pinching its ring). */
+    hook.gotoViewpoint = (i: number) => cmd.gotoViewpoint(i);
+    /** Screenshots only: hide the street panel (the world is unchanged). */
+    hook.photoMode = (on: boolean) => {
+      setPanelVisible(this.world, 'street-panel', !on);
+      this.pois.setHidden(on);
+      this.photo = on;
+    };
+    /** Open / close point of interest i near Mira (same as pinching its sign). */
+    hook.poi = (i: number) => this.pois.toggle(i);
     hook.street = () => ({
+      residents: this.life.children.filter((o) => o.name !== 'dry-grass').length,
+      poi: this.pois.info(),
+      tile: this.visit ? `${this.visit.col},${this.visit.row}` : null,
       active: !!streetView.peek(),
       viewpoint: streetView.peek()?.viewpoint ?? null,
       name: streetView.peek() ? VIEWPOINTS[streetView.peek()!.viewpoint].name : null,
@@ -186,7 +227,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       year: viewYear.peek(),
       plan: streetView.peek()?.plan ?? null,
       child: this.narrative
-        ? { happy: this.narrative.state === 'thriving', state: this.narrative.state, garden: this.narrative.garden, lines: [...this.narrative.lines], speaking: this.talk.near, line: this.talk.line }
+        ? { talking: this.convo.active, index: this.convo.index, dialogue: this.dialogue.map((d) => d.text), happy: this.narrative.state === 'thriving', state: this.narrative.state, garden: this.narrative.garden, lines: [...this.narrative.lines], speaking: this.talk.near, line: this.talk.line, pointing: this.gaze.pointing, blinks: this.gaze.blinks, expression: expressionFor(this.narrative.state), points: this.dialogue.map((d) => d.point ?? null), groundY: +(this.child?.root.position.y ?? 0).toFixed(3) }
         : null,
       districtHere: this.districtHere,
       geometries: this.world.renderer.info.memory.geometries,
@@ -214,6 +255,10 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     click('st-next', () => cmd.stepViewpoint(1));
     click('st-return', cmd.exitCity);
     for (const y of YEARS) click(`st-${y}`, () => cmd.setYear(y));
+    click('st-details-btn', () => (detailsOpen.value = !detailsOpen.peek()));
+    click('st-talk', () => this.talkNext());
+    click('st-talk-back', () => this.talkBack());
+    click('st-talk-end', () => this.talkEnd());
     click('st-plan-a', () => cmd.setStreetPlan('A'));
     click('st-plan-b', () => cmd.setStreetPlan('B'));
     const compare = panel.getElementById('st-compare');
@@ -232,11 +277,19 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
         panel.getElementById<UIKit.Text>(`st-${y}-label`)?.setProperties({ color: on ? '#ffffff' : '#1d3f46' });
       }
       lines.forEach((el, i) => el?.setProperties({ text: this.story[i] ?? '', display: this.story[i] ? 'flex' : 'none' }));
+      // Talking to Mira: Talk / Back / Next / End (only when she is here).
+      const here = !!this.child && this.dialogue.length > 0;
+      const talking = this.convo.active;
+      panel.getElementById('st-talk-row')?.setProperties({ display: here ? 'flex' : 'none' });
+      panel.getElementById<UIKit.Text>('st-talk-label')?.setProperties({ text: talking ? (this.convo.index < this.dialogue.length - 1 ? 'Next line' : 'Finish') : 'Talk to Mira' });
+      panel.getElementById('st-talk-back')?.setProperties({ display: talking ? 'flex' : 'none' });
+      panel.getElementById('st-talk-end')?.setProperties({ display: talking ? 'flex' : 'none' });
       // Guided tips follow the player into the street; the next target glows amber.
       const tip = coachText.peek();
       tipEl?.setProperties({ text: tip || '-', display: tip ? 'flex' : 'none' });
       const cue = tutorial.active ? tutorial.step : null;
-      panel.getElementById('st-return')?.setProperties({ backgroundColor: cue === 'back' ? '#b87500' : undefined });
+      panel.getElementById('st-return')?.setProperties({ backgroundColor: cue === 'other' ? '#b87500' : undefined });
+      panel.getElementById('st-talk')?.setProperties({ backgroundColor: cue === 'talk' && !this.convo.active ? '#b87500' : undefined });
       // Compare futures (only with a saved Plan A): the four differences that matter here.
       const a = planA.peek();
       compare?.setProperties({ display: a && v.plan !== 'none' ? 'flex' : 'none' });
@@ -259,6 +312,17 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
         });
       }
     };
+    const layer = () => {
+      const open = detailsOpen.value;
+      panel.getElementById('st-details')?.setProperties({ display: open ? 'flex' : 'none' });
+      panel.getElementById<UIKit.Text>('st-details-label')?.setProperties({ text: open ? 'Less' : 'Details' });
+      const obj = this.world.getSceneEntity('street-panel')?.object3D;
+      if (obj) {
+        obj.userData.base_height = open ? (planA.peek() ? '56%' : '40%') : '28%';
+        window.dispatchEvent(new Event('terracity-relayout'));
+      }
+    };
+    this.cleanupFuncs.push(detailsOpen.subscribe(layer), planA.subscribe(layer));
     this.paintPanel = refresh;
     this.cleanupFuncs.push(
       streetView.subscribe(refresh),
@@ -309,6 +373,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
 
   private enter(col: number, row: number, viewpoint: number): void {
     this.visit = { col, row };
+    miraTalked.value = false; // a new visit: she has not been talked to yet
     this.build(col, row);
     // Hide the tabletop: board, placed pieces and tray, comparison dioramas, panels.
     const hidden: Object3D[] = [];
@@ -341,6 +406,16 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     };
     this.world.scene.fog = new FogExp2('#dce8ec', 0.006);
     this.root.visible = true;
+    // One sun at a time: the tabletop's key light rests while the street's own
+    // low sun (with a shadow map fitted to the street) lights the visit.
+    this.tableSun = this.findTableSun();
+    if (this.tableSun) {
+      this.tableSunIntensity = this.tableSun.intensity;
+      this.tableSun.intensity = 0;
+    }
+    this.streetSun.visible = true;
+    this.streetFill.visible = true;
+    this.tableIbl = this.world.scene.environmentIntensity;
     // The real HDR sky (Poly Haven, CC0) behind the street; the dome stays as fallback.
     this.savedBackground = this.world.scene.background;
     void this.loadSky().then(() => this.applyAtmosphere());
@@ -366,6 +441,10 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
 
   private leave(): void {
     this.root.visible = false;
+    this.streetSun.visible = false;
+    this.streetFill.visible = false;
+    if (this.tableSun) this.tableSun.intensity = this.tableSunIntensity;
+    this.world.scene.environmentIntensity = this.tableIbl;
     this.world.scene.background = this.savedBackground as never;
     this.sky.visible = true;
     setPanelVisible(this.world, 'street-panel', false);
@@ -399,8 +478,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const head = cam.getWorldPosition(new Vector3());
     const fwd = cam.getWorldDirection(new Vector3());
     const headYaw = Math.atan2(-fwd.x, -fwd.z);
-    // Without a district here (e.g. Plan A left this tile empty) stand on the ground.
-    const pose = streetPose(this.districtHere ? v : { ...v, ground: 0 }, head.y);
+    // Without a district here (e.g. Plan A left this tile empty) stand on what
+    // is really there: open ground or an unplanned sprawl slab, never inside a house.
+    const pose = streetPose(this.districtHere ? v : this.clearStand(v), head.y);
     this.root.position.set(head.x, pose.y, head.z);
     this.root.rotation.set(0, pose.yaw + headYaw, 0);
     this.inner.position.set(pose.offsetX, 0, pose.offsetZ);
@@ -410,6 +490,10 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   update(delta: number): void {
     this.clock += delta;
     this.stepChild(delta);
+    // Street light: less sky fill, so the low sun's shadows read crisply (the
+    // tabletop's IBL level is restored on return).
+    if (this.root.visible) this.world.scene.environmentIntensity = STREET_IBL;
+    if (this.root.visible) this.pois.update(this.world.camera.getWorldPosition(this.eyeScratch));
     if (this.root.visible) {
       for (const c of this.cyclists) {
         c.obj.position.x += c.dir * c.speed * delta;
@@ -423,10 +507,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       }
     }
     if (this.root.visible && this.birds.count) {
-      const m = new Matrix4();
-      const q = new Quaternion();
-      const up = new Vector3(0, 1, 0);
-      const v = new Vector3();
+      const { m, q, up, v } = this.birdScratch;
       for (let i = 0; i < this.birds.count; i++) {
         const flock = i % 2;
         const a = this.clock * (flock ? 0.12 : -0.09) + (i >> 1) * 0.11 + flock * 2.1;
@@ -516,8 +597,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     hood.scale.setScalar(STREET_SCALE);
     const kitTint = new Color('#ffffff').lerp(DRY_TINT, st.dryness * 0.55);
     hood.traverse((o) => {
-      o.castShadow = false; // the sun's shadow map only covers the tabletop
-      o.receiveShadow = false;
+      // The street's own low sun (buildStreetSun) casts long shadows here.
+      o.castShadow = true;
+      o.receiveShadow = true;
       o.raycast = () => {};
       // Kit models use a street copy of the atlas material, tinted toward dry
       // ochre with the projected dryness (lawns, gardens and trees parch).
@@ -529,11 +611,27 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       }
     });
     this.streetMat?.color.copy(kitTint);
+    // Unplanned yards read as worn, dry ground with some grass — not sand dunes.
+    hood.traverse((o) => {
+      const m = o as Mesh;
+      if (!m.isMesh || !this.streetMat) return;
+      let a: Object3D | null = o;
+      while (a && a !== hood && a.name !== 'sprawl-yard') a = a.parent;
+      if (a?.name !== 'sprawl-yard') return;
+      this.yardMat ??= this.streetMat.clone();
+      this.yardMat.map = this.streetMat.map;
+      this.yardMat.color.set('#c2c79a').lerp(new Color('#cdbf98'), st.dryness * 0.5);
+      m.material = this.yardMat;
+    });
     this.applyDrought(st.dryness);
     this.hood.add(hood);
     this.story = streetStory(projected, st, { sprawlNearby, beachesNearby, homesHere: !!home });
-    this.buildLife(st, !!home);
+    this.buildLife(st, !!home, sprawlNearby);
+    this.lastHood = hood;
     this.buildChild(projected, st, !!home);
+    this.buildPois(plan, year, col, row, hood);
+    this.buildDressing(st, !!home);
+    this.castStreetShadows();
     this.applyAtmosphere();
   }
 
@@ -554,31 +652,208 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     if (!this.childGroup.parent) this.inner.add(this.childGroup);
     this.narrative = childNarrative(projected, st, { homesHere });
     this.child = null;
-    const ground = homesHere ? 0.62 : 0;
+    // On a district plinth, or on whatever stands under her spot (an unplanned
+    // sprawl slab is ~0.7 m tall: never bury her in it).
+    const ground = homesHere ? 0.62 : this.groundAt(CHILD_SPOT.x, CHILD_SPOT.z);
     const gardenKind = this.narrative ? this.narrative.garden : projected.environment >= TARGETS.environment ? 'lush' : 'dry';
     const garden = createGarden(gardenKind, GARDEN.w, GARDEN.d);
     garden.position.set(GARDEN.x, ground, GARDEN.z);
     this.childGroup.add(garden);
     this.talk = { t: 0, near: false, line: 0 };
     this.bubble.opacity = 0;
+    this.dialogue = [];
+    this.convo = { active: false, index: 0, t: 0 };
+    if (this.talkTarget) this.talkTarget.visible = false;
     if (!this.narrative) return;
+    // Grounded, user-paced conversation for this future and this place (mira-dialogue.ts).
+    const v = streetView.peek();
+    if (v) {
+      const tag = v.plan;
+      const current = tag === 'none' ? [] : tag === 'A' && planA.peek() ? planA.peek()! : game.placements;
+      const other =
+        tag === 'A' ? { planId: 'B' as const, plan: game.placements }
+        : tag === 'none' ? { planId: 'B' as const, plan: game.placements }
+        : planA.peek() ? { planId: 'A' as const, plan: planA.peek()! }
+        : futuresOpen.peek() ? { planId: 'none' as const, plan: [] }
+        : null;
+      const ctx = narrativeContext(game.terrain, current, tag, projected.year, this.visit.col, this.visit.row, other);
+      this.dialogue = miraDialogue(ctx);
+    }
     this.child = createChild();
-    // Her face follows the simulated outcome: she smiles only in a thriving neighbourhood.
-    this.child.mood?.(this.narrative.state === 'thriving');
+    // Her face follows the simulated outcome: a smile where her neighbourhood
+    // thrives, a calm, thoughtful face otherwise (never staged misery).
+    this.child.mood?.(expressionFor(this.narrative.state));
+    // Where each line points (street-inner metres), from the tile the line names.
+    this.linePoints = this.dialogue.map((d) => (d.point && this.lastHood ? this.tileToInner(this.lastHood, d.point.col, d.point.row) : null));
     this.child.root.position.set(CHILD_SPOT.x, ground, CHILD_SPOT.z);
     this.childGroup.add(this.child.root);
-    this.bubble.mesh.position.set(CHILD_SPOT.x, ground + 1.7, CHILD_SPOT.z);
+    this.bubble.mesh.position.set(CHILD_SPOT.x, ground + 1.62, CHILD_SPOT.z);
     this.childGroup.add(this.bubble.mesh);
-    this.story.push(`${CHILD_NAME} (${CHILD_AGE}): "${this.narrative.lines.join(' ')}"`);
+    // Soft contact shadow and the talk affordance (a ring at her feet; pinch / tap her).
+    const shadow = new Mesh(new CircleGeometry(0.32, 24).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.28, depthWrite: false }));
+    shadow.position.set(CHILD_SPOT.x, ground + 0.01, CHILD_SPOT.z);
+    shadow.raycast = () => {};
+    this.childGroup.add(shadow);
+    this.ensureTalkTarget();
+    this.talkTarget!.position.set(CHILD_SPOT.x, ground, CHILD_SPOT.z);
+    this.talkTarget!.visible = true;
+    this.paintPanel?.();
   }
 
-  /** She turns to you, breathes, waves and speaks when you are near (< 8 m). */
+  /** Nearest clear standing spot to viewpoint `v` when no district stands here. */
+  private clearStand(v: Viewpoint): Viewpoint {
+    for (const r of [0, 2, 4, 6, 9, 12]) {
+      for (let k = 0; k < (r ? 8 : 1); k++) {
+        const a = (k / 8) * Math.PI * 2;
+        const x = v.x + Math.cos(a) * r;
+        const z = v.z + Math.sin(a) * r;
+        const tops = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => this.surfaceAt(x + dx, z + dz));
+        const g = tops[0];
+        if (g > 1.2 || !tops.every((t) => t < g + 0.25)) continue; // ground or a slab, never a roof
+        // A clear view ahead: no wall within 8 m across the view (+-40 deg).
+        const len = Math.hypot(v.lookX - x, v.lookZ - z) || 1;
+        const ux = (v.lookX - x) / len;
+        const uz = (v.lookZ - z) / len;
+        const ahead = [-0.7, -0.35, 0, 0.35, 0.7].every((a) => {
+          const c = Math.cos(a);
+          const s = Math.sin(a);
+          const dx = ux * c - uz * s;
+          const dz = ux * s + uz * c;
+          return [1, 2, 3, 4, 5, 6, 8].every((d) => this.surfaceAt(x + dx * d, z + dz * d) < g + 1);
+        });
+        if (ahead) return { ...v, x, z, ground: g };
+      }
+    }
+    return { ...v, ground: 0 };
+  }
+
+  /** Highest surface of the built neighbourhood under (x, z), in street-inner metres. */
+  private surfaceAt(x: number, z: number): number {
+    const hits = this.rayDown(x, z);
+    return hits.length ? Math.max(0, this.inner.worldToLocal(hits[0].point.clone()).y) : 0;
+  }
+
+  private rayDown(x: number, z: number): Intersection[] {
+    this.inner.updateMatrixWorld(true);
+    const origin = this.inner.localToWorld(new Vector3(x, 40, z));
+    const down = this.inner.localToWorld(new Vector3(x, 0, z)).sub(origin).normalize();
+    // The street disables raycasts on its meshes (cheap XR rays): use the
+    // prototype's raycast directly.
+    const rc = new Raycaster(origin, down);
+    const hits: Intersection[] = [];
+    this.hood.traverseVisible((o) => {
+      if ((o as Mesh).isMesh) (Object.getPrototypeOf(o) as Mesh).raycast.call(o, rc, hits);
+    });
+    return hits.sort((a, b) => a.distance - b.distance);
+  }
+
+  /** First surface below head height under (x, z) (skips canopies and roofs). */
+  private groundAt(x: number, z: number): number {
+    for (const hit of this.rayDown(x, z)) {
+      const y = this.inner.worldToLocal(hit.point.clone()).y;
+      if (y < 1.2) return Math.max(0, y);
+    }
+    return 0;
+  }
+
+  // ------------------------------------------------ points of interest --
+
+  private pois!: PoiMarkers;
+  /** Per-frame scratch objects: no allocation in the frame loop (Milestone G audit). */
+  private eyeScratch = new Vector3();
+  /** Screenshots only (`photoMode`): no UI in the frame. */
+  private photo = false;
+  private camScratch = new Vector3();
+  private localScratch = new Vector3();
+  private birdScratch = { m: new Matrix4(), q: new Quaternion(), up: new Vector3(0, 1, 0), v: new Vector3() };
+
+  /**
+   * One or two places near Mira that explain a modelled consequence, chosen
+   * from this plan / future only (points-of-interest.ts). Each is an info board
+   * on her street (human scale, never in front of her) whose arrow points at
+   * the real place: the park, the solar farm, the unplanned houses.
+   */
+  private buildPois(plan: readonly Placement[], year: Year, col: number, row: number, hood: Group): void {
+    const pois = pointsOfInterest(game.terrain, plan, year, col, row);
+    hood.updateMatrixWorld(true);
+    this.inner.updateMatrixWorld(true);
+    const at: Vector3[] = [];
+    const targets: Array<Vector3 | null> = [];
+    pois.forEach((poi, i) => {
+      const b = POI_BOARDS[i];
+      at.push(new Vector3(b.x, this.groundAt(b.x, b.z), b.z));
+      const dc = poi.tile.col - col;
+      const dr = poi.tile.row - row;
+      targets.push(dc || dr ? this.inner.worldToLocal(hood.localToWorld(new Vector3(dc * TILE_SIZE, 0, dr * TILE_SIZE))) : null);
+    });
+    this.pois.set(pois, at, targets);
+  }
+
+  // ------------------------------------------------- conversation (user-paced) --
+
+  private dialogue: DialogueLine[] = [];
+  private linePoints: Array<Vector3 | null> = [];
+  private lastHood: Group | null = null;
+  private gaze = { blinkAt: 2.5, blinkT: 0, blinks: 0, pointing: false, armL: 0 };
+
+  /** A board tile's centre in street-inner metres (the visited district is the origin). */
+  private tileToInner(hood: Group, col: number, row: number): Vector3 {
+    hood.updateMatrixWorld(true);
+    this.inner.updateMatrixWorld(true);
+    const v = this.visit!;
+    return this.inner.worldToLocal(hood.localToWorld(new Vector3((col - v.col) * TILE_SIZE, 0, (row - v.row) * TILE_SIZE)));
+  }
+  private convo = { active: false, index: 0, t: 0 };
+  private talkTarget: Group | null = null;
+  private talkRing: Mesh | null = null;
+
+  /** Ring at her feet + an invisible capsule: point and pinch (or tap) her to talk. */
+  private ensureTalkTarget(): void {
+    if (this.talkTarget) return;
+    const g = new Group();
+    g.name = 'mira-talk';
+    this.talkRing = new Mesh(new RingGeometry(0.42, 0.5, 40).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: '#ffd36b', transparent: true, opacity: 0.8, depthWrite: false }));
+    this.talkRing.position.y = 0.02;
+    this.talkRing.raycast = () => {};
+    const hit = new Mesh(new CylinderGeometry(0.45, 0.45, 1.5, 12).translate(0, 0.75, 0), new MeshBasicMaterial({ visible: false }));
+    g.add(this.talkRing, hit);
+    const entity = this.world.createTransformEntity(g, { parent: this.innerEntity });
+    entity.addComponent(RayInteractable);
+    g.addEventListener('click' as never, (() => this.talkNext()) as never);
+    this.talkTarget = g;
+  }
+
+  /** Start the conversation, or go to the next line (the last line ends it). */
+  talkNext(): void {
+    if (!this.child || !this.dialogue.length) return;
+    if (!this.convo.active) this.convo = { active: true, index: 0, t: 0 };
+    else if (this.convo.index < this.dialogue.length - 1) this.convo = { ...this.convo, index: this.convo.index + 1, t: 0 };
+    else return this.talkEnd();
+    sfx.childChime(0);
+    this.paintPanel?.();
+  }
+
+  talkBack(): void {
+    if (!this.convo.active || this.convo.index === 0) return;
+    this.convo = { ...this.convo, index: this.convo.index - 1, t: 0 };
+    sfx.childChime(0);
+    this.paintPanel?.();
+  }
+
+  talkEnd(): void {
+    if (!this.convo.active) return;
+    this.convo = { active: false, index: 0, t: 0 };
+    miraTalked.value = true; // a conversation was had (the first-five-minutes step moves on)
+    this.paintPanel?.();
+  }
+
+  /** She turns to you, breathes, shifts her weight and waves when a line starts. */
   private stepChild(delta: number): void {
     const c = this.child;
     const n = this.narrative;
     if (!c || !n || !this.root.visible) return;
-    const cam = this.world.camera.getWorldPosition(new Vector3());
-    const local = this.childGroup.worldToLocal(cam.clone());
+    const cam = this.world.camera.getWorldPosition(this.camScratch);
+    const local = this.childGroup.worldToLocal(this.localScratch.copy(cam));
     const dx = local.x - c.root.position.x;
     const dz = local.z - c.root.position.z;
     const near = Math.hypot(dx, dz) < 8;
@@ -588,24 +863,100 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     c.body.rotation.y += dy * Math.min(1, delta * 3);
     const calm = prefersReducedMotion();
     c.body.scale.y = calm ? 1 : 1 + 0.012 * Math.sin(this.clock * 2.1);
+    c.body.rotation.z = calm ? 0 : 0.025 * Math.sin(this.clock * 0.7); // weight shift
     if (near && !this.talk.near) {
       this.talk = { t: 0, near: true, line: 0 };
       sfx.childChime(Math.max(-1, Math.min(1, dx / 6)));
-    } else if (!near) this.talk.near = false;
-    if (near) this.talk.t += delta;
-    const line = Math.min(n.lines.length - 1, Math.floor(this.talk.t / 6));
-    if (line !== this.talk.line) {
-      this.talk.line = line;
-      sfx.childChime(0);
+    } else if (!near) {
+      this.talk.near = false;
+      if (this.convo.active) this.talkEnd();
     }
-    this.bubble.set(`${CHILD_NAME}, ${CHILD_AGE}`, n.lines[line]);
-    const target = near ? 1 : 0;
+    this.convo.t += delta;
+    // Bubble: an invitation when she notices you, then the line you are on.
+    const line = this.convo.active ? this.dialogue[this.convo.index]?.text : null;
+    this.bubble.set(
+      line ? `${CHILD_NAME}, ${CHILD_AGE}  (${this.convo.index + 1}/${this.dialogue.length})` : `${CHILD_NAME}, ${CHILD_AGE}`,
+      line ?? (this.dialogue.length ? 'Hi! Pinch me or tap Talk to Mira.' : ''),
+    );
+    const target = near && !this.photo && (line || this.dialogue.length) ? 1 : 0;
     const op = (this.bubble.mesh.material as MeshBasicMaterial).opacity;
     this.bubble.opacity = op + (target - op) * Math.min(1, delta * 4);
     this.bubble.mesh.lookAt(this.childGroup.localToWorld(new Vector3(local.x, this.bubble.mesh.position.y, local.z)));
-    // Wave during the first moments of each line.
-    const since = this.talk.t - line * 6;
-    c.arm.rotation.z = near && since < 1.8 && !calm ? -2.5 + 0.35 * Math.sin(this.clock * 9) : -0.12;
+    if (this.talkRing) {
+      this.talkRing.visible = near && !this.convo.active;
+      (this.talkRing.material as MeshBasicMaterial).opacity = calm ? 0.7 : 0.55 + 0.3 * Math.sin(this.clock * 3);
+    }
+    // Wave as each line starts (and once when she first sees you) — unless
+    // the line is about a place: then she points at it with her other hand.
+    const since = this.convo.active ? this.convo.t : this.talk.t;
+    if (near) this.talk.t += delta;
+    const target3 = this.convo.active ? this.linePoints[this.convo.index] : null;
+    c.arm.rotation.z = near && since < 1.8 && !calm && !target3 ? -2.5 + 0.35 * Math.sin(this.clock * 9) : -0.12;
+    const g = this.gaze;
+    // Pointing: the left arm rises toward the place (yaw relative to her body), then rests.
+    if (c.armL) {
+      const want = target3 ? 1 : 0;
+      g.armL += (want - g.armL) * Math.min(1, delta * (calm ? 20 : 5));
+      g.pointing = !!target3;
+      let yaw = 0;
+      if (target3) {
+        yaw = Math.atan2(target3.x - c.root.position.x, target3.z - c.root.position.z) - c.body.rotation.y;
+        yaw = Math.max(-1.3, Math.min(1.3, Math.atan2(Math.sin(yaw), Math.cos(yaw))));
+        this.pointYaw = yaw;
+      }
+      c.armL.rotation.order = 'YXZ';
+      c.armL.rotation.set(-1.35 * g.armL, (this.pointYaw ?? 0) * g.armL, 0.12 * (1 - g.armL));
+    }
+    // Head: looks at you (eye height), a small nod as each line starts.
+    if (c.head) {
+      const headY = c.root.position.y + 1.06 * c.root.scale.y;
+      const dist = Math.max(0.5, Math.hypot(dx, dz));
+      const pitch = Math.max(-0.35, Math.min(0.35, Math.atan2(local.y - headY, dist)));
+      const nod = this.convo.active && this.convo.t < 0.6 && !calm ? 0.12 * Math.sin((this.convo.t / 0.6) * Math.PI) : 0;
+      c.head.rotation.x += (-pitch + nod - c.head.rotation.x) * Math.min(1, delta * 6);
+      // Glance toward the place she points at, then back to you.
+      const look = target3 && this.convo.t < 1.2 ? (this.pointYaw ?? 0) * 0.5 : 0;
+      c.head.rotation.y += (look - c.head.rotation.y) * Math.min(1, delta * 5);
+    }
+    // Blinks every few seconds (deterministic rhythm, not random).
+    if (c.blink && !calm) {
+      g.blinkAt -= delta;
+      if (g.blinkAt <= 0 && g.blinkT <= 0) {
+        g.blinkT = 0.12;
+        g.blinks++;
+        g.blinkAt = 2.6 + 1.4 * Math.abs(Math.sin(g.blinks * 1.7));
+      }
+      if (g.blinkT > 0) g.blinkT -= delta;
+      c.blink(g.blinkT > 0);
+    }
+  }
+  private pointYaw: number | null = null;
+
+  /** Solid street geometry between the camera and Mira's head / chest (names of what blocks; [] = clear). */
+  private miraOccluded(): string[] {
+    const c = this.child;
+    if (!c) return ['no-mira'];
+    this.root.updateMatrixWorld(true);
+    const eye = this.world.camera.getWorldPosition(new Vector3());
+    const out: string[] = [];
+    for (const h of [1.2, 0.8]) {
+      const target = c.root.localToWorld(new Vector3(0, h, 0));
+      const dir = target.clone().sub(eye);
+      const dist = dir.length();
+      const rc = new Raycaster(eye, dir.normalize(), 0.05, dist - 0.35);
+      const hits: Intersection[] = [];
+      for (const g of [this.hood, this.life, this.dressing].filter(Boolean) as Object3D[]) {
+        g.traverseVisible((o) => {
+          const m = o as Mesh;
+          if (!m.isMesh) return;
+          const mat = m.material as MeshStandardMaterial;
+          if (Array.isArray(mat) || mat.transparent) return;
+          (Object.getPrototypeOf(o) as Mesh).raycast.call(o, rc, hits);
+        });
+      }
+      for (const hit of hits) out.push(hit.object.name || hit.object.parent?.name || hit.object.type);
+    }
+    return [...new Set(out)];
   }
 
   /**
@@ -616,7 +967,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
    */
   private life = new Group();
   private cyclists: Array<{ obj: Object3D; speed: number; dir: 1 | -1 }> = [];
-  private buildLife(st: FutureVisualState, homesHere: boolean): void {
+  private buildLife(st: FutureVisualState, homesHere: boolean, sprawlNearby = 0): void {
     for (const c of [...this.life.children]) {
       c.traverse((o) => {
         const m = o as Mesh;
@@ -626,11 +977,30 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     }
     this.cyclists = [];
     if (!this.life.parent) this.inner.add(this.life);
-    if (!homesHere) return;
+    if (!homesHere) {
+      // Where nobody planned, people still live here (the projection puts its
+      // unplanned-sprawl residents on these tiles): neighbours outside their
+      // houses, and dry grass rather than a desert.
+      if (!sprawlNearby) return;
+      const r = rng(91);
+      const want = Math.min(6, 2 + sprawlNearby);
+      const spots: Array<[number, number, number]> = [[4, 6, 2.6], [-7, 5, 0.6], [14, -7, 1.9], [-14, -6, 3.6], [9, 10, -0.8], [-3, -9, 2.2], [18, 4, 1.2], [-18, 8, 0.2]];
+      let n = 0;
+      for (const [x, z, yaw] of spots) {
+        if (n >= want) break;
+        const g = this.groundAt(x, z);
+        // Stand on open ground or a yard, never inside a house.
+        if (this.surfaceAt(x, z) > g + 0.3 || this.surfaceAt(x + 0.6, z) > g + 0.3 || this.surfaceAt(x - 0.6, z) > g + 0.3) continue;
+        this.life.add(this.person(x, z, g, yaw, r));
+        n++;
+      }
+      this.life.add(createDryGrass((x, z) => this.groundAt(x, z), st, 140));
+      return;
+    }
     const smog = st.haze >= 0.2;
     const r = rng(77);
     const spots: Array<[number, number, number]> = [
-      [-15, 3.9, 0.3], [-9.5, -3.9, 2.8], [-3.2, 4.0, -0.4], [7.4, -4.0, 3.4], [8.5, 3.9, 1.1], [13, -4.0, 2.2], [17.5, 4.1, -1.2], [-19.5, -3.9, 1.7],
+      [-15, 3.9, 0.3], [-9.5, -3.9, 2.8], [-3.2, 4.0, -0.4], [-6.0, -4.0, 3.4], [8.5, 3.9, 1.1], [13, -4.0, 2.2], [17.5, 4.1, -1.2], [-19.5, -3.9, 1.7],
     ];
     const outdoors = smog ? spots.filter((_, i) => i % 3 === 0) : spots;
     for (const [x, z, yaw] of outdoors) this.life.add(this.person(x, z, 0.62, yaw, r));
@@ -713,10 +1083,14 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
   /**
    * Parched gardens: a copy of the kit atlas whose vegetation cells (lawn,
    * foliage, green roof) are shifted toward dry ochre by the projected dryness.
-   * Walls, roofs and paving keep their colours. Rebuilt in coarse steps.
+   * Walls, roofs and paving keep their colours. Built once per coarse step and
+   * kept (at most 8): switching futures reuses them instead of leaking a new
+   * texture per visit (Milestone G audit).
    */
   private droughtKey = -1;
   private wetMap: Texture | null = null;
+  private droughtTex = new Map<number, Texture>();
+  private yardMat: MeshStandardMaterial | null = null;
   private applyDrought(dryness: number): void {
     const mat = this.streetMat;
     if (!mat?.map) return;
@@ -724,8 +1098,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     const step = Math.round(Math.max(0, dryness - 0.12) * 8) / 8; // 0 = no change
     if (step === this.droughtKey) return;
     this.droughtKey = step;
-    if (step === 0) {
-      mat.map = this.wetMap;
+    const cached = step === 0 ? this.wetMap : this.droughtTex.get(step);
+    if (cached) {
+      mat.map = cached;
       mat.needsUpdate = true;
       return;
     }
@@ -761,7 +1136,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     tex.flipY = this.wetMap.flipY;
     tex.colorSpace = this.wetMap.colorSpace;
     tex.anisotropy = this.wetMap.anisotropy;
-    if (mat.map !== this.wetMap) mat.map.dispose();
+    this.droughtTex.set(step, tex);
     mat.map = tex;
     mat.needsUpdate = true;
   }
@@ -947,6 +1322,86 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       hill.raycast = () => {};
       this.root.add(hill);
     }
+  }
+
+  /**
+   * Street sun: a warm, low afternoon sun from over the sea side, whose shadow
+   * map covers the visited street (±34 m) so houses, trees and people throw
+   * long, crisp shadows at human scale. Lives in street coordinates.
+   */
+  private streetSun!: DirectionalLight;
+  private streetFill!: HemisphereLight;
+  private tableSun: DirectionalLight | null = null;
+  private tableSunIntensity = 0;
+  private tableIbl = 0.7;
+  private buildStreetSun(): void {
+    const sun = new DirectionalLight('#ffd9a6', 3.4);
+    sun.name = 'street-sun';
+    // Low, from the sea end of the street and across it: long shadows that
+    // run over the road and sidewalks toward the viewer.
+    sun.position.set(34, 22, 24);
+    sun.target.position.set(0, 0, -2);
+    sun.castShadow = true;
+    const size = QUALITY_SETTINGS[QUALITY].shadowMapSize;
+    sun.shadow.mapSize.set(size, size);
+    const cam = sun.shadow.camera;
+    cam.left = -34;
+    cam.right = 34;
+    cam.top = 34;
+    cam.bottom = -34;
+    cam.near = 1;
+    cam.far = 140;
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.04;
+    sun.visible = false;
+    this.inner.add(sun, sun.target);
+    this.streetSun = sun;
+    // Soft fill: blue sky from above, warm bounce from the paving, so shade
+    // reads as cool colour (Mediterranean afternoon) instead of black.
+    const fill = new HemisphereLight('#bcd8f0', '#e8c9a0', 1.15);
+    fill.name = 'street-fill';
+    fill.visible = false;
+    this.inner.add(fill);
+    this.streetFill = fill;
+  }
+
+  /** Bougainvillea, lamps, palms, crossings: only on a planned street; flowers follow greening / dryness. */
+  private dressing: Group | null = null;
+  private buildDressing(st: FutureVisualState, homesHere: boolean): void {
+    if (this.dressing) {
+      disposeDressing(this.dressing);
+      this.inner.remove(this.dressing);
+      this.dressing = null;
+    }
+    if (!homesHere) return;
+    this.dressing = createStreetDressing((x, z) => this.surfaceAt(x, z), st, VIEWPOINTS);
+    this.inner.add(this.dressing);
+  }
+
+  /** Everything solid in the street casts and receives the street sun's shadow (not UI, rings or glass). */
+  private castStreetShadows(): void {
+    const skip = (o: Object3D): boolean => {
+      for (let a: Object3D | null = o; a && a !== this.inner; a = a.parent) {
+        if (/^(viewpoint-|poi-|mira-talk|mira-subtitle|street-sky)/.test(a.name)) return true;
+      }
+      return false;
+    };
+    this.inner.traverse((o) => {
+      const m = o as Mesh;
+      if (!m.isMesh) return;
+      const mat = m.material as MeshStandardMaterial;
+      const solid = !Array.isArray(mat) && !mat.transparent && !skip(o);
+      m.castShadow = solid;
+      m.receiveShadow = solid;
+    });
+  }
+
+  private findTableSun(): DirectionalLight | null {
+    let found: DirectionalLight | null = null;
+    this.world.scene.traverse((o) => {
+      if (!found && (o as DirectionalLight).isDirectionalLight && o !== this.streetSun) found = o as DirectionalLight;
+    });
+    return found;
   }
 
   /** Glowing standing spots at the other viewpoints: point and pinch to teleport. */

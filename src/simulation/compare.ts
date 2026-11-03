@@ -1,4 +1,4 @@
-/** Plan A vs Plan B at a given year: per-metric winner + a one-line headline. */
+/** Two plans at a given year: per-metric winner + a one-line headline (names are the UI's). */
 import type { Year } from '../config/projection.js';
 import type { TerrainMap } from '../world/terrain-map.js';
 import type { Placement } from './metrics.js';
@@ -25,6 +25,7 @@ export function comparePlans(
   planA: readonly Placement[],
   planB: readonly Placement[],
   year: Year = 2050,
+  names: { A: string; B: string } = { A: 'Plan A', B: 'Plan B' },
 ): PlanComparison {
   const a = projectYear(terrain, planA, year);
   const b = projectYear(terrain, planB, year);
@@ -38,6 +39,6 @@ export function comparePlans(
   let headline: string;
   if (allMet(aTargets) && allMet(bTargets)) headline = `Both plans meet every ${year} target.`;
   else if (am === bm) headline = `Both plans meet ${am} of 4 targets in ${year}.`;
-  else headline = `Plan ${am > bm ? 'A' : 'B'} meets ${Math.max(am, bm)} of 4 targets in ${year} (other: ${Math.min(am, bm)}).`;
+  else headline = `${am > bm ? names.A : names.B} meets ${Math.max(am, bm)} of 4 targets in ${year} (other: ${Math.min(am, bm)}).`;
   return { year, a, b, aTargets, bTargets, better, headline };
 }

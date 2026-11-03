@@ -13,22 +13,31 @@
 </style>
 <Panel id="root" class="panel-root">
   <div class="heading">Plan</div>
+  <Button id="btn-split" class="enter"><ButtonIcon><Split></Split></ButtonIcon><ButtonLabel id="split-label">Split into two futures</ButtonLabel></Button>
+  <Button id="btn-seam" class="enter"><ButtonIcon><Columns2></Columns2></ButtonIcon><ButtonLabel id="seam-label">Reality Seam</ButtonLabel></Button>
+  <Button id="btn-why" class="enter"><ButtonIcon><Sparkles></Sparkles></ButtonIcon><ButtonLabel id="why-label">Why? Causality Vision</ButtonLabel></Button>
+  <Button id="btn-enter" class="enter"><ButtonIcon><DoorOpen></DoorOpen></ButtonIcon><ButtonLabel id="enter-label">Enter your city</ButtonLabel></Button>
   <div class="cols">
     <div class="col">
       <Button id="btn-undo" class="button"><ButtonIcon><Undo2></Undo2></ButtonIcon><ButtonLabel>Undo</ButtonLabel></Button>
+    </div>
+    <div class="col">
+      <Button id="btn-save-a" class="button"><ButtonIcon><Save></Save></ButtonIcon><ButtonLabel>Save plan</ButtonLabel></Button>
+    </div>
+  </div>
+  <div id="act-more" class="cols">
+    <div class="col">
       <Button id="btn-redo" class="button"><ButtonIcon><Redo2></Redo2></ButtonIcon><ButtonLabel>Redo</ButtonLabel></Button>
       <Button id="btn-rotate" class="button"><ButtonIcon><RotateCw></RotateCw></ButtonIcon><ButtonLabel>Rotate</ButtonLabel></Button>
       <Button id="btn-remove" class="button"><ButtonIcon><Trash2></Trash2></ButtonIcon><ButtonLabel>Remove</ButtonLabel></Button>
       <Button id="btn-restart" class="button"><ButtonIcon><RefreshCw></RefreshCw></ButtonIcon><ButtonLabel>Clear map</ButtonLabel></Button>
     </div>
     <div class="col">
-      <Button id="btn-save-a" class="button"><ButtonIcon><Save></Save></ButtonIcon><ButtonLabel>Save Plan A</ButtonLabel></Button>
-      <Button id="btn-restore-a" class="button"><ButtonIcon><History></History></ButtonIcon><ButtonLabel>Restore A</ButtonLabel></Button>
-      <Button id="btn-compare" class="button"><ButtonIcon><Columns2></Columns2></ButtonIcon><ButtonLabel>Compare A/B</ButtonLabel></Button>
+      <Button id="btn-restore-a" class="button"><ButtonIcon><History></History></ButtonIcon><ButtonLabel>Restore saved</ButtonLabel></Button>
+      <Button id="btn-compare" class="button"><ButtonIcon><Columns2></Columns2></ButtonIcon><ButtonLabel>Compare saved</ButtonLabel></Button>
       <Button id="btn-pause" class="button"><ButtonIcon><Pause></Pause></ButtonIcon><ButtonLabel id="pause-label">Pause</ButtonLabel></Button>
-      <Button id="btn-finish" class="button"><ButtonIcon><Flag></Flag></ButtonIcon><ButtonLabel>Finish plan</ButtonLabel></Button>
+      <Button id="btn-replay" class="button"><ButtonIcon><Play></Play></ButtonIcon><ButtonLabel>Replay intro</ButtonLabel></Button>
     </div>
   </div>
-  <Button id="btn-split" class="enter"><ButtonIcon><Split></Split></ButtonIcon><ButtonLabel id="split-label">Split into two futures</ButtonLabel></Button>
-  <Button id="btn-enter" class="enter"><ButtonIcon><DoorOpen></DoorOpen></ButtonIcon><ButtonLabel id="enter-label">Enter your city</ButtonLabel></Button>
+  <Button id="btn-finish" class="enter"><ButtonIcon><Flag></Flag></ButtonIcon><ButtonLabel>Finish plan</ButtonLabel></Button>
 </Panel>

@@ -13,12 +13,15 @@ import {
   Mesh,
   MeshStandardMaterial,
   Object3D,
+  PCFShadowMap,
   PCFSoftShadowMap,
   SRGBColorSpace,
   VisibilityState,
 } from '@iwsdk/core';
 import { BOARD_CENTER, GRID_COLS, TILE_SIZE } from '../config/scenario.js';
 import { prefersReducedMotion } from '../ui/accessibility.js';
+import { QUALITY, QUALITY_SETTINGS } from '../config/quality.js';
+import { streetView } from '../core/session.js';
 
 const HALF_W = (GRID_COLS * TILE_SIZE) / 2;
 
@@ -67,7 +70,8 @@ export class AmbientSystem extends createSystem({}) {
   private setupShadows(): void {
     const renderer = this.world.renderer;
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = PCFSoftShadowMap;
+    const q = QUALITY_SETTINGS[QUALITY];
+    renderer.shadowMap.type = q.softShadows ? PCFSoftShadowMap : PCFShadowMap;
     let sun: DirectionalLight | undefined;
     this.world.scene.traverse((o) => {
       if ((o as DirectionalLight).isDirectionalLight) sun = o as DirectionalLight;
@@ -76,7 +80,7 @@ export class AmbientSystem extends createSystem({}) {
     sun.castShadow = true;
     // 2048² over a 1.1 m frustum: ~0.54 mm per texel, fine enough for villa-scale
     // eaves and trees (was 1024² over 1.2 m, ~1.2 mm).
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(q.shadowMapSize, q.shadowMapSize);
     sun.shadow.bias = -0.0005;
     sun.shadow.normalBias = 0.002;
     const cam = sun.shadow.camera;
@@ -87,6 +91,11 @@ export class AmbientSystem extends createSystem({}) {
     cam.near = 0.5;
     cam.far = 4;
     sun.target.position.set(...BOARD_CENTER);
+    // The shadow frustum covers the tabletop only; at street level nothing
+    // receives it, so skip the shadow pass there (Milestone G audit: 13 casters
+    // were still rendered into a 2048² map every frame in the street).
+    const s = sun;
+    this.cleanupFuncs.push(streetView.subscribe((v) => (s.castShadow = !v)));
     this.world.scene.add(sun.target);
     // Ground everything on the board in shadow.
     this.world.scene.getObjectByName('terrain-board')?.traverse((o) => {

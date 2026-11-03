@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { buildPlan, key, open, snap } from './helpers';
+import { buildPlan, key, open, snap, ui } from './helpers';
 
 type Street = { active: boolean; viewpoint: number | null; boardVisible: boolean | null; fading: boolean; year: number; story: string[] };
 const street = (page: import('@playwright/test').Page) =>
@@ -60,8 +60,7 @@ test('compare futures at street level: same place and camera, Plan A vs Plan B f
   type S2 = Street & { plan: 'A' | 'B'; haze: number; greening: number; districtHere: boolean };
   const st = () => page.evaluate(() => (window as unknown as { __terracity: { street(): S2 } }).__terracity.street());
   const click = async (id: string) => {
-    const p = await page.evaluate((id) => (window as unknown as { __terracity: { uiToScreen(a: string, b: string): { x: number; y: number } } }).__terracity.uiToScreen('street-panel', id), id);
-    await page.mouse.click(p.x, p.y);
+    await ui(page, 'street-panel', id); // opens Details first, as a user would
     await settled(page);
   };
   await open(page);
@@ -135,4 +134,81 @@ test('the last child: her garden and words follow the plan; rewriting the plan c
   const again = await visit2050();
   const outcome = (c: C) => c && { happy: c.happy, state: c.state, garden: c.garden, lines: c.lines };
   expect(outcome(again)).toEqual(outcome(after));
+});
+
+test('Mira 2.0: a user-paced conversation grounded in the simulation; the same place differs between futures', async ({ page }) => {
+  test.setTimeout(180_000);
+  type C = { talking: boolean; index: number; dialogue: string[]; groundY: number; expression: string; pointing: boolean; points: Array<{ col: number; row: number } | null> } | null;
+  type P = { kind: string; title: string; lines: string[]; open: boolean };
+  type S3 = Street & { plan: 'A' | 'B' | 'none'; child: C; poi: P[]; residents: number };
+  const occluded = () => page.evaluate(() => (window as unknown as { __terracity: { miraOccluded(): string[] } }).__terracity.miraOccluded());
+  const st = () => page.evaluate(() => (window as unknown as { __terracity: { street(): S3 } }).__terracity.street());
+  await open(page);
+  // Your plan (balanced) vs nobody planning; enter Future A in 2050.
+  await buildPlan(page, [[5, 6, 3], [5, 7, 3], [1, 6, 2], [1, 6, 4], [1, 2, 4], [1, 8, 3], [3, 10, 8], [3, 11, 8], [3, 12, 8], [4, 9, 3], [4, 1, 4], [2, 9, 4]]);
+  await key(page, 'KeyV');
+  await page.waitForFunction(() => { const s = (window as unknown as { __terracity: { split(): { open: boolean; t: number } } }).__terracity.split(); return s.open && s.t === 1; });
+  await page.evaluate(() => (window as unknown as { __terracity: { selectFuture(f: string): void } }).__terracity.selectFuture('A'));
+  await ui(page, 'actions-panel', 'btn-enter');
+  await settled(page);
+
+  const a = await st();
+  expect(a.plan).toBe('B'); // the current plan (no Plan A saved)
+  const lines = a.child!.dialogue;
+  expect(a.child!.talking).toBe(false); // she invites; the user starts
+  expect(lines.length).toBeGreaterThanOrEqual(3);
+  expect(new Set(lines).size).toBe(lines.length);
+  expect(lines[0]).toBe("Hi, I'm Mira. I live on this street.");
+  expect(lines.join(' ')).toMatch(/In the other future this street was never built/);
+  expect(lines.at(-1)).toBe('Will you look at the other future too?');
+
+  // Points of interest near her come from this plan only (no sprawl in yours).
+  expect(a.poi.length).toBeGreaterThan(0);
+  expect(a.poi.map((q) => q.kind)).not.toContain('sprawl');
+  const toggle = (i: number) => page.evaluate((k) => (window as unknown as { __terracity: { poi(i: number): void } }).__terracity.poi(k), i);
+  await toggle(0);
+  expect((await st()).poi.map((q) => q.open)[0]).toBe(true);
+  await toggle(0);
+  expect((await st()).poi.every((q) => !q.open)).toBe(true);
+
+  // Mira 3.0: in view, nothing between you and her; a smile where her street thrives.
+  expect(await occluded()).toEqual([]);
+  expect(a.child!.expression).toBe('happy');
+
+  // Talk -> next -> back -> end, at the user's pace.
+  await ui(page, 'street-panel', 'st-talk');
+  expect((await st()).child).toMatchObject({ talking: true, index: 0 });
+  await ui(page, 'street-panel', 'st-talk');
+  expect((await st()).child!.index).toBe(1);
+  await ui(page, 'street-panel', 'st-talk-back');
+  expect((await st()).child!.index).toBe(0);
+  await ui(page, 'street-panel', 'st-talk-end');
+  expect((await st()).child!.talking).toBe(false);
+
+  // The same place in the future where nobody planned: different, still true, words.
+  await ui(page, 'street-panel', 'st-return');
+  await settled(page);
+  await page.evaluate(() => (window as unknown as { __terracity: { selectFuture(f: string): void } }).__terracity.selectFuture('B'));
+  await ui(page, 'actions-panel', 'btn-enter');
+  await settled(page);
+  const b = await st();
+  expect(b.plan).toBe('none');
+  expect(b.viewpoint).toBe(a.viewpoint);
+  expect(b.child!.dialogue[0]).toBe("Hi, I'm Mira.");
+  expect(b.child!.dialogue.join(' ')).toMatch(/In the other future there is a planned street here/);
+  expect(b.child!.dialogue).not.toEqual(lines);
+  expect(b.child!.groundY).toBeGreaterThan(0.5); // she stands on the sprawl slab, not inside it
+  expect(b.poi.map((q) => q.kind)).toEqual(['sprawl']);
+  // Where nobody planned: calm (not staged misery), neighbours around, still in clear view.
+  expect(b.child!.expression).toBe('neutral');
+  expect(b.residents).toBeGreaterThan(0);
+  expect(await occluded()).toEqual([]);
+  // When a line is about a place, she points at it.
+  const pi = b.child!.points.findIndex((x) => !!x);
+  expect(pi).toBeGreaterThanOrEqual(0);
+  const talkTo = (a: 'next') => page.evaluate((x) => (window as unknown as { __terracity: { talk(a: string): void } }).__terracity.talk(x), a);
+  for (let i = 0; i <= pi; i++) await talkTo('next');
+  await page.waitForTimeout(300);
+  expect((await st()).child!.pointing).toBe(true);
+  expect(b.poi[0].lines.join(' ')).toMatch(/newcomers without a planned home/);
 });

@@ -3,7 +3,9 @@ TerraCity — stylized people (Blender, reproducible). Soft, rounded figures wit
 faces, hair and clothing, coloured per vertex with a baked top-light gradient
 (no textures). Output: public/models/people.glb with root nodes
 
-  mira          Mira, 9: children mira-body and mira-arm-r (pivot at the shoulder)
+  mira          Mira, 9: mira-body, mira-head (pivot at the neck; mira-smile /
+                mira-sad / mira-neutral mouths and mira-lids eyelids inside),
+                mira-arm-r and mira-arm-l (pivots at the shoulders)
   adult-0..3    four distinct adults, standing
   rider         an adult seated on a bicycle (legs bent), no bicycle
 
@@ -163,49 +165,82 @@ def face(cx, cz, r, skin, eye="#2b2420", y_front=None, smile=True, cheeks=True):
 
 # ------------------------------------------------------------------ Mira --
 
+def pivot_at(o, xyz):
+    """Move an object's origin to `xyz` (world), geometry unchanged."""
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.context.scene.cursor.location = xyz
+    bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+    bpy.context.scene.cursor.location = (0, 0, 0)
+    return o
+
+
+def attach(child, parent):
+    """Parent keeping the child's world placement."""
+    child.parent = parent
+    child.matrix_parent_inverse = parent.matrix_world.inverted()
+
+
 def mira():
+    """Mira, 9: body; head (pivot at the neck) with three mouths and eyelids;
+    two arms (pivots at the shoulders) — so she can look at you, blink, nod,
+    and point at what she talks about."""
     skin, hair, dress = "#c98d6a", "#3a2618", "#f2b33d"
     P = []
     # Legs and sandals.
     for sx in (-1, 1):
         P += capsule("leg", (sx * 0.065, 0, 0.06), (sx * 0.06, 0, 0.44), 0.045, 0.05, skin)
         P.append(sphere("shoe", (sx * 0.065, -0.03, 0.035), (0.055, 0.09, 0.04), "#c0563b", 12, 8))
-    # Dress: a flared skirt and a fitted top, white collar, a pocket with a flower.
-    # One A-line dress: flared hem, fitted waist, rounded shoulders.
+    # One A-line dress: flared hem, fitted waist, rounded shoulders; white collar; a flower.
     P.append(lathe("dress", [(0.36, 0.27, 0.25), (0.39, 0.27, 0.25), (0.5, 0.23, 0.21), (0.66, 0.17, 0.15), (0.77, 0.14, 0.12), (0.88, 0.15, 0.125), (0.97, 0.14, 0.11), (1.01, 0.09, 0.075), (1.03, 0.05, 0.045)], dress, 20))
     bpy.ops.mesh.primitive_torus_add(major_radius=0.07, minor_radius=0.013, location=(0, 0, 1.015), major_segments=20, minor_segments=6)
     P.append(finish(bpy.context.active_object, "#ffffff", 0))
     P.append(sphere("flower", (0.09, -0.2, 0.62), (0.03, 0.015, 0.03), "#e86a8f", 10, 6))
-    # Neck and head (big, friendly proportions).
     P += capsule("neck", (0, 0, 0.98), (0, 0, 1.06), 0.045, 0.045, skin)
+    body = join(P, "mira-body")
+
+    # Head (big, friendly proportions), pivot at the top of the neck.
     hr = 0.15
-    P.append(sphere("head", (0, 0, 1.2), (hr, hr * 0.96, hr * 1.02), skin, 20, 14))
-    P += face(0, 1.2, hr, skin, smile=False)  # her mouth follows the simulation (below)
-    # Hair: a cap, a fringe, two pigtails with yellow ties.
-    P.append(sphere("hair", (0, 0.015, 1.235), (hr * 1.07, hr * 1.06, hr * 1.0), hair, 20, 14))
-    for v in P[-1].data.vertices:  # open the face: push front-lower hair inward
-        w = P[-1].matrix_world @ v.co
+    H = [sphere("head", (0, 0, 1.2), (hr, hr * 0.96, hr * 1.02), skin, 20, 14)]
+    H += face(0, 1.2, hr, skin, smile=False)  # her mouth follows the simulation (below)
+    H.append(sphere("hair", (0, 0.015, 1.235), (hr * 1.07, hr * 1.06, hr * 1.0), hair, 20, 14))
+    for v in H[-1].data.vertices:  # open the face: push front-lower hair inward
+        w = H[-1].matrix_world @ v.co
         if w.y < -0.04 and w.z < 1.27:
             v.co.y += 0.05
-    P.append(sphere("fringe", (0, -0.1, 1.31), (hr * 0.75, hr * 0.28, hr * 0.22), hair, 16, 10))
+    H.append(sphere("fringe", (0, -0.1, 1.31), (hr * 0.75, hr * 0.28, hr * 0.22), hair, 16, 10))
     for sx in (-1, 1):
-        P.append(sphere("pigtail", (sx * 0.19, 0.03, 1.17), (0.06, 0.06, 0.1), hair, 14, 10))
-        P.append(sphere("tie", (sx * 0.16, 0.03, 1.23), (0.03, 0.03, 0.02), "#f2d03d", 10, 6))
-    # Left arm, relaxed.
-    P += capsule("arm-l", (-0.17, 0, 0.96), (-0.21, -0.02, 0.66), 0.038, 0.032, skin)
-    P.append(sphere("hand-l", (-0.215, -0.02, 0.62), (0.042, 0.035, 0.05), skin, 12, 8))
-    body = join(P, "mira-body")
-    # Right arm: pivot at the shoulder (origin), hanging down along -Z.
+        H.append(sphere("pigtail", (sx * 0.19, 0.03, 1.17), (0.06, 0.06, 0.1), hair, 14, 10))
+        H.append(sphere("tie", (sx * 0.16, 0.03, 1.23), (0.03, 0.03, 0.02), "#f2d03d", 10, 6))
+    head = pivot_at(join(H, "mira-head"), (0, 0, 1.06))
+    f = -hr * 0.93
+    happy = mouth(0, 1.2, hr, f, True, "mira-smile")
+    sad = mouth(0, 1.2, hr, f, False, "mira-sad")
+    # Neutral: a small, calm line (thoughtful, not unhappy).
+    neutral = sphere("mira-neutral", (0, f + hr * 0.02, 1.2 - hr * 0.36), (hr * 0.11, hr * 0.02, hr * 0.022), "#8a3b33", 10, 6)
+    # Eyelids (hidden; shown for a blink): skin-coloured caps just in front of the eyes.
+    lids = []
+    for sx in (-1, 1):
+        lids.append(sphere("lid", (sx * hr * 0.36, f - 0.004, 1.2 + hr * 0.05), (hr * 0.16, hr * 0.08, hr * 0.2), skin, 10, 8))
+    lid = join(lids, "mira-lids")
+    for o in (happy, sad, neutral, lid):
+        attach(o, head)
+
+    # Arms: pivots at the shoulders, hanging down along -Z.
     A = capsule("arm-r", (0, 0, 0), (0.03, -0.02, -0.3), 0.038, 0.032, skin)
     A.append(sphere("hand-r", (0.035, -0.02, -0.34), (0.042, 0.035, 0.05), skin, 12, 8))
-    arm = join(A, "mira-arm-r")
-    arm.location = (0.17, 0, 0.96)
-    happy = mouth(0, 1.2, hr, -hr * 0.93, True, "mira-smile")
-    sad = mouth(0, 1.2, hr, -hr * 0.93, False, "mira-sad")
+    arm_r = join(A, "mira-arm-r")
+    arm_r.location = (0.17, 0, 0.96)
+    L = capsule("arm-l", (0, 0, 0), (-0.03, -0.02, -0.3), 0.038, 0.032, skin)
+    L.append(sphere("hand-l", (-0.035, -0.02, -0.34), (0.042, 0.035, 0.05), skin, 12, 8))
+    arm_l = join(L, "mira-arm-l")
+    arm_l.location = (-0.17, 0, 0.96)
+
     root = bpy.data.objects.new("mira", None)
     bpy.context.scene.collection.objects.link(root)
-    for o in (body, arm, happy, sad):
-        o.parent = root
+    for o in (body, head, arm_r, arm_l):
+        attach(o, root)
     return root
 
 

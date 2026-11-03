@@ -21,6 +21,6 @@
   <div id="ov-line-5" class="line">-</div>
   <div class="buttons">
     <Button id="ov-primary"><ButtonIcon><Play></Play></ButtonIcon><ButtonLabel id="ov-primary-label">Start</ButtonLabel></Button>
-    <Button id="ov-secondary" variant="secondary"><ButtonLabel id="ov-secondary-label">Compare A/B</ButtonLabel></Button>
+    <Button id="ov-secondary" variant="secondary"><ButtonLabel id="ov-secondary-label">Compare with saved</ButtonLabel></Button>
   </div>
 </Panel>

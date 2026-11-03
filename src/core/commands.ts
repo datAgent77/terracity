@@ -8,6 +8,7 @@ import { StructureType } from '../config/scenario.js';
 import { STRUCTURES } from '../config/structures.js';
 import { projectYear } from '../simulation/projection.js';
 import { futurePair } from '../world/futures.js';
+import { clampSeam, stepSeam } from '../interactions/reality-seam.js';
 import { GARDEN_VIEWPOINT, nextViewpoint } from '../world/street-view.js';
 import {
   armedType,
@@ -22,13 +23,19 @@ import {
   selectedId,
   statusText,
   futuresOpen,
+  seamPos,
+  causalityOn,
+  miraTalked,
+  outroOpen,
+  planVersion,
   streetView,
   timeLeft,
   tutorial,
   viewYear,
 } from './session.js';
 
-const PLAN_A_KEY = 'terracity.planA.v1';
+import { LEGACY_PLAN_A_KEY, parseSaved, SAVE_KEY, serialize } from './persistence.js';
+import type { Placement } from '../simulation/metrics.js';
 
 /** Editing is allowed only while building and viewing 2026. */
 export function canEdit(): boolean {
@@ -135,40 +142,59 @@ export function savePlanA(): void {
   if (phase.peek() !== 'building') return;
   const snapshot = game.placements.map((p) => ({ ...p }));
   planA.value = snapshot;
-  try {
-    localStorage.setItem(PLAN_A_KEY, JSON.stringify(snapshot));
-  } catch {
-    /* storage unavailable: Plan A stays in memory for this session */
-  }
-  statusText.value = `Plan A saved (${snapshot.length} pieces). Change the map to make Plan B, then Compare.`;
+  persist();
+  statusText.value = `Plan saved (${snapshot.length} pieces). Keep changing your plan, then compare it with the saved one.`;
 }
 
 export function restorePlanA(): void {
   const a = planA.peek();
   if (!a || !canEdit()) {
-    if (!a) statusText.value = 'No Plan A saved yet.';
+    if (!a) statusText.value = 'No saved plan yet.';
     return;
   }
   clearSelection();
-  game.load(a, 'Plan A');
+  game.load(a, 'The saved plan');
 }
 
 export function toggleCompare(): void {
   if (!planA.peek()) {
-    statusText.value = 'Save Plan A first, then change the map to build Plan B.';
+    statusText.value = 'Save your plan first, then change it and compare.';
     return;
   }
   clearSelection();
   compareOpen.value = !compareOpen.peek();
 }
 
-/** Restore a Plan A saved in an earlier visit (per-browser convenience). */
+/** The current map saved in an earlier visit, restored when the first session starts. */
+let savedCurrent: Placement[] | null = null;
+
+/**
+ * Load Plan A and the current map saved in an earlier visit (validated as a
+ * whole; a corrupt save is ignored). Plan A is available at once, the map is
+ * restored when the session starts.
+ */
 export function loadStoredPlanA(): void {
+  let raw: string | null = null;
+  let legacy: string | null = null;
   try {
-    const raw = localStorage.getItem(PLAN_A_KEY);
-    if (raw) planA.value = JSON.parse(raw);
+    raw = localStorage.getItem(SAVE_KEY);
+    legacy = localStorage.getItem(LEGACY_PLAN_A_KEY);
   } catch {
-    /* ignore corrupt or blocked storage */
+    return; // storage blocked
+  }
+  const s = parseSaved(game.terrain, raw, legacy);
+  if (!s) return;
+  if (s.planA) planA.value = s.planA;
+  savedCurrent = s.current.length ? s.current : null;
+}
+
+/** Save Plan A and the current map (only while a session is running). */
+export function persist(): void {
+  if (phase.peek() === 'intro') return;
+  try {
+    localStorage.setItem(SAVE_KEY, serialize(planA.peek(), game.placements));
+  } catch {
+    /* storage unavailable: everything stays in memory for this session */
   }
 }
 
@@ -179,8 +205,27 @@ let tutorialFinished = false;
 /** Re-evaluate the coach after any state change. */
 export function updateTutorial(): void {
   if (!tutorial.active) return;
-  tutorial.update({ placements: game.placements, servedIds: game.metrics.servedIds, viewYear: viewYear.peek(), inStreet: !!streetView.peek(), futuresOpen: !!futuresOpen.peek() });
-  if (!tutorial.active) tutorialFinished = true;
+  const v = streetView.peek();
+  tutorial.update({
+    placements: game.placements,
+    servedIds: game.metrics.servedIds,
+    viewYear: viewYear.peek(),
+    inStreet: !!v,
+    futuresOpen: !!futuresOpen.peek(),
+    causalityOn: causalityOn.peek(),
+    seam: seamPos.peek(),
+    streetPlan: v?.plan ?? null,
+    talked: miraTalked.peek(),
+    planVersion: planVersion.peek(),
+  });
+  if (!tutorial.active) {
+    tutorialFinished = true;
+    // Completed by the player (not skipped): the closing card.
+    if (tutorial.completed) {
+      outroOpen.value = true;
+      statusText.value = "The future isn't written. Change it. Return to the tabletop to keep planning.";
+    }
+  }
   coachText.value = phase.peek() === 'building' ? tutorial.text : '';
 }
 
@@ -189,11 +234,37 @@ export function toggleTips(): void {
     tutorial.skip();
     tutorialFinished = true;
   } else {
-    tutorial.reset();
+    tutorial.reset(planVersion.peek());
     tutorialFinished = false;
   }
   updateTutorial();
   coachText.value = phase.peek() === 'building' ? tutorial.text : '';
+}
+
+/**
+ * Replay the first five minutes on the current plan (nothing is cleared):
+ * back to one world on the tabletop; step 1 waits for a new choice.
+ */
+export function replayIntro(): void {
+  outroOpen.value = false;
+  exitCity();
+  closeFutures();
+  causalityOn.value = false;
+  tutorial.reset(planVersion.peek());
+  tutorialFinished = false;
+  updateTutorial();
+  statusText.value = 'Every city begins with a choice.';
+}
+
+/** Close the closing card; planning continues. */
+export function closeOutro(): void {
+  outroOpen.value = false;
+}
+
+/** Start without the guided journey: straight to the full planning tools. */
+export function startWithoutIntro(): void {
+  startGame();
+  if (tutorial.active) toggleTips();
 }
 
 export function startGame(): void {
@@ -203,12 +274,17 @@ export function startGame(): void {
   if (!tutorialFinished) tutorial.reset();
   challenge.start();
   phase.value = 'building';
+  if (savedCurrent) {
+    game.load(savedCurrent, 'Your saved plan');
+    savedCurrent = null;
+    statusText.value = 'Your saved plan was restored. Clear map to start over.';
+  }
   timeLeft.value = challenge.timeLeft;
   result.value = null;
   viewYear.value = 2026;
   compareOpen.value = false;
   paused.value = false;
-  statusText.value = 'Plan Costa Verde for 2050. Pinch a structure from the tray.';
+  if (!game.placements.length) statusText.value = 'Plan Costa Verde for 2050. Pinch a structure from the tray.';
   updateTutorial();
 }
 
@@ -301,13 +377,13 @@ export function setStreetPlan(plan: 'A' | 'B'): void {
   const v = streetView.peek();
   if (!v || v.plan === plan || v.plan === 'none') return;
   if (plan === 'A' && !planA.peek()) {
-    statusText.value = 'Save Plan A on the tabletop first, then change the map to make Plan B.';
+    statusText.value = 'Save your plan on the tabletop first, then change it to compare.';
     return;
   }
   // Comparing futures: 2026 is the same for both plans, so show 2050.
   if (viewYear.peek() === 2026) viewYear.value = 2050;
   streetView.value = { ...v, plan };
-  statusText.value = plan === 'A' ? 'Plan A in the same place.' : 'Plan B (your current map) in the same place.';
+  statusText.value = plan === 'A' ? 'The saved plan, in the same place.' : 'Your plan, in the same place.';
 }
 
 // ---------------------------------------------------------- split reality --
@@ -319,14 +395,50 @@ export function openFutures(): void {
   compareOpen.value = false;
   futuresOpen.value = { selected: null };
   statusText.value = planA.peek()
-    ? 'Two futures: Plan A in your left hand, Plan B (now) in your right. Bring your hands together to merge.'
+    ? 'Two futures: your plan on the left, the saved plan on the right. Bring your hands together to merge.'
     : 'Two futures: your plan on the left, the same coast if nobody plans on the right. Bring your hands together to merge.';
 }
 
 export function closeFutures(): void {
   if (!futuresOpen.peek()) return;
+  seamPos.value = null;
   futuresOpen.value = null;
-  statusText.value = 'One world again. Your plan is unchanged.';
+  // Merging closes the comparison; it never combines two plans.
+  statusText.value = planA.peek()
+    ? 'One world again: you are back on your plan. Plans are compared, never combined; Restore saved brings the saved plan back.'
+    : 'One world again: your plan, unchanged. The other future was only a comparison.';
+}
+
+/**
+ * Reality Seam on / off: lay the two futures on the table at the same place,
+ * divided by a movable seam (opens the futures first if needed). Off: back
+ * to side by side.
+ */
+export function toggleSeam(): void {
+  if (streetView.peek() || phase.peek() === 'intro') return;
+  if (seamPos.peek() !== null) {
+    seamPos.value = null;
+    statusText.value = 'The two futures side by side again.';
+    return;
+  }
+  if (!futuresOpen.peek()) openFutures();
+  if (!futuresOpen.peek()) return;
+  seamPos.value = 0.5;
+  statusText.value = planA.peek()
+    ? 'Reality Seam: your plan on the left of the seam, the saved plan on the right. Pinch the glowing handle (or drag, or use the arrow keys) to move it.'
+    : 'Reality Seam: your plan on the left of the seam, the same place if nobody plans on the right. Pinch the glowing handle (or drag, or use the arrow keys) to move it.';
+}
+
+/** Move the seam (0..1 across the board). */
+export function setSeam(u: number): void {
+  if (seamPos.peek() === null) return;
+  const v = clampSeam(u);
+  if (v !== seamPos.peek()) seamPos.value = v;
+}
+
+export function nudgeSeam(dir: -1 | 1): void {
+  const u = seamPos.peek();
+  if (u !== null) setSeam(stepSeam(u, dir));
 }
 
 export function toggleFutures(): void {
@@ -348,7 +460,8 @@ export function enterFuture(side: 'A' | 'B'): void {
   if (!futuresOpen.peek() || streetView.peek()) return;
   const a = planA.peek();
   const pair = futurePair(a, game.placements, viewYear.peek());
-  const plan: 'A' | 'B' | 'none' = a ? side : side === 'A' ? 'B' : 'none';
+  // Future A is always your (current) plan; B is the saved plan or nobody planning.
+  const plan: 'A' | 'B' | 'none' = side === 'A' ? 'B' : a ? 'A' : 'none';
   const homes = (ps: readonly { type: StructureType; col: number; row: number; id: string }[]) => ps.find((p) => p.type === StructureType.Residential);
   const target = homes(game.placements) ?? homes(pair[side].plan) ?? (a ? homes(a) : undefined);
   futuresOpen.value = { selected: side };

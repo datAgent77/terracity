@@ -31,10 +31,20 @@ export const timeLeft = signal(challenge.timeLeft);
 export const result = signal<ChallengeResult | null>(null);
 /** Paused (e.g. headset removed / overlay open). */
 export const paused = signal(false);
+/** Causality Vision: show why outcomes changed (rings on affected tiles, explanation card). */
+export const causalityOn = signal(false);
+/** Information layer 3 (full metrics, all planning controls, settings, detailed street story) is open. */
+export const detailsOpen = signal(false);
 /** "Sculpt time": continuous time progress (0..1) while the dial is turned (null = not scrubbing). */
 export const timeScrub = signal<number | null>(null);
 /** "Split reality": two futures held side by side (null = one world on the table). */
 export const futuresOpen = signal<{ selected: 'A' | 'B' | null } | null>(null);
+/**
+ * Reality Seam: while the two futures are open, they can lie on the table at
+ * the same place with a movable boundary; `u` (0..1, west to east) is where
+ * Future A (left) gives way to Future B (right). null = side by side.
+ */
+export const seamPos = signal<number | null>(null);
 /** "Enter your city": the garden district being visited at street level (null = tabletop). */
 export const streetView = signal<{
   id: string;
@@ -52,3 +62,7 @@ export const streetView = signal<{
 export const tutorial = new Tutorial();
 /** Current coach line ('' when tips are finished or skipped). */
 export const coachText = signal(tutorial.text);
+/** A conversation with Mira was had (and ended) during the current street visit (first-five-minutes step 5). */
+export const miraTalked = signal(false);
+/** The closing card of the first five minutes ("The future isn't written. Change it."). */
+export const outroOpen = signal(false);

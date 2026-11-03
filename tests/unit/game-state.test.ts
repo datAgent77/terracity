@@ -3,6 +3,7 @@ import { BALANCE } from '../../src/config/balance';
 import { StructureType as S } from '../../src/config/scenario';
 import { STRUCTURES } from '../../src/config/structures';
 import { GameState } from '../../src/core/game-state';
+import { projectYear } from '../../src/simulation/projection';
 
 describe('GameState actions', () => {
   it('adds, moves, rotates and removes, emitting events', () => {
@@ -118,5 +119,28 @@ describe('undo / redo consistency', () => {
     g.reset();
     expect(g.placements).toEqual([]);
     expect(g.canUndo).toBe(false);
+  });
+});
+
+describe('Plan A / Plan B isolation (CAUSALITY G, QA 1)', () => {
+  it('editing the current map (Plan B) never changes a saved Plan A or its 2050 projection', () => {
+    const g = new GameState();
+    g.add(S.Residential, 6, 4);
+    g.add(S.Road, 6, 3);
+    g.add(S.Wind, 12, 8);
+    // Plan A is saved as a copy of the pieces (commands.savePlanA).
+    const planA = g.placements.map((p) => ({ ...p }));
+    const frozen = JSON.stringify(planA);
+    const before = projectYear(g.terrain, planA, 2050);
+    const [homes, , wind] = g.placements;
+    g.move(homes.id, 6, 2);
+    g.rotate(wind.id);
+    g.remove(g.placements[1].id);
+    g.add(S.Park, 9, 3);
+    g.undo();
+    expect(JSON.stringify(planA)).toBe(frozen);
+    expect(projectYear(g.terrain, planA, 2050)).toEqual(before);
+    // …and the current map really changed.
+    expect(JSON.stringify(g.placements)).not.toBe(frozen);
   });
 });

@@ -22,11 +22,12 @@ import {
   viewYear,
 } from '../core/session.js';
 import { formatClock } from '../gameplay/challenge.js';
-import { coachText, futuresOpen, tutorial } from '../core/session.js';
+import { causalityOn, coachText, detailsOpen, futuresOpen, seamPos, streetView, tutorial } from '../core/session.js';
 import { cycleSound, largeText, prefersReducedMotion, soundLevel } from './accessibility.js';
 import { onHover, pulse } from './hover.js';
+import { viewLabel } from './view-label.js';
 import { landBudget } from '../simulation/land-budget.js';
-import { projectYear, type YearMetrics } from '../simulation/projection.js';
+import { explainYear, projectYear, type YearMetrics } from '../simulation/projection.js';
 import { sfx } from '../audio/sfx.js';
 
 const MET = '#1f8a4c';
@@ -35,13 +36,13 @@ const ARMED_BG = '#ffd36b';
 const IDLE_BG = 'rgba(0,0,0,0)';
 const ACTION_IDS = [
   'btn-undo', 'btn-redo', 'btn-rotate', 'btn-remove', 'btn-restart',
-  'btn-save-a', 'btn-restore-a', 'btn-compare', 'btn-pause', 'btn-finish', 'btn-split', 'btn-enter',
+  'btn-save-a', 'btn-restore-a', 'btn-compare', 'btn-pause', 'btn-finish', 'btn-split', 'btn-enter', 'btn-why', 'btn-replay', 'btn-seam',
 ];
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
 
 /** Tray slot the current tutorial tip asks for (1 = Homes, 3 = Wind). */
-const TIP_SLOT: Partial<Record<string, number>> = { homes: 1, wind: 3 };
+const TIP_SLOT: Partial<Record<string, number>> = { homes: 1 };
 
 /** Panels enlarged by the "Larger text" preference. */
 const SCALABLE_PANELS = ['hud-panel', 'actions-panel', 'time-panel', 'overlay-panel', 'compare-panel', 'street-panel'];
@@ -75,7 +76,54 @@ export class PanelSystem extends createSystem({}) {
     this.bindHud();
     this.bindActions();
     this.bindTrayLabels();
+    this.bindLayers();
     this.exposeTestHooks();
+  }
+
+  /**
+   * Information layers. Layer 1 (always): year, plan and mode, one instruction,
+   * the latest decision's effect. Layer 3 (on request, "Details" / D): the four
+   * metrics and land line, and the secondary planning controls.
+   */
+  private bindLayers(): void {
+    const hud = this.world.getSceneObject<UIKitMLAsset>('hud-panel');
+    const actions = this.world.getSceneObject<UIKitMLAsset>('actions-panel');
+    const label = hud?.getElementById<UIKit.Text>('details-label');
+    const mode = hud?.getElementById<UIKit.Text>('m-mode');
+    const btn = hud?.getElementById('btn-details') as unknown as Clickable | undefined;
+    if (btn) this.onClick(btn, () => (detailsOpen.value = !detailsOpen.peek()));
+    // Screen-space boxes follow the content (an oversized box would block the city).
+    const boxes: Record<string, [string, string]> = { 'hud-panel': ['34%', '62%'], 'actions-panel': ['36%', '56%'] };
+    const apply = () => {
+      const open = detailsOpen.value;
+      hud?.getElementById('hud-details')?.setProperties({ display: open ? 'flex' : 'none' });
+      actions?.getElementById('act-more')?.setProperties({ display: open ? 'flex' : 'none' });
+      label?.setProperties({ text: open ? 'Hide details' : 'Details' });
+      for (const [id, [small, big]] of Object.entries(boxes)) {
+        const obj = this.world.getSceneEntity(id)?.object3D;
+        if (obj) obj.userData.base_height = open ? big : small;
+      }
+      this.applyTextSize(largeText.peek());
+    };
+    const paintMode = () => {
+      const st = streetView.value;
+      const m = viewLabel({
+        phase: phase.value,
+        year: viewYear.value,
+        futuresOpen: !!futuresOpen.value,
+        seam: seamPos.value !== null,
+        hasSaved: !!planA.value,
+        street: st ? st.plan : null,
+      }).text;
+      mode?.setProperties({ text: m });
+    };
+    const relayout = () => this.applyTextSize(largeText.peek());
+    window.addEventListener('terracity-relayout', relayout);
+    this.cleanupFuncs.push(
+      () => window.removeEventListener('terracity-relayout', relayout),
+      detailsOpen.subscribe(apply),
+      ...[futuresOpen, streetView, planA, phase, viewYear, seamPos].map((s) => (s as { subscribe(f: () => void): () => void }).subscribe(paintMode)),
+    );
   }
 
   private clock = 0;
@@ -112,7 +160,7 @@ export class PanelSystem extends createSystem({}) {
     const land = text('m-land');
     text('t-population')?.setProperties({ text: `goal ${fmt(TARGETS.population)}` });
     text('t-environment')?.setProperties({ text: `goal ${TARGETS.environment}+` });
-    text('t-budget')?.setProperties({ text: `of ${BALANCE.startBudget}` });
+    text('t-budget')?.setProperties({ text: `of ${BALANCE.startBudget}, one-off` });
     text('t-renewable')?.setProperties({ text: `goal ${TARGETS.renewableCoverage}%` });
 
     // Colour-independent status: the goal label reads "met" once a target is reached.
@@ -157,11 +205,10 @@ export class PanelSystem extends createSystem({}) {
       set(env, y.environment);
       set(budget, y.budgetLeft);
       set(renew, y.renewableCoverage);
+      // What the four numbers mean, from the same projection (TEMPORAL_SIMULATION_SPEC.md).
+      const ex = explainYear(y);
       const unserved = game.metrics.unservedHomes;
-      const extra = [
-        unserved ? `${unserved} homes not connected by road` : '',
-        y.sprawlResidents ? `+${fmt(y.sprawlResidents)} in unplanned sprawl` : '',
-      ].filter(Boolean);
+      const extra = [ex.housing, ex.power, unserved ? `${unserved} homes not connected by road` : ''].filter(Boolean);
       sprawl?.setProperties({ text: extra.join(' / ') });
       const lb = landBudget(game.terrain, game.placements, y);
       land?.setProperties({
@@ -185,6 +232,9 @@ export class PanelSystem extends createSystem({}) {
     this.cleanupFuncs.push(
       coachText.subscribe((t) => {
         coach?.setProperties({ text: t || '-', display: t ? 'flex' : 'none' });
+        // One instruction at a time: the status line steps aside while a step is shown
+        // (the decision card still reports what each action changed).
+        text('status-text')?.setProperties({ display: t ? 'none' : 'flex' });
         skipLabel?.setProperties({ text: tutorial.active ? 'Skip tips' : 'Show tips' });
       }),
       largeText.subscribe((on) => {
@@ -217,13 +267,24 @@ export class PanelSystem extends createSystem({}) {
     }
     this.onClick(xrButton, () => this.world.launchXR());
     this.onClick(exitButton, () => this.world.exitXR());
-    this.cleanupFuncs.push(
-      this.world.visibilityState.subscribe((visibilityState) => {
-        const is2D = visibilityState === VisibilityState.NonImmersive;
-        xrButton.setProperties({ display: is2D ? 'flex' : 'none' });
-        exitButton.setProperties({ display: is2D ? 'none' : 'flex' });
-      }),
-    );
+    // XR capability fallback: offer "Enter Mixed Reality" only where the
+    // browser can start an immersive-ar session; everywhere else the desktop
+    // (mouse + keyboard) experience is complete on its own.
+    let supported = false;
+    const xrHook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
+    const paint = () => {
+      const is2D = this.world.visibilityState.peek() === VisibilityState.NonImmersive;
+      xrButton.setProperties({ display: is2D && supported ? 'flex' : 'none' });
+      xrHook.xrButtonShown = is2D && supported;
+      exitButton.setProperties({ display: is2D ? 'none' : 'flex' });
+    };
+    const xr = (navigator as Navigator & { xr?: { isSessionSupported(mode: string): Promise<boolean> } }).xr;
+    void (xr ? xr.isSessionSupported('immersive-ar').catch(() => false) : Promise.resolve(false)).then((ok) => {
+      supported = ok;
+      xrHook.xrSupported = ok;
+      paint();
+    });
+    this.cleanupFuncs.push(this.world.visibilityState.subscribe(paint));
   }
 
   private bindActions(): void {
@@ -239,9 +300,12 @@ export class PanelSystem extends createSystem({}) {
       'btn-restore-a': cmd.restorePlanA,
       'btn-compare': cmd.toggleCompare,
       'btn-pause': cmd.togglePause,
+      'btn-replay': cmd.replayIntro,
       'btn-finish': () => cmd.finishGame(),
       'btn-enter': () => (futuresOpen.peek() ? cmd.enterFuture(futuresOpen.peek()!.selected ?? 'A') : cmd.enterCity()),
       'btn-split': cmd.toggleFutures,
+      'btn-seam': cmd.toggleSeam,
+      'btn-why': () => (causalityOn.value = !causalityOn.peek()),
     };
     const buttons = new Map<string, Settable>();
     for (const id of ACTION_IDS) {
@@ -254,6 +318,8 @@ export class PanelSystem extends createSystem({}) {
     const pauseLabel = panel.getElementById<UIKit.Text>('pause-label');
     const splitLabel = panel.getElementById<UIKit.Text>('split-label');
     const enterLabel = panel.getElementById<UIKit.Text>('enter-label');
+    const whyLabel = panel.getElementById<UIKit.Text>('why-label');
+    const seamLabel = panel.getElementById<UIKit.Text>('seam-label');
     const dim = (id: string, on: boolean) => buttons.get(id)?.setProperties({ opacity: on ? 1 : 0.4 });
     const refresh = () => {
       const editing = phase.value === 'building' && viewYear.value === 2026 && !paused.value;
@@ -270,11 +336,23 @@ export class PanelSystem extends createSystem({}) {
       buttons.get('btn-split')?.setProperties({ backgroundColor: tutorial.active && tutorial.step === 'split' ? '#b87500' : undefined });
       pauseLabel?.setProperties({ text: paused.value ? 'Resume' : 'Pause' });
       splitLabel?.setProperties({ text: futuresOpen.value ? 'Merge the futures' : 'Split into two futures' });
+      // Contextual: the seam belongs to the comparison of the two futures.
+      const seamCue = tutorial.active && tutorial.step === 'seam' && seamPos.value === null;
+      buttons.get('btn-seam')?.setProperties({ display: futuresOpen.value ? 'flex' : 'none', backgroundColor: seamPos.value !== null ? '#0f7a6f' : seamCue ? '#b87500' : undefined });
+      this.display.set('actions-panel#btn-seam', futuresOpen.value ? 'flex' : 'none');
+      // One primary action per stage: planning controls step aside while comparing futures.
+      for (const id of ['btn-undo', 'btn-save-a', 'btn-finish']) {
+        buttons.get(id)?.setProperties({ display: futuresOpen.value ? 'none' : 'flex' });
+        this.display.set(`actions-panel#${id}`, futuresOpen.value ? 'none' : 'flex');
+      }
+      seamLabel?.setProperties({ text: seamPos.value !== null ? 'Side by side' : 'Reality Seam' });
+      whyLabel?.setProperties({ text: causalityOn.value ? 'Hide causality' : 'Why? Causality Vision' });
+      buttons.get('btn-why')?.setProperties({ backgroundColor: causalityOn.value ? '#0f7a6f' : undefined });
       dim('btn-split', phase.value !== 'intro');
       dim('btn-enter', !!futuresOpen.value || game.placements.some((p) => p.type === 'residential'));
       enterLabel?.setProperties({ text: futuresOpen.value ? `Enter future ${futuresOpen.value.selected ?? 'A'}` : 'Enter your city' });
     };
-    for (const s of [planVersion, phase, viewYear, paused, planA, coachText, futuresOpen] as const) {
+    for (const s of [planVersion, phase, viewYear, paused, planA, coachText, futuresOpen, causalityOn, seamPos] as const) {
       this.cleanupFuncs.push((s as { subscribe(f: () => void): () => void }).subscribe(refresh));
     }
   }
@@ -310,6 +388,9 @@ export class PanelSystem extends createSystem({}) {
   }
 
   /** Test/debug hooks: locate a UIKit element on screen and in the world. */
+  /** Contextual controls: what the UI currently shows / hides (test hook). */
+  private display = new Map<string, string>();
+
   private exposeTestHooks(): void {
     const v = new Vector3();
     const locate = (panelId: string, elementId: string) => {
@@ -327,6 +408,15 @@ export class PanelSystem extends createSystem({}) {
       return { x: r.left + ((p.x + 1) / 2) * r.width, y: r.top + ((1 - p.y) / 2) * r.height };
     };
     hook.uiWorldPosition = (panelId: string, elementId: string) => locate(panelId, elementId)?.toArray();
+    /** Display state the UI set for a contextual control ('flex' unless hidden). */
+    hook.uiDisplay = (panelId: string, elementId: string) => this.display.get(`${panelId}#${elementId}`) ?? 'flex';
+    /** Open whatever information layer contains this element (what a user does with "Details"). */
+    hook.reveal = (panelId: string, elementId: string) => {
+      const layer3 = new Set(['btn-redo', 'btn-rotate', 'btn-remove', 'btn-restart', 'btn-restore-a', 'btn-compare', 'btn-pause', 'btn-replay']);
+      if ((panelId === 'actions-panel' && layer3.has(elementId)) || (panelId === 'street-panel' && /^st-(plan|line|c\d)/.test(elementId))) {
+        detailsOpen.value = true;
+      }
+    };
     // Dev only: print button positions so CLI-driven XR tests can aim at them.
     // Re-logged on every visibility change because ScreenSpace panels move
     // between the desktop overlay and their world transform.

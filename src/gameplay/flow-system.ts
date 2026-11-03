@@ -10,18 +10,21 @@ import { game } from '../core/session.js';
 import { projectYear } from '../simulation/projection.js';
 import type { Year } from '../config/projection.js';
 import { cycleSound, largeText, soundOn } from '../ui/accessibility.js';
-import { challenge, coachText, compareOpen, futuresOpen, paused, phase, planA, result, streetView, timeLeft, viewYear } from '../core/session.js';
+import { challenge, coachText, outroOpen, seamPos, compareOpen, planVersion, causalityOn, detailsOpen, futuresOpen, paused, phase, planA, result, streetView, timeLeft, viewYear } from '../core/session.js';
 
 
 export class FlowSystem extends createSystem({}) {
   init(): void {
     cmd.loadStoredPlanA();
+    // Keep the save current: every plan change and every Plan A save.
+    this.cleanupFuncs.push(planVersion.subscribe(() => cmd.persist()), planA.subscribe(() => cmd.persist()));
     // Test/debug hook: read-only view of the challenge state.
     const hook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
     Object.assign(hook, {
       /** Projection of the current plan (read-only; used by tests and the video recorder). */
       project: (year: Year) => projectYear(game.terrain, game.placements, year, game.metrics),
-      viewYear, phase, planA, compareOpen, result, timeLeft, paused, challenge, coachText, largeText, soundOn });
+      placements: () => game.placements,
+      viewYear, phase, planA, compareOpen, result, timeLeft, paused, challenge, coachText, outroOpen, largeText, soundOn });
     // Dev only: state trace so CLI-driven XR tests (which cannot read JS) can assert on it.
     if (import.meta.env.DEV) {
       const trace = () =>
@@ -46,6 +49,8 @@ export class FlowSystem extends createSystem({}) {
   update(delta: number): void {
     cmd.tickClock(delta);
     const kb = this.input.keyboard;
+    if (kb.getKeyDown('KeyD')) detailsOpen.value = !detailsOpen.peek();
+    if (kb.getKeyDown('KeyW')) causalityOn.value = !causalityOn.peek();
     if (kb.getKeyDown('KeyE')) {
       if (streetView.peek()) cmd.exitCity();
       else if (futuresOpen.peek()) cmd.enterFuture(futuresOpen.peek()!.selected ?? 'A');
@@ -55,15 +60,26 @@ export class FlowSystem extends createSystem({}) {
       if (kb.getKeyDown('ArrowRight')) cmd.stepViewpoint(1);
       if (kb.getKeyDown('ArrowLeft')) cmd.stepViewpoint(-1);
       if (kb.getKeyDown('Escape')) cmd.exitCity();
+      const talk = (window as unknown as { __terracity?: { talk?(a: string): void } }).__terracity?.talk;
+      if (kb.getKeyDown('KeyK')) talk?.('next');
+      if (kb.getKeyDown('KeyB')) talk?.('back');
+      if (kb.getKeyDown('KeyX')) talk?.('end');
       return; // tabletop shortcuts are off while visiting the street
     }
     if (kb.getKeyDown('KeyV')) cmd.toggleFutures();
+    if (seamPos.peek() !== null) {
+      if (kb.getKeyDown('ArrowRight')) cmd.nudgeSeam(1);
+      if (kb.getKeyDown('ArrowLeft')) cmd.nudgeSeam(-1);
+    }
     if (kb.getKeyDown('KeyT')) cmd.nextYear();
     if (kb.getKeyDown('KeyS')) cmd.savePlanA();
     if (kb.getKeyDown('KeyC')) cmd.toggleCompare();
     if (kb.getKeyDown('KeyP')) cmd.togglePause();
     if (kb.getKeyDown('KeyF')) cmd.finishGame();
     if (kb.getKeyDown('KeyH')) cmd.toggleTips();
+    if (kb.getKeyDown('KeyI')) cmd.replayIntro();
+    if (kb.getKeyDown('KeyG')) cmd.toggleSeam();
+    if (kb.getKeyDown('KeyN')) (window as unknown as { __terracity?: { nextCause?(): void } }).__terracity?.nextCause?.();
     if (kb.getKeyDown('KeyL')) largeText.value = !largeText.peek();
     if (kb.getKeyDown('KeyM')) cycleSound();
     if (kb.getKeyDown('Enter')) {

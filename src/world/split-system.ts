@@ -26,14 +26,18 @@ import {
   type Object3D,
   PlaneGeometry,
   RayInteractable,
+  type Material,
+  Plane,
   RingGeometry,
   SRGBColorSpace,
+  SphereGeometry,
   Vector3,
 } from '@iwsdk/core';
 import { BOARD_CENTER, GRID_COLS, TILE_SIZE } from '../config/scenario.js';
 import { sfx } from '../audio/sfx.js';
 import * as cmd from '../core/commands.js';
-import { futuresOpen, game, phase, planA, streetView, tutorial, viewYear } from '../core/session.js';
+import { futuresOpen, game, outroOpen, phase, planA, seamPos, streetView, tutorial, viewYear } from '../core/session.js';
+import { localXFromSeam, seamFromLocalX, seamReport } from '../interactions/reality-seam.js';
 import { Placeable } from '../interactions/placeable-component.js';
 import { initialGesture, stepGesture, type GestureState, type HandSample, type Vec3 } from '../interactions/two-hand-gesture.js';
 import { checkTargets, projectYear } from '../simulation/projection.js';
@@ -41,7 +45,7 @@ import { prefersReducedMotion } from '../ui/accessibility.js';
 import { setPanelVisible } from '../ui/panel-visibility.js';
 import { futurePair, type Side } from './futures.js';
 import { futureVisualState } from './future-visual-state.js';
-import { createMiniBoard, labelPlate } from './mini-board.js';
+import { createMiniBoard } from './mini-board.js';
 import { compareRows } from './street-compare.js';
 
 /** Scale of each future and its offset from the board centre (world metres). */
@@ -52,10 +56,19 @@ const OPEN_TIME = 0.8;
 const ENTER_DISTANCE = 0.35;
 /** Duration (s) of the dive into a future. */
 const DIVE_TIME = 0.45;
+/** Reality Seam: height of the handle and of the ray / mouse drag surface above the board centre. */
+const SEAM_KNOB_Y = 0.05;
+const SEAM_DRAG_Y = 0.045;
 const BOARD_W = GRID_COLS * TILE_SIZE;
 const BOARD_D = 10 * TILE_SIZE;
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
+
+/**
+ * Clipping planes of the two futures (shared so that anything drawn on a
+ * future, e.g. Causality Vision rings, is cut by the same seam).
+ */
+export const seamClipPlanes: Record<Side, Plane> = { A: new Plane(new Vector3(-1, 0, 0), 0), B: new Plane(new Vector3(1, 0, 0), 0) };
 
 export class SplitSystem extends createSystem({
   placeables: { required: [Placeable] },
@@ -90,7 +103,7 @@ export class SplitSystem extends createSystem({
     this.tagline = this.card(1400, 160);
     this.tagline.mesh.name = 'tagline';
     this.tagline.mesh.scale.setScalar(0.06);
-    this.paintCard(this.tagline, ["THE FUTURE ISN'T WRITTEN. IT'S BUILT."], 64, 'rgba(15,42,48,0.82)', '#ffe6a6');
+    this.paintCard(this.tagline, ["THE FUTURE ISN'T WRITTEN. CHANGE IT."], 64, 'rgba(15,42,48,0.82)', '#ffe6a6');
     this.world.scene.add(this.tagline.mesh);
 
     this.cleanupFuncs.push(
@@ -102,7 +115,7 @@ export class SplitSystem extends createSystem({
       streetView.subscribe((v) => {
         if (!futuresOpen.peek()) return;
         // Inside a future the miniatures are hidden and must not catch rays.
-        this.setPickable(!v);
+        this.setPickable(!v && seamPos.peek() === null);
         for (const side of ['A', 'B'] as Side[]) {
           const r = this.sides[side]?.root;
           if (r) r.visible = !v;
@@ -117,11 +130,41 @@ export class SplitSystem extends createSystem({
       planA.subscribe(() => {
         if (futuresOpen.peek()) this.buildFutures();
       }),
+      // Reality Seam: lay both futures on the table, aligned; side by side again when closed.
+      seamPos.subscribe((u) => {
+        if (!futuresOpen.peek()) return;
+        this.target = u === null ? 1 : 0;
+        if (prefersReducedMotion()) {
+          this.t = this.target;
+          this.layout();
+        }
+        this.setPickable(u === null && !streetView.peek());
+        this.updateClipping();
+      }),
     );
+    this.buildSeam();
 
     const hook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
     /** Test hook: select a future (what a pinch / tap on it does). */
     hook.selectFuture = (side: Side) => cmd.selectFuture(side);
+    /** Page pixel of the seam drag surface at seam position u (desktop drag tests). */
+    hook.seamToScreen = (u: number) => {
+      const v = new Vector3(BOARD_CENTER[0] + localXFromSeam(u), BOARD_CENTER[1] + SEAM_DRAG_Y, BOARD_CENTER[2] + BOARD_D * 0.25).project(this.world.camera);
+      const r = this.world.renderer.domElement.getBoundingClientRect();
+      return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+    };
+    /** World position of the seam handle at u (hand tests). */
+    hook.seamHandleAt = (u: number) => [BOARD_CENTER[0] + localXFromSeam(u), BOARD_CENTER[1] + SEAM_KNOB_Y, BOARD_CENTER[2] + BOARD_D / 2 + 0.03];
+    /** Visual evidence only: freeze the split transition at t (0..1); null resumes. */
+    hook.splitFreeze = (t: number | null) => {
+      this.frozen = t;
+      if (t !== null) {
+        this.t = t;
+        this.layout();
+        this.updateClipping();
+        this.fractureGlow = Math.max(0, 1 - t * 1.6);
+      }
+    };
     hook.split = () => ({
       open: !!futuresOpen.peek(),
       selected: futuresOpen.peek()?.selected ?? null,
@@ -129,12 +172,17 @@ export class SplitSystem extends createSystem({
       gesture: this.gestureMode,
       progress: this.progress,
       hint: this.hint?.mesh.visible ?? false,
+      comparison: this.comparison?.mesh.visible ? this.comparison.key : '',
       tagline: this.tagline?.mesh.visible ?? false,
       boardVisible: this.world.scene.getObjectByName('terrain-board')?.visible ?? null,
       built: this.builtKey,
       diving: this.diving?.side ?? null,
       grabbable: (['A', 'B'] as Side[]).filter((x) => this.sides[x]?.entity.hasComponent(OneHandGrabbable)),
       hands: this.hands().map((h) => (h.pos ? h.pos.map((v) => +v.toFixed(3)) : null)),
+      seam: seamPos.peek(),
+      seamVisible: this.seamGroup?.visible ?? false,
+      seamReport: this.seamKey,
+      seamHeld: this.seamHandleEntity?.hasComponent(Grabbed) ?? false,
       /** World centres of the two futures (for hand-ray tests). */
       centres: (['A', 'B'] as Side[]).map((s) => this.sides[s]?.root.getWorldPosition(new Vector3()).toArray() ?? null),
     });
@@ -215,8 +263,14 @@ export class SplitSystem extends createSystem({
     ctx.fillStyle = fg;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = `bold ${size}px system-ui, sans-serif`;
-    lines.forEach((l, i) => ctx.fillText(l, w / 2, h / 2 + (i - (lines.length - 1) / 2) * size * 1.15));
+    // Shrink to fit the widest line (never cut a sentence).
+    let px = size;
+    ctx.font = `bold ${px}px system-ui, sans-serif`;
+    while (px > 18 && Math.max(...lines.map((l) => ctx.measureText(l).width)) > w - 60) {
+      px -= 2;
+      ctx.font = `bold ${px}px system-ui, sans-serif`;
+    }
+    lines.forEach((l, i) => ctx.fillText(l, w / 2, h / 2 + (i - (lines.length - 1) / 2) * px * 1.15));
     c.tex.needsUpdate = true;
   }
 
@@ -320,23 +374,15 @@ export class SplitSystem extends createSystem({
       const root = new Group();
       root.name = `future-${side}`;
       root.add(mini);
-      // Label standing on the far edge: title, year, verdict and the four numbers.
+      // A small title tag on the far edge: which future this is, and targets met.
       const checks = checkTargets(projected);
       const met = [checks.population, checks.environment, checks.renewableCoverage, checks.budget].filter(Boolean).length;
-      const plate = labelPlate({
-        title: `${side}: ${f.title}`.toUpperCase(),
-        verdict: `${met}/4`,
-        winner: met === 4,
-        metrics: rows.map((r) => ({
-          label: r.label.replace(' (target 60)', ''),
-          value: side === 'A' ? r.a : r.b,
-          ok: r.better === side || r.better === 'tie',
-          better: r.better === side,
-        })),
-      });
-      plate.position.set(0, 0.14, -BOARD_D / 2 - 0.02);
-      plate.scale.setScalar(0.85);
-      mini.add(plate);
+      const tag = this.titleTag(`${side}  ${f.title}`, `${met} of 4 targets`, side === 'A' ? '#8fd3ff' : '#ffd36b');
+      tag.position.set(0, 0.09, -BOARD_D / 2 - 0.02);
+      tag.name = 'future-tag';
+      mini.add(tag);
+      // Clipping: at the split each future first shows only its half of the table.
+      this.clipMaterials(mini, side);
       // Selection ring under the future, and an invisible hit box to pinch / tap it.
       const ring = new Mesh(
         new RingGeometry(0.52, 0.56, 64).rotateX(-Math.PI / 2).scale(1, 1, BOARD_D / BOARD_W),
@@ -355,11 +401,134 @@ export class SplitSystem extends createSystem({
       this.futures.add(root);
       this.sides[side] = { root, entity, ring, hit };
     }
+    this.paintComparison(rows, pair.year, pair.A.title, pair.B.title);
     this.layout();
     this.paintSelection(futuresOpen.peek()?.selected ?? null);
   }
 
+  // ---------------------------------------------- split moment, comparison --
+
+  private clipPlanes = seamClipPlanes;
+  private clipMats: Material[] = [];
+
+  /** Give a future its own material copies, clipped to its half while splitting. */
+  private clipMaterials(mini: Object3D, side: Side): void {
+    const plane = this.clipPlanes[side];
+    const copies = new Map<Material, Material>();
+    mini.traverse((o) => {
+      const m = o as Mesh;
+      if (!m.isMesh || !m.material || Array.isArray(m.material)) return;
+      let c = copies.get(m.material);
+      if (!c) {
+        c = m.material.clone();
+        c.clippingPlanes = [plane];
+        copies.set(m.material, c);
+        this.clipMats.push(c);
+      }
+      m.material = c;
+    });
+  }
+
+  /**
+   * The seam stays fixed in the world, at the middle of the table: Future A
+   * shows only what is left of it, Future B only what is right of it. As they
+   * pull apart each one slides out of the seam and appears whole — they never
+   * overlap. Once apart, clipping is off.
+   */
+  private updateClipping(): void {
+    // Reality Seam: the boundary sits where the user put it; else the middle.
+    const u = seamPos.peek();
+    const seam = BOARD_CENTER[0] + (u === null ? 0 : localXFromSeam(u));
+    const off = this.t >= 1 ? 1e3 : 0;
+    this.clipPlanes.A.set(new Vector3(-1, 0, 0), seam + off);
+    this.clipPlanes.B.set(new Vector3(1, 0, 0), -seam + off);
+  }
+
+  private titleTag(title: string, sub: string, accent: string): Mesh {
+    const canvas = document.createElement('canvas');
+    canvas.width = 768;
+    canvas.height = 160;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = 'rgba(15,32,38,0.82)';
+    ctx.beginPath();
+    ctx.roundRect(4, 4, 760, 152, 40);
+    ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(70, 80, 34, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#0f2026';
+    ctx.font = 'bold 44px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(title[0], 70, 82);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 50px system-ui, sans-serif';
+    ctx.fillText(title.slice(1).trim().toUpperCase(), 124, 62);
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.font = '36px system-ui, sans-serif';
+    ctx.fillText(sub, 124, 116);
+    const tex = new CanvasTexture(canvas);
+    tex.colorSpace = SRGBColorSpace;
+    const m = new Mesh(new PlaneGeometry(0.42, 0.0875), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+    m.raycast = () => {};
+    return m;
+  }
+
+  private comparison!: { mesh: Mesh; ctx: CanvasRenderingContext2D; tex: CanvasTexture; key: string };
+
+  /** One compact strip between the futures: the differences that matter, A | B. */
+  private paintComparison(rows: ReturnType<typeof compareRows>, year: number, a: string, b: string): void {
+    if (!this.comparison) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 400;
+      const tex = new CanvasTexture(canvas);
+      tex.colorSpace = SRGBColorSpace;
+      const mesh = new Mesh(new PlaneGeometry(1024 / 400, 1), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+      mesh.name = 'futures-comparison';
+      mesh.raycast = () => {};
+      mesh.renderOrder = 6;
+      mesh.visible = false;
+      this.world.scene.add(mesh);
+      this.comparison = { mesh, ctx: canvas.getContext('2d')!, tex, key: '' };
+    }
+    const { ctx, tex } = this.comparison;
+    this.comparison.key = `${year}|${rows.map((r) => `${r.label}:${r.a}/${r.b}:${r.better}`).join('|')}`;
+    ctx.clearRect(0, 0, 1024, 400);
+    ctx.fillStyle = 'rgba(250,248,242,0.94)';
+    ctx.beginPath();
+    ctx.roundRect(4, 4, 1016, 392, 36);
+    ctx.fill();
+    ctx.font = 'bold 34px system-ui, sans-serif';
+    ctx.fillStyle = '#1d5f6b';
+    ctx.fillText(`In ${year}`, 40, 56);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#2b6f9a';
+    ctx.fillText(`A  ${a}`.slice(0, 20), 690, 56);
+    ctx.fillStyle = '#9a6a00';
+    ctx.fillText(`B  ${b}`.slice(0, 20), 990, 56);
+    rows.forEach((r, i) => {
+      const y = 116 + i * 68;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#3d5a60';
+      ctx.font = '36px system-ui, sans-serif';
+      ctx.fillText(r.label.replace(' (target 60)', ' (goal 60)'), 40, y);
+      for (const [side, x, val] of [['A', 690, r.a], ['B', 990, r.b]] as const) {
+        const best = r.better === side;
+        ctx.textAlign = 'right';
+        ctx.fillStyle = best ? '#0f7a6f' : '#2b2620';
+        ctx.font = `${best ? 'bold ' : ''}38px system-ui, sans-serif`;
+        ctx.fillText(`${best ? '\u2713 ' : ''}${val}`, x, y);
+      }
+    });
+    tex.needsUpdate = true;
+  }
+
   private disposeFutures(): void {
+    for (const m of this.clipMats) m.dispose();
+    this.clipMats = [];
     for (const side of ['A', 'B'] as Side[]) {
       const s = this.sides[side];
       if (!s) continue;
@@ -397,6 +566,9 @@ export class SplitSystem extends createSystem({
     for (const side of ['A', 'B'] as Side[]) {
       const s = this.sides[side];
       if (!s) continue;
+      // Title tags appear once the futures are apart (no half-clipped labels).
+      const tag = s.root.getObjectByName('future-tag');
+      if (tag) tag.visible = this.t > 0.85;
       const p = this.pose(side, this.t);
       s.root.position.copy(p.pos);
       s.root.scale.setScalar(p.scale);
@@ -405,13 +577,16 @@ export class SplitSystem extends createSystem({
   }
 
   private pose(side: Side, t: number): { pos: Vector3; scale: number; rx: number; ry: number } {
+    // t = 0: both futures lie exactly where the table is (each clipped to its
+    // half, so together they ARE the table); they then pull apart, shrink and
+    // turn toward the seated viewer.
     const k = smooth(t);
     const dir = side === 'A' ? -1 : 1;
     return {
-      pos: new Vector3(BOARD_CENTER[0] + dir * (0.015 + (FUTURE_X - 0.015) * k), BOARD_CENTER[1] + 0.02 * k, BOARD_CENTER[2] - 0.02 * k),
+      pos: new Vector3(BOARD_CENTER[0] + dir * FUTURE_X * k, BOARD_CENTER[1] + 0.03 * k, BOARD_CENTER[2] - 0.03 * k),
       scale: 1 + (FUTURE_SCALE - 1) * k,
       rx: 0.1 * k,
-      ry: -dir * 0.2 * k, // turned toward the seated viewer
+      ry: -dir * 0.2 * k,
     };
   }
 
@@ -438,6 +613,127 @@ export class SplitSystem extends createSystem({
       s.root.position.lerp(p.pos, k);
       s.root.scale.setScalar(s.root.scale.x + (p.scale - s.root.scale.x) * k);
       s.root.rotation.set(p.rx, p.ry, 0);
+    }
+  }
+
+  // ------------------------------------------------------- reality seam --
+
+  private seamGroup!: Group;
+  private seamKnob!: Mesh;
+  private seamDrag!: Mesh;
+  private seamHandle!: Mesh;
+  private seamHandleEntity!: Entity;
+  private seamLabel!: { mesh: Mesh; ctx: CanvasRenderingContext2D; tex: CanvasTexture; key: string };
+  private seamTags!: Record<Side, { mesh: Mesh; ctx: CanvasRenderingContext2D; tex: CanvasTexture; key: string }>;
+  private seamKey = '';
+  private seamDragging = false;
+
+  /**
+   * The seam: a thin wall of light across the table, a golden handle on the
+   * near edge (pinch it and move your hand sideways), a drag surface for rays
+   * and the mouse, labels for the two sides, and a line that says what differs
+   * in the column under the seam (from the two projections only).
+   */
+  private buildSeam(): void {
+    const g = new Group();
+    g.name = 'reality-seam';
+    g.visible = false;
+    const wallMat = new MeshBasicMaterial({ color: '#fff3d1', transparent: true, opacity: 0.35, depthWrite: false, blending: AdditiveBlending });
+    const wall = new Mesh(new BoxGeometry(0.0025, 0.07, BOARD_D + 0.02).translate(0, 0.035, 0), wallMat);
+    const edge = new Mesh(new BoxGeometry(0.0012, 0.0012, BOARD_D + 0.02).translate(0, 0.07, 0), new MeshBasicMaterial({ color: '#ffffff' }));
+    this.seamKnob = new Mesh(new SphereGeometry(0.012, 16, 12), new MeshBasicMaterial({ color: '#ffd36b' }));
+    this.seamKnob.position.set(0, SEAM_KNOB_Y, BOARD_D / 2 + 0.03);
+    const halo = new Mesh(new SphereGeometry(0.02, 16, 12), new MeshBasicMaterial({ color: '#ffe6a6', transparent: true, opacity: 0.3, depthWrite: false, blending: AdditiveBlending }));
+    this.seamKnob.add(halo);
+    const stem = new Mesh(new BoxGeometry(0.002, 0.002, 0.03).translate(0, SEAM_KNOB_Y, BOARD_D / 2 + 0.015), new MeshBasicMaterial({ color: '#ffd36b' }));
+    for (const o of [wall, edge, this.seamKnob, halo, stem]) o.raycast = () => {};
+    g.add(wall, edge, this.seamKnob, stem);
+    // Labels: which future is on which side, and what the seam reveals.
+    const shown = (c: { mesh: Mesh }) => {
+      // Seam labels are always readable while the seam is: full opacity, on top.
+      (c.mesh.material as MeshBasicMaterial).opacity = 1;
+      (c.mesh.material as MeshBasicMaterial).depthTest = false;
+      c.mesh.visible = true;
+      c.mesh.renderOrder = 9;
+    };
+    // What differs under the seam: in front of the near edge, below the handle (never over the panels).
+    this.seamLabel = this.card(1300, 230);
+    shown(this.seamLabel);
+    this.seamLabel.mesh.scale.setScalar(0.06);
+    this.seamLabel.mesh.position.set(0, -0.005, BOARD_D / 2 + 0.11);
+    g.add(this.seamLabel.mesh);
+    this.seamTags = { A: this.card(700, 120), B: this.card(700, 120) };
+    for (const side of ['A', 'B'] as Side[]) {
+      shown(this.seamTags[side]);
+      this.seamTags[side].mesh.scale.setScalar(0.035);
+      g.add(this.seamTags[side].mesh);
+    }
+    this.world.scene.add(g);
+    this.seamGroup = g;
+
+    // Hand: an invisible pinchable handle that rides on the knob.
+    this.seamHandle = new Mesh(new SphereGeometry(0.035, 10, 8), new MeshBasicMaterial({ visible: false }));
+    this.seamHandle.name = 'reality-seam-handle';
+    this.seamHandleEntity = this.world.createTransformEntity(this.seamHandle);
+    this.seamHandleEntity.addComponent(OneHandGrabbable, { rotate: false });
+
+    // Ray / mouse: press anywhere over the table to bring the seam there, drag to move it.
+    this.seamDrag = new Mesh(new PlaneGeometry(BOARD_W + 0.06, BOARD_D + 0.06).rotateX(-Math.PI / 2), new MeshBasicMaterial({ visible: false }));
+    this.seamDrag.name = 'reality-seam-surface';
+    this.seamDrag.position.set(BOARD_CENTER[0], BOARD_CENTER[1] + SEAM_DRAG_Y, BOARD_CENTER[2]);
+    const dragEntity = this.world.createTransformEntity(this.seamDrag);
+    dragEntity.addComponent(RayInteractable);
+    const toU = (p: Vector3) => seamFromLocalX(p.x - BOARD_CENTER[0]);
+    this.seamDrag.addEventListener('pointerdown' as never, ((e: { point: Vector3; pointerId?: number; target?: { setPointerCapture?(id: number): void } }) => {
+      if (!this.seamGroup.visible) return;
+      if (e.pointerId !== undefined) e.target?.setPointerCapture?.(e.pointerId);
+      this.seamDragging = true;
+      cmd.setSeam(toU(e.point));
+    }) as never);
+    this.seamDrag.addEventListener('pointermove' as never, ((e: { point: Vector3 }) => {
+      if (this.seamDragging) cmd.setSeam(toU(e.point));
+    }) as never);
+    const end = () => (this.seamDragging = false);
+    this.seamDrag.addEventListener('pointerup' as never, end as never);
+    window.addEventListener('pointerup', end);
+    this.cleanupFuncs.push(() => window.removeEventListener('pointerup', end));
+    this.seamDrag.raycast = () => {};
+  }
+
+  private stepSeam(): void {
+    const u = seamPos.peek();
+    const on = u !== null && !!futuresOpen.peek() && !streetView.peek() && this.t < 0.05 && !this.diving;
+    if (on !== this.seamGroup.visible) {
+      this.seamGroup.visible = on;
+      this.seamDrag.raycast = on ? Mesh.prototype.raycast : () => {};
+    }
+    const held = this.seamHandleEntity.hasComponent(Grabbed);
+    if (!on) {
+      if (!held) this.seamHandle.position.set(0, -10, 0); // out of reach
+      return;
+    }
+    // The hand moves the seam sideways (only x matters; the handle snaps back to the knob on release).
+    if (held) cmd.setSeam(seamFromLocalX(this.seamHandle.getWorldPosition(new Vector3()).x - BOARD_CENTER[0]));
+    const x = localXFromSeam(seamPos.peek()!);
+    this.seamGroup.position.set(BOARD_CENTER[0] + x, BOARD_CENTER[1], BOARD_CENTER[2]);
+    if (!held) this.seamHandle.position.copy(this.seamKnob.getWorldPosition(new Vector3()));
+    // Side labels sit just either side of the seam, over the far edge.
+    const cam = this.world.camera.getWorldPosition(new Vector3());
+    for (const side of ['A', 'B'] as Side[]) {
+      const m = this.seamTags[side].mesh;
+      m.position.set(side === 'A' ? -0.115 : 0.115, 0.06, -BOARD_D / 2 + 0.02);
+      m.lookAt(cam);
+    }
+    this.seamLabel.mesh.lookAt(cam);
+    // What differs under the seam (recomputed only when the column, year or plans change).
+    const pair = futurePair(planA.peek(), game.placements, viewYear.peek());
+    const rep = seamReport(game.terrain, pair.A.plan, pair.B.plan, pair.year, seamPos.peek()!, { A: pair.A.title, B: pair.B.title });
+    const key = `${rep.lines.join("|")}`;
+    if (key !== this.seamKey) {
+      this.seamKey = key;
+      this.paintCard(this.seamLabel, rep.lines, 46, 'rgba(15,42,48,0.85)', '#ffffff');
+      this.paintCard(this.seamTags.A, [`< A  ${pair.A.title}`], 52, 'rgba(15,42,48,0.8)', '#8fd3ff');
+      this.paintCard(this.seamTags.B, [`B  ${pair.B.title} >`], 52, 'rgba(15,42,48,0.8)', '#ffd36b');
     }
   }
 
@@ -489,18 +785,54 @@ export class SplitSystem extends createSystem({
     setPanelVisible(this.world, 'tray-labels', true);
   }
 
+  private frozen: number | null = null;
+  private pulse!: Mesh;
+  private pulseT = 1;
+
   update(delta: number): void {
+    if (!this.pulse) {
+      this.pulse = new Mesh(new RingGeometry(0.9, 1, 64).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: '#cfefff', transparent: true, opacity: 0, depthWrite: false, blending: AdditiveBlending }));
+      this.pulse.raycast = () => {};
+      this.pulse.visible = false;
+      this.pulse.position.set(BOARD_CENTER[0], BOARD_CENTER[1] + 0.01, BOARD_CENTER[2]);
+      this.world.scene.add(this.pulse);
+    }
+    if (this.pulseT < 1) {
+      this.pulseT = Math.min(1, this.pulseT + delta / 0.7);
+      const r = 0.1 + this.pulseT * 0.7;
+      this.pulse.scale.set(r, 1, r);
+      (this.pulse.material as MeshBasicMaterial).opacity = 0.6 * (1 - this.pulseT);
+    }
+    this.pulse.visible = this.pulseT < 1;
+    // The comparison strip: in front of the two futures, below them, once they are apart.
+    if (this.comparison) {
+      // (Hidden under the first-five-minutes closing card, which sits in front of it.)
+      const show = !!futuresOpen.peek() && !streetView.peek() && this.t > 0.9 && !this.diving && !outroOpen.peek();
+      this.comparison.mesh.visible = show;
+      if (show) {
+        const xr = this.world.renderer.xr.isPresenting;
+        this.comparison.mesh.position.set(BOARD_CENTER[0], BOARD_CENTER[1] + (xr ? 0.02 : 0.0), BOARD_CENTER[2] + (xr ? 0.24 : 0.2));
+        this.comparison.mesh.scale.setScalar(xr ? 0.11 : 0.12);
+        this.comparison.mesh.lookAt(this.world.camera.getWorldPosition(new Vector3()));
+      }
+    }
     this.stepGesture(delta);
+    this.stepSeam();
     this.stepCards(delta);
     this.stepHeld(delta);
     this.stepDive(delta);
     this.fracture.visible = this.fractureGlow > 0.01;
     this.fractureMat.opacity = this.fractureGlow * (0.85 + 0.15 * Math.sin(performance.now() / 70));
 
-    if (this.t !== this.target) {
+    if (this.t !== this.target && this.frozen === null) {
+      const was = this.t;
       this.t = Math.max(0, Math.min(1, this.t + (this.target > this.t ? 1 : -1) * (delta / OPEN_TIME)));
       this.layout();
-      if (this.t === 0 && this.target === 0) {
+      this.updateClipping();
+      // The seam glows while the halves part; a ring of light runs over the table when they are apart.
+      if (this.target === 1) this.fractureGlow = Math.max(this.fractureGlow, 1 - this.t * 1.6);
+      if (was < 1 && this.t === 1 && !prefersReducedMotion()) this.pulseT = 0;
+      if (this.t === 0 && this.target === 0 && seamPos.peek() === null) {
         this.futures.visible = false;
         this.disposeFutures();
         this.builtKey = '';

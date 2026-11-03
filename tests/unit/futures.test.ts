@@ -10,11 +10,11 @@ const p = (type: Placement['type'], col: number, row: number): Placement => ({ i
 const plan = [p(S.Road, 6, 3), p(S.Residential, 6, 4), p(S.Wind, 12, 8)];
 
 describe('futures to split', () => {
-  it('uses Plan A (left) and the current map (right) when Plan A exists', () => {
+  it('with a saved plan: your (current) plan on the left (A), the saved plan on the right (B)', () => {
     const a = [p(S.Residential, 6, 4)];
     const f = futurePair(a, plan, 2026);
-    expect(f.A.plan).toBe(a);
-    expect(f.B.plan).toBe(plan);
+    expect(f.A).toEqual({ title: 'Your plan', plan });
+    expect(f.B).toEqual({ title: 'Saved plan', plan: a });
     expect(f.year).toBe(2050);
   });
 

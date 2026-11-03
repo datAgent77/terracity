@@ -1,0 +1,11 @@
+A tile=6,2 vp2 plan=B poi=[{"kind":"park","title":"Neighbourhood park","lines":["Next to 1 neighbourhood: nature +1.","Its trees grow every year: by 2050, 2 parks add nature +4."],"open":false},{"kind":"energy","title":"Solar farm","lines":["Makes 4 of the 27 units of clean power the region has."],"open":false}]
+A tile=6,2 vp3 plan=B poi=[{"kind":"park","title":"Neighbourhood park","lines":["Next to 1 neighbourhood: nature +1.","Its trees grow every year: by 2050, 2 parks add nature +4."],"open":false},{"kind":"energy","title":"Solar farm","lines":["Makes 4 of the 27 units of clean power the region has."],"open":false}]
+A tile=6,2 vp0 plan=B poi=[{"kind":"park","title":"Neighbourhood park","lines":["Next to 1 neighbourhood: nature +1.","Its trees grow every year: by 2050, 2 parks add nature +4."],"open":false},{"kind":"energy","title":"Solar farm","lines":["Makes 4 of the 27 units of clean power the region has."],"open":false}]
+A poi open: [true,false]
+A tile=6,2 vp1 plan=B poi=[{"kind":"park","title":"Neighbourhood park","lines":["Next to 1 neighbourhood: nature +1.","Its trees grow every year: by 2050, 2 parks add nature +4."],"open":false},{"kind":"energy","title":"Solar farm","lines":["Makes 4 of the 27 units of clean power the region has."],"open":false}]
+B tile=6,2 vp2 plan=none poi=[{"kind":"sprawl","title":"Unplanned houses","lines":["One of 8 places where 16,000 newcomers without a planned home built, without streets or parks.","Unplanned building costs nature -24 across the region."],"open":false}]
+B tile=6,2 vp3 plan=none poi=[{"kind":"sprawl","title":"Unplanned houses","lines":["One of 8 places where 16,000 newcomers without a planned home built, without streets or parks.","Unplanned building costs nature -24 across the region."],"open":false}]
+B tile=6,2 vp0 plan=none poi=[{"kind":"sprawl","title":"Unplanned houses","lines":["One of 8 places where 16,000 newcomers without a planned home built, without streets or parks.","Unplanned building costs nature -24 across the region."],"open":false}]
+B poi open: [true]
+B tile=6,2 vp1 plan=none poi=[{"kind":"sprawl","title":"Unplanned houses","lines":["One of 8 places where 16,000 newcomers without a planned home built, without streets or parks.","Unplanned building costs nature -24 across the region."],"open":false}]
+page errors: 0 
