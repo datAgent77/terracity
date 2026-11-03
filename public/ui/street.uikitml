@@ -68,6 +68,11 @@
     <div class="crow"><div id="st-c3-l" class="cname">-</div><div id="st-c3-a" class="cval">-</div><div id="st-c3-b" class="cval">-</div></div>
   </div>
   </div>
+  <div id="st-talk-row" class="row">
+    <Button id="st-talk" class="button"><ButtonIcon><MessageCircle></MessageCircle></ButtonIcon><ButtonLabel id="st-talk-label">Talk to Mira</ButtonLabel></Button>
+    <Button id="st-talk-back" class="button"><ButtonIcon><ChevronLeft></ChevronLeft></ButtonIcon><ButtonLabel>Back</ButtonLabel></Button>
+    <Button id="st-talk-end" class="button"><ButtonIcon><X></X></ButtonIcon><ButtonLabel>End</ButtonLabel></Button>
+  </div>
   <div class="row">
     <div id="st-details-btn" class="dtoggle"><div id="st-details-label" class="dlabel">Details</div></div>
     <Button id="st-prev" class="button"><ButtonIcon><ChevronLeft></ChevronLeft></ButtonIcon><ButtonLabel>Previous</ButtonLabel></Button>

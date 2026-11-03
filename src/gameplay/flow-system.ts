@@ -59,6 +59,10 @@ export class FlowSystem extends createSystem({}) {
       if (kb.getKeyDown('ArrowRight')) cmd.stepViewpoint(1);
       if (kb.getKeyDown('ArrowLeft')) cmd.stepViewpoint(-1);
       if (kb.getKeyDown('Escape')) cmd.exitCity();
+      const talk = (window as unknown as { __terracity?: { talk?(a: string): void } }).__terracity?.talk;
+      if (kb.getKeyDown('KeyK')) talk?.('next');
+      if (kb.getKeyDown('KeyB')) talk?.('back');
+      if (kb.getKeyDown('KeyX')) talk?.('end');
       return; // tabletop shortcuts are off while visiting the street
     }
     if (kb.getKeyDown('KeyV')) cmd.toggleFutures();

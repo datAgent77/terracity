@@ -30,3 +30,5 @@ export * from '@pmndrs/uikit-lucide/dist/LogOut.js';
 export * from '@pmndrs/uikit-lucide/dist/Split.js';
 export * from '@pmndrs/uikit-lucide/dist/Merge.js';
 export * from '@pmndrs/uikit-lucide/dist/Sparkles.js';
+export * from '@pmndrs/uikit-lucide/dist/MessageCircle.js';
+export * from '@pmndrs/uikit-lucide/dist/X.js';

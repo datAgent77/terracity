@@ -32,6 +32,7 @@ import {
   FogExp2,
   Group,
   IcosahedronGeometry,
+  type Intersection,
   InstancedMesh,
   Matrix4,
   Mesh,
@@ -39,6 +40,7 @@ import {
   MeshStandardMaterial,
   type Object3D,
   Quaternion,
+  Raycaster,
   RayInteractable,
   RingGeometry,
   SphereGeometry,
@@ -54,7 +56,7 @@ import { GRID_COLS, StructureType, TerrainType, TILE_SIZE } from '../config/scen
 import { projectYear, type YearMetrics } from '../simulation/projection.js';
 import { TARGETS } from '../config/balance.js';
 import * as cmd from '../core/commands.js';
-import { coachText, detailsOpen, game, planA, planVersion, streetView, tutorial, viewYear } from '../core/session.js';
+import { coachText, detailsOpen, futuresOpen, game, planA, planVersion, streetView, tutorial, viewYear } from '../core/session.js';
 import { Placeable } from '../interactions/placeable-component.js';
 import { sfx, streetAmbience } from '../audio/sfx.js';
 import { prefersReducedMotion, soundOn } from '../ui/accessibility.js';
@@ -72,6 +74,7 @@ import { decorPrototype } from './terrain-decor.js';
 import { PAINTED, PAINTED_FLAT } from './palette.js';
 import { Bubble, createChild, createGarden, disposeTree, type Child } from './child.js';
 import { CHILD_AGE, CHILD_NAME, childNarrative, type ChildNarrative } from './child-narrative.js';
+import { miraDialogue, narrativeContext, type DialogueLine } from './mira-dialogue.js';
 import { compareRows } from './street-compare.js';
 import { streetStory } from './street-story.js';
 import { CHILD_SPOT, GARDEN, streetPose, STREET_SCALE, VIEWPOINTS } from './street-view.js';
@@ -176,6 +179,8 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     );
 
     const hook = ((window as unknown as Record<string, unknown>).__terracity ??= {}) as Record<string, unknown>;
+    /** Talk to Mira: 'next' (start / next line), 'back', 'end'. Same as the panel and pinching her. */
+    hook.talk = (a: 'next' | 'back' | 'end') => (a === 'next' ? this.talkNext() : a === 'back' ? this.talkBack() : this.talkEnd());
     hook.street = () => ({
       active: !!streetView.peek(),
       viewpoint: streetView.peek()?.viewpoint ?? null,
@@ -186,7 +191,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       year: viewYear.peek(),
       plan: streetView.peek()?.plan ?? null,
       child: this.narrative
-        ? { happy: this.narrative.state === 'thriving', state: this.narrative.state, garden: this.narrative.garden, lines: [...this.narrative.lines], speaking: this.talk.near, line: this.talk.line }
+        ? { talking: this.convo.active, index: this.convo.index, dialogue: this.dialogue.map((d) => d.text), happy: this.narrative.state === 'thriving', state: this.narrative.state, garden: this.narrative.garden, lines: [...this.narrative.lines], speaking: this.talk.near, line: this.talk.line, groundY: +(this.child?.root.position.y ?? 0).toFixed(3) }
         : null,
       districtHere: this.districtHere,
       geometries: this.world.renderer.info.memory.geometries,
@@ -215,6 +220,9 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     click('st-return', cmd.exitCity);
     for (const y of YEARS) click(`st-${y}`, () => cmd.setYear(y));
     click('st-details-btn', () => (detailsOpen.value = !detailsOpen.peek()));
+    click('st-talk', () => this.talkNext());
+    click('st-talk-back', () => this.talkBack());
+    click('st-talk-end', () => this.talkEnd());
     click('st-plan-a', () => cmd.setStreetPlan('A'));
     click('st-plan-b', () => cmd.setStreetPlan('B'));
     const compare = panel.getElementById('st-compare');
@@ -233,6 +241,13 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
         panel.getElementById<UIKit.Text>(`st-${y}-label`)?.setProperties({ color: on ? '#ffffff' : '#1d3f46' });
       }
       lines.forEach((el, i) => el?.setProperties({ text: this.story[i] ?? '', display: this.story[i] ? 'flex' : 'none' }));
+      // Talking to Mira: Talk / Back / Next / End (only when she is here).
+      const here = !!this.child && this.dialogue.length > 0;
+      const talking = this.convo.active;
+      panel.getElementById('st-talk-row')?.setProperties({ display: here ? 'flex' : 'none' });
+      panel.getElementById<UIKit.Text>('st-talk-label')?.setProperties({ text: talking ? (this.convo.index < this.dialogue.length - 1 ? 'Next' : 'Finish') : 'Talk to Mira' });
+      panel.getElementById('st-talk-back')?.setProperties({ display: talking ? 'flex' : 'none' });
+      panel.getElementById('st-talk-end')?.setProperties({ display: talking ? 'flex' : 'none' });
       // Guided tips follow the player into the street; the next target glows amber.
       const tip = coachText.peek();
       tipEl?.setProperties({ text: tip || '-', display: tip ? 'flex' : 'none' });
@@ -266,7 +281,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       panel.getElementById<UIKit.Text>('st-details-label')?.setProperties({ text: open ? 'Less' : 'Details' });
       const obj = this.world.getSceneEntity('street-panel')?.object3D;
       if (obj) {
-        obj.userData.base_height = open ? (planA.peek() ? '50%' : '34%') : '22%';
+        obj.userData.base_height = open ? (planA.peek() ? '56%' : '40%') : '28%';
         window.dispatchEvent(new Event('terracity-relayout'));
       }
     };
@@ -566,14 +581,33 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     if (!this.childGroup.parent) this.inner.add(this.childGroup);
     this.narrative = childNarrative(projected, st, { homesHere });
     this.child = null;
-    const ground = homesHere ? 0.62 : 0;
+    // On a district plinth, or on whatever stands under her spot (an unplanned
+    // sprawl slab is ~0.7 m tall: never bury her in it).
+    const ground = homesHere ? 0.62 : this.groundAt(CHILD_SPOT.x, CHILD_SPOT.z);
     const gardenKind = this.narrative ? this.narrative.garden : projected.environment >= TARGETS.environment ? 'lush' : 'dry';
     const garden = createGarden(gardenKind, GARDEN.w, GARDEN.d);
     garden.position.set(GARDEN.x, ground, GARDEN.z);
     this.childGroup.add(garden);
     this.talk = { t: 0, near: false, line: 0 };
     this.bubble.opacity = 0;
+    this.dialogue = [];
+    this.convo = { active: false, index: 0, t: 0 };
+    if (this.talkTarget) this.talkTarget.visible = false;
     if (!this.narrative) return;
+    // Grounded, user-paced conversation for this future and this place (mira-dialogue.ts).
+    const v = streetView.peek();
+    if (v) {
+      const tag = v.plan;
+      const current = tag === 'none' ? [] : tag === 'A' && planA.peek() ? planA.peek()! : game.placements;
+      const other =
+        tag === 'A' ? { planId: 'B' as const, plan: game.placements }
+        : tag === 'none' ? { planId: 'B' as const, plan: game.placements }
+        : planA.peek() ? { planId: 'A' as const, plan: planA.peek()! }
+        : futuresOpen.peek() ? { planId: 'none' as const, plan: [] }
+        : null;
+      const ctx = narrativeContext(game.terrain, current, tag, projected.year, this.visit.col, this.visit.row, other);
+      this.dialogue = miraDialogue(ctx);
+    }
     this.child = createChild();
     // Her face follows the simulated outcome: she smiles only in a thriving neighbourhood.
     this.child.mood?.(this.narrative.state === 'thriving');
@@ -581,10 +615,85 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     this.childGroup.add(this.child.root);
     this.bubble.mesh.position.set(CHILD_SPOT.x, ground + 1.62, CHILD_SPOT.z);
     this.childGroup.add(this.bubble.mesh);
-    this.story.push(`${CHILD_NAME} (${CHILD_AGE}): "${this.narrative.lines.join(' ')}"`);
+    // Soft contact shadow and the talk affordance (a ring at her feet; pinch / tap her).
+    const shadow = new Mesh(new CircleGeometry(0.32, 24).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.28, depthWrite: false }));
+    shadow.position.set(CHILD_SPOT.x, ground + 0.01, CHILD_SPOT.z);
+    shadow.raycast = () => {};
+    this.childGroup.add(shadow);
+    this.ensureTalkTarget();
+    this.talkTarget!.position.set(CHILD_SPOT.x, ground, CHILD_SPOT.z);
+    this.talkTarget!.visible = true;
+    this.paintPanel?.();
   }
 
-  /** She turns to you, breathes, waves and speaks when you are near (< 8 m). */
+  /** Highest surface of the built neighbourhood under (x, z), in street-inner metres. */
+  private groundAt(x: number, z: number): number {
+    this.inner.updateMatrixWorld(true);
+    const origin = this.inner.localToWorld(new Vector3(x, 40, z));
+    const down = this.inner.localToWorld(new Vector3(x, 0, z)).sub(origin).normalize();
+    // The street disables raycasts on its meshes (cheap XR rays): use the
+    // prototype's raycast directly.
+    const rc = new Raycaster(origin, down);
+    const hits: Intersection[] = [];
+    this.hood.traverseVisible((o) => {
+      if ((o as Mesh).isMesh) (Object.getPrototypeOf(o) as Mesh).raycast.call(o, rc, hits);
+    });
+    hits.sort((a, b) => a.distance - b.distance);
+    // First surface below head height (skips canopies and roofs).
+    for (const hit of hits) {
+      const y = this.inner.worldToLocal(hit.point.clone()).y;
+      if (y < 1.2) return Math.max(0, y);
+    }
+    return 0;
+  }
+
+  // ------------------------------------------------- conversation (user-paced) --
+
+  private dialogue: DialogueLine[] = [];
+  private convo = { active: false, index: 0, t: 0 };
+  private talkTarget: Group | null = null;
+  private talkRing: Mesh | null = null;
+
+  /** Ring at her feet + an invisible capsule: point and pinch (or tap) her to talk. */
+  private ensureTalkTarget(): void {
+    if (this.talkTarget) return;
+    const g = new Group();
+    g.name = 'mira-talk';
+    this.talkRing = new Mesh(new RingGeometry(0.42, 0.5, 40).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: '#ffd36b', transparent: true, opacity: 0.8, depthWrite: false }));
+    this.talkRing.position.y = 0.02;
+    this.talkRing.raycast = () => {};
+    const hit = new Mesh(new CylinderGeometry(0.45, 0.45, 1.5, 12).translate(0, 0.75, 0), new MeshBasicMaterial({ visible: false }));
+    g.add(this.talkRing, hit);
+    const entity = this.world.createTransformEntity(g, { parent: this.innerEntity });
+    entity.addComponent(RayInteractable);
+    g.addEventListener('click' as never, (() => this.talkNext()) as never);
+    this.talkTarget = g;
+  }
+
+  /** Start the conversation, or go to the next line (the last line ends it). */
+  talkNext(): void {
+    if (!this.child || !this.dialogue.length) return;
+    if (!this.convo.active) this.convo = { active: true, index: 0, t: 0 };
+    else if (this.convo.index < this.dialogue.length - 1) this.convo = { ...this.convo, index: this.convo.index + 1, t: 0 };
+    else return this.talkEnd();
+    sfx.childChime(0);
+    this.paintPanel?.();
+  }
+
+  talkBack(): void {
+    if (!this.convo.active || this.convo.index === 0) return;
+    this.convo = { ...this.convo, index: this.convo.index - 1, t: 0 };
+    sfx.childChime(0);
+    this.paintPanel?.();
+  }
+
+  talkEnd(): void {
+    if (!this.convo.active) return;
+    this.convo = { active: false, index: 0, t: 0 };
+    this.paintPanel?.();
+  }
+
+  /** She turns to you, breathes, shifts her weight and waves when a line starts. */
   private stepChild(delta: number): void {
     const c = this.child;
     const n = this.narrative;
@@ -600,23 +709,32 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
     c.body.rotation.y += dy * Math.min(1, delta * 3);
     const calm = prefersReducedMotion();
     c.body.scale.y = calm ? 1 : 1 + 0.012 * Math.sin(this.clock * 2.1);
+    c.body.rotation.z = calm ? 0 : 0.025 * Math.sin(this.clock * 0.7); // weight shift
     if (near && !this.talk.near) {
       this.talk = { t: 0, near: true, line: 0 };
       sfx.childChime(Math.max(-1, Math.min(1, dx / 6)));
-    } else if (!near) this.talk.near = false;
-    if (near) this.talk.t += delta;
-    const line = Math.min(n.lines.length - 1, Math.floor(this.talk.t / 6));
-    if (line !== this.talk.line) {
-      this.talk.line = line;
-      sfx.childChime(0);
+    } else if (!near) {
+      this.talk.near = false;
+      if (this.convo.active) this.talkEnd();
     }
-    this.bubble.set(`${CHILD_NAME}, ${CHILD_AGE}`, n.lines[line]);
-    const target = near ? 1 : 0;
+    this.convo.t += delta;
+    // Bubble: an invitation when she notices you, then the line you are on.
+    const line = this.convo.active ? this.dialogue[this.convo.index]?.text : null;
+    this.bubble.set(
+      line ? `${CHILD_NAME}, ${CHILD_AGE}  (${this.convo.index + 1}/${this.dialogue.length})` : `${CHILD_NAME}, ${CHILD_AGE}`,
+      line ?? (this.dialogue.length ? 'Hi! Pinch me or tap Talk to Mira.' : ''),
+    );
+    const target = near && (line || this.dialogue.length) ? 1 : 0;
     const op = (this.bubble.mesh.material as MeshBasicMaterial).opacity;
     this.bubble.opacity = op + (target - op) * Math.min(1, delta * 4);
     this.bubble.mesh.lookAt(this.childGroup.localToWorld(new Vector3(local.x, this.bubble.mesh.position.y, local.z)));
-    // Wave during the first moments of each line.
-    const since = this.talk.t - line * 6;
+    if (this.talkRing) {
+      this.talkRing.visible = near && !this.convo.active;
+      (this.talkRing.material as MeshBasicMaterial).opacity = calm ? 0.7 : 0.55 + 0.3 * Math.sin(this.clock * 3);
+    }
+    // Wave as each line starts (and once when she first sees you).
+    const since = this.convo.active ? this.convo.t : this.talk.t;
+    if (near) this.talk.t += delta;
     c.arm.rotation.z = near && since < 1.8 && !calm ? -2.5 + 0.35 * Math.sin(this.clock * 9) : -0.12;
   }
 

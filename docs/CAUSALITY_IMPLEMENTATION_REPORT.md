@@ -162,3 +162,54 @@ Tests (C, clean run): unit 178 / 178; Playwright 32 passed, 3 skipped (split
 spec now also checks the comparison strip and the merge message); IWER hand
 scripts exit 0; IWER split → pinch-select → merge and Become Small flows pass;
 Causality Vision in the two-futures view passes; build OK.
+
+## Milestone D — Mira 2.0
+
+**Files**: `src/world/mira-dialogue.ts` (new, pure), `src/world/street-system.ts`
+(conversation, talk target, grounding), `public/ui/street.uikitml` (talk row),
+`src/ui/lucide-subset.ts`, `src/gameplay/flow-system.ts` (K / B / X keys in the
+street); tests `tests/unit/mira-dialogue.test.ts`, `tests/e2e/street.spec.ts`
+("Mira 2.0"); capture `scripts/visual/mira2.mjs`.
+
+- **Grounded narrative context**: `narrativeContext()` gathers only what the
+  simulation knows — year, plan / future, the visited tile (the same in every
+  future), the decisions within two tiles, a snapshot (housed, sprawl, nature,
+  renewable share, land used, tree loss), local facts (homes on her tile,
+  parks / wind / solar / homes nearby, farmland built over, sprawl nearby and
+  on her tile) and, when there is one, the same place in the other future.
+- **Dialogue from validated templates**: every line carries the facts that make
+  it true (`support`); a unit test checks, over many plans, that each line's
+  support holds in its context, that no line repeats, that the output is
+  deterministic, and that the same place gives different words in two futures.
+  Tradeoffs are named both ways ("…the land stayed open, but 16,000 people had
+  no planned home"). Never mentioned (not modelled): water, health, traffic,
+  family history.
+- **User-paced conversation**: Mira invites ("Hi! Pinch me or tap Talk to
+  Mira."), a soft ring marks her; pinch / click her or "Talk to Mira" starts;
+  Next / Back / End (also K / B / X); the bubble shows "Mira, 9 (i/n)". She
+  turns to you, shifts her weight and waves at each line; nothing advances on
+  its own.
+- **The same place, two futures** (evidence `cd-*`): in your plan "Hi, I'm
+  Mira. I live on this street. … In the other future this street was never
+  built. Unplanned houses went up here instead, and 16,000 people had no
+  planned home." Where nobody planned: "Hi, I'm Mira. … In the other future
+  there is a planned street here, with gardens, where we have houses built
+  without a plan."
+- **Found and fixed while verifying**: a line claimed "more fields stayed" on a
+  tile that had sprawl in that future (new `sprawlHere` fact); in the
+  nobody-plans future Mira stood inside the 0.7 m sprawl slab — she is now
+  placed on the surface under her spot (downward ray against the street).
+
+Evidence: `docs/visual/cd-1-invitation.png`, `cd-2-talk-line1.png`,
+`cd-3-talk-other-future.png`, `cd-4-future-B-line1.png`,
+`cd-5-future-B-other.png`, `cd-log.txt` (desktop Chromium).
+
+Limitations: the camera in a future without a district stays at ground level
+even where a sprawl slab stands; voice is not included (text only); not tried
+on a Quest.
+
+Tests (D, clean run): `tsc` OK; unit **184 / 184** (new `mira-dialogue.test.ts`
+6); Playwright **33 passed**, 3 skipped (new "Mira 2.0" street test: talk → next
+→ back → end, grounded lines, same place differs between futures, Mira on the
+slab); IWER hand scripts `xr-phase1/2/3` exit 0; Mira capture 0 page errors;
+build OK, 10 MB.

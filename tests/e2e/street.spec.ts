@@ -135,3 +135,52 @@ test('the last child: her garden and words follow the plan; rewriting the plan c
   const outcome = (c: C) => c && { happy: c.happy, state: c.state, garden: c.garden, lines: c.lines };
   expect(outcome(again)).toEqual(outcome(after));
 });
+
+test('Mira 2.0: a user-paced conversation grounded in the simulation; the same place differs between futures', async ({ page }) => {
+  test.setTimeout(180_000);
+  type C = { talking: boolean; index: number; dialogue: string[]; groundY: number } | null;
+  type S3 = Street & { plan: 'A' | 'B' | 'none'; child: C };
+  const st = () => page.evaluate(() => (window as unknown as { __terracity: { street(): S3 } }).__terracity.street());
+  await open(page);
+  // Your plan (balanced) vs nobody planning; enter Future A in 2050.
+  await buildPlan(page, [[5, 6, 3], [5, 7, 3], [1, 6, 2], [1, 6, 4], [1, 2, 4], [1, 8, 3], [3, 10, 8], [3, 11, 8], [3, 12, 8], [4, 9, 3], [4, 1, 4], [2, 9, 4]]);
+  await key(page, 'KeyV');
+  await page.waitForFunction(() => { const s = (window as unknown as { __terracity: { split(): { open: boolean; t: number } } }).__terracity.split(); return s.open && s.t === 1; });
+  await page.evaluate(() => (window as unknown as { __terracity: { selectFuture(f: string): void } }).__terracity.selectFuture('A'));
+  await ui(page, 'actions-panel', 'btn-enter');
+  await settled(page);
+
+  const a = await st();
+  expect(a.plan).toBe('B'); // the current plan (no Plan A saved)
+  const lines = a.child!.dialogue;
+  expect(a.child!.talking).toBe(false); // she invites; the user starts
+  expect(lines.length).toBeGreaterThanOrEqual(3);
+  expect(new Set(lines).size).toBe(lines.length);
+  expect(lines[0]).toBe("Hi, I'm Mira. I live on this street.");
+  expect(lines.join(' ')).toMatch(/In the other future this street was never built/);
+  expect(lines.at(-1)).toBe('Will you look at the other future too?');
+
+  // Talk -> next -> back -> end, at the user's pace.
+  await ui(page, 'street-panel', 'st-talk');
+  expect((await st()).child).toMatchObject({ talking: true, index: 0 });
+  await ui(page, 'street-panel', 'st-talk');
+  expect((await st()).child!.index).toBe(1);
+  await ui(page, 'street-panel', 'st-talk-back');
+  expect((await st()).child!.index).toBe(0);
+  await ui(page, 'street-panel', 'st-talk-end');
+  expect((await st()).child!.talking).toBe(false);
+
+  // The same place in the future where nobody planned: different, still true, words.
+  await ui(page, 'street-panel', 'st-return');
+  await settled(page);
+  await page.evaluate(() => (window as unknown as { __terracity: { selectFuture(f: string): void } }).__terracity.selectFuture('B'));
+  await ui(page, 'actions-panel', 'btn-enter');
+  await settled(page);
+  const b = await st();
+  expect(b.plan).toBe('none');
+  expect(b.viewpoint).toBe(a.viewpoint);
+  expect(b.child!.dialogue[0]).toBe("Hi, I'm Mira.");
+  expect(b.child!.dialogue.join(' ')).toMatch(/In the other future there is a planned street here/);
+  expect(b.child!.dialogue).not.toEqual(lines);
+  expect(b.child!.groundY).toBeGreaterThan(0.5); // she stands on the sprawl slab, not inside it
+});
