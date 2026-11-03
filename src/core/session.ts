@@ -64,5 +64,5 @@ export const tutorial = new Tutorial();
 export const coachText = signal(tutorial.text);
 /** A conversation with Mira was had (and ended) during the current street visit (first-five-minutes step 5). */
 export const miraTalked = signal(false);
-/** The closing card of the first five minutes ("The future isn't written. It's built."). */
+/** The closing card of the first five minutes ("The future isn't written. Change it."). */
 export const outroOpen = signal(false);

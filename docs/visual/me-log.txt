@@ -1,0 +1,12 @@
+beat 1 card: {"visible":true,"title":"Every city begins with a choice."}
+step: Step 1/7: Make one choice. Pinch Homes in the tray and drop it on a glowing tile beside the town.
+after choice: "By 2026: gains housed +4,000. Costs: nature -3, renewable share -4, budget -12, land used (sq km) +2.3." | Step 2/7: Travel to 2050 (turn the time dial or tap 2050). The card shows what your choice did by then.
+2050: card=What your decision changed by 2050 | Step 3/7: Split the city into two futures: bring both hands together and pull them apart (or tap Split).
+split: Step 4/7: Tap Reality Seam, then pinch the golden handle and sweep it: the same place, two futures.
+seam: A Your plan: homes, open land|B If nobody plans: unplanned houses x2 | Step 5/7: Enter a future (pull it toward you, or tap Enter future). Someone lives there in 2050.
+enter: plan=B | Step 6/7: Meet Mira. Pinch her or tap Talk to Mira.
+talk: line="We have to walk farther to find somewhere shady." | Step 6/7: Meet Mira. Pinch her or tap Talk to Mira.
+talk ended: Step 7/7: Return, then enter the other future: the same street, another outcome.
+other: plan=none | coach='' outro=true
+closing card: {"visible":true,"title":"The future isn't written. Change it."}
+page errors: 0 

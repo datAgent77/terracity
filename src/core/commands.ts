@@ -213,6 +213,7 @@ export function updateTutorial(): void {
     inStreet: !!v,
     futuresOpen: !!futuresOpen.peek(),
     causalityOn: causalityOn.peek(),
+    seam: seamPos.peek(),
     streetPlan: v?.plan ?? null,
     talked: miraTalked.peek(),
     planVersion: planVersion.peek(),
@@ -222,7 +223,7 @@ export function updateTutorial(): void {
     // Completed by the player (not skipped): the closing card.
     if (tutorial.completed) {
       outroOpen.value = true;
-      statusText.value = "The future isn't written. It's built. Return to the tabletop to keep planning.";
+      statusText.value = "The future isn't written. Change it. Return to the tabletop to keep planning.";
     }
   }
   coachText.value = phase.peek() === 'building' ? tutorial.text : '';

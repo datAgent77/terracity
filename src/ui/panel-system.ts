@@ -232,6 +232,9 @@ export class PanelSystem extends createSystem({}) {
     this.cleanupFuncs.push(
       coachText.subscribe((t) => {
         coach?.setProperties({ text: t || '-', display: t ? 'flex' : 'none' });
+        // One instruction at a time: the status line steps aside while a step is shown
+        // (the decision card still reports what each action changed).
+        text('status-text')?.setProperties({ display: t ? 'none' : 'flex' });
         skipLabel?.setProperties({ text: tutorial.active ? 'Skip tips' : 'Show tips' });
       }),
       largeText.subscribe((on) => {
@@ -334,10 +337,17 @@ export class PanelSystem extends createSystem({}) {
       pauseLabel?.setProperties({ text: paused.value ? 'Resume' : 'Pause' });
       splitLabel?.setProperties({ text: futuresOpen.value ? 'Merge the futures' : 'Split into two futures' });
       // Contextual: the seam belongs to the comparison of the two futures.
-      buttons.get('btn-seam')?.setProperties({ display: futuresOpen.value ? 'flex' : 'none', backgroundColor: seamPos.value !== null ? '#0f7a6f' : undefined });
+      const seamCue = tutorial.active && tutorial.step === 'seam' && seamPos.value === null;
+      buttons.get('btn-seam')?.setProperties({ display: futuresOpen.value ? 'flex' : 'none', backgroundColor: seamPos.value !== null ? '#0f7a6f' : seamCue ? '#b87500' : undefined });
+      this.display.set('actions-panel#btn-seam', futuresOpen.value ? 'flex' : 'none');
+      // One primary action per stage: planning controls step aside while comparing futures.
+      for (const id of ['btn-undo', 'btn-save-a', 'btn-finish']) {
+        buttons.get(id)?.setProperties({ display: futuresOpen.value ? 'none' : 'flex' });
+        this.display.set(`actions-panel#${id}`, futuresOpen.value ? 'none' : 'flex');
+      }
       seamLabel?.setProperties({ text: seamPos.value !== null ? 'Side by side' : 'Reality Seam' });
       whyLabel?.setProperties({ text: causalityOn.value ? 'Hide causality' : 'Why? Causality Vision' });
-      buttons.get('btn-why')?.setProperties({ backgroundColor: causalityOn.value ? '#0f7a6f' : tutorial.active && tutorial.step === 'why' ? '#b87500' : undefined });
+      buttons.get('btn-why')?.setProperties({ backgroundColor: causalityOn.value ? '#0f7a6f' : undefined });
       dim('btn-split', phase.value !== 'intro');
       dim('btn-enter', !!futuresOpen.value || game.placements.some((p) => p.type === 'residential'));
       enterLabel?.setProperties({ text: futuresOpen.value ? `Enter future ${futuresOpen.value.selected ?? 'A'}` : 'Enter your city' });
@@ -378,6 +388,9 @@ export class PanelSystem extends createSystem({}) {
   }
 
   /** Test/debug hooks: locate a UIKit element on screen and in the world. */
+  /** Contextual controls: what the UI currently shows / hides (test hook). */
+  private display = new Map<string, string>();
+
   private exposeTestHooks(): void {
     const v = new Vector3();
     const locate = (panelId: string, elementId: string) => {
@@ -395,6 +408,8 @@ export class PanelSystem extends createSystem({}) {
       return { x: r.left + ((p.x + 1) / 2) * r.width, y: r.top + ((1 - p.y) / 2) * r.height };
     };
     hook.uiWorldPosition = (panelId: string, elementId: string) => locate(panelId, elementId)?.toArray();
+    /** Display state the UI set for a contextual control ('flex' unless hidden). */
+    hook.uiDisplay = (panelId: string, elementId: string) => this.display.get(`${panelId}#${elementId}`) ?? 'flex';
     /** Open whatever information layer contains this element (what a user does with "Details"). */
     hook.reveal = (panelId: string, elementId: string) => {
       const layer3 = new Set(['btn-redo', 'btn-rotate', 'btn-remove', 'btn-restart', 'btn-restore-a', 'btn-compare', 'btn-pause', 'btn-replay']);

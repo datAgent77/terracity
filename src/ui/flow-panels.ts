@@ -75,10 +75,8 @@ export class FlowPanelSystem extends createSystem({}) {
       );
     }
     this.paintYears = () => {
-      // Tutorial cue: pulse the year the current tip asks for.
-      // (The GODMODE tips use the split / enter controls; no year cue.)
-      const cue: number | null = null;
-      void tutorial;
+      // Tutorial cue: pulse the year the current step asks for (step 2: 2050).
+      const cue: number | null = tutorial.active && tutorial.step === 'time' ? 2050 : null;
       for (const y of YEARS) {
         const on = viewYear.peek() === y;
         const hover = this.yearHover.has(y);
@@ -164,11 +162,11 @@ export class FlowPanelSystem extends createSystem({}) {
         secondaryAction = cmd.startWithoutIntro;
       } else if (outro) {
         // Beat 6: the question, then the planning tools are all yours.
-        setTitle("The future isn't written. It's built.");
-        body?.setProperties({ text: 'You made a choice, split the city, saw why the futures differ and met Mira in both of them.' });
+        setTitle("The future isn't written. Change it.");
+        body?.setProperties({ text: 'You made a choice, saw it in 2050, split the city, moved the seam between two futures and met Mira in both of them.' });
         setLines([
           'Keep planning: more homes, clean power and parks. Tap Finish plan when Costa Verde is balanced.',
-          'Replay intro (Plan pad, More) walks the six steps again on your current plan.',
+          'Replay intro (Plan pad, More) walks the seven steps again on your current plan.',
         ]);
         primaryLabel?.setProperties({ text: 'Keep planning' });
         primaryAction = cmd.closeOutro;

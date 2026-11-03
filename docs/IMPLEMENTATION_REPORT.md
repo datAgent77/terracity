@@ -265,3 +265,68 @@ view on desktop; pointing uses a simple shoulder rotation (no elbow);
 gestures are not tested on a headset.
 
 **11. Acceptance**: met for D.
+
+## Milestone E — Competition polish
+
+**1. Implemented**
+
+- **The five-minute slice** ([COMPETITION_DEMO_SCRIPT.md](COMPETITION_DEMO_SCRIPT.md)),
+  seven interactive steps, each waiting for the user's own action: one
+  choice → **travel to 2050** (the decision card re-explains the choice in
+  that year; the 2050 year button pulses) → split → **move the Reality Seam**
+  → enter a future → talk to Mira (she points at what she names) → the other
+  future; closing card **"The future isn't written. Change it."** (Keep
+  planning / Replay intro). Skip intro, Skip tips (H), Replay intro (I).
+- **Contextual controls**: while the futures are compared, Undo / Save plan /
+  Finish step aside and Reality Seam appears (one primary action per stage);
+  the HUD shows one instruction at a time (the status line hides while a
+  step is shown — the decision card still reports each action); the street
+  panel's two "Next" buttons are now "Next line" (Mira) and "Prev spot /
+  Next spot" (viewpoints).
+- **Time travel explains itself**: changing the year re-shows the decision
+  card for that year (~7 s), not only the first time.
+- Accessibility kept: reduced motion, larger text, sound levels, desktop
+  keys for every step.
+
+**2. Files changed**: `src/gameplay/tutorial.ts`, `src/gameplay/tutorial-system.ts`,
+`src/core/commands.ts`, `src/core/session.ts`, `src/ui/panel-system.ts`
+(contextual controls, `uiDisplay` hook), `src/ui/flow-panels.ts`,
+`src/world/causality-system.ts`, `src/world/split-system.ts` (tagline),
+`src/world/street-system.ts`, `public/ui/street.uikitml`; tests
+`tests/unit/tutorial.test.ts`, `tests/e2e/polish.spec.ts`;
+`scripts/visual/first-five.mjs`; docs (demo script, checklist section 5).
+
+**3. Found and fixed**: the step for the seam never completed from the
+keyboard (the tutorial did not listen to the seam); after the first few
+seconds, travelling to 2050 showed no explanation at all.
+
+**4. Tests**: unit `tutorial.test.ts` (4: the seven steps in order, one
+action per step, replay / skip, hint tiles); e2e "the first five minutes"
+(all seven steps end to end incl. 2050 card year and seam move, closing
+card, replay keeps the plan) and "contextual controls".
+
+Evidence: `docs/visual/me-1-every-city.png` … `me-8-the-future-is-built.png`
+(incl. `me-4-in-2050.png`, `me-5b-seam.png`, `me-6-mira-points.png`), `me-log.txt`.
+
+**5–6. Results (clean run)**
+
+| Check | Status |
+|---|---|
+| `tsc --noEmit` | PASS |
+| Unit (215; the tutorial suite was rewritten: 5 → 4 tests) | PASS |
+| E2E desktop (37 passed, 4 skipped env-gated) | PASS |
+| IWER hand scripts xr-phase1/2/3; IWER seam pinch-drag | PASS (emulator) |
+| First-five capture, 0 page errors | PASS |
+| Production build (11 MB) | PASS |
+
+**7. Desktop**: PASS. **8. XR**: IWER PASS; Quest NOT TESTED (checklist
+section 5 is the on-device run of this slice).
+
+**9–10. Limitations / risks**: the slice is text-guided (no voice-over);
+time to complete for a first-time user is unmeasured; desktop panels are
+still floating panels projected in screen space (not a separate HTML
+layout).
+
+**11. Acceptance**: met for E in code, desktop and emulator. The final
+standard — a first-time user understanding the loop without explanation —
+needs real users on a Quest.

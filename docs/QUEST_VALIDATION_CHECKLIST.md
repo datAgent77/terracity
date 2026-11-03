@@ -79,16 +79,19 @@ desktop + IWER, stereo): these are the scene's cost, **not** frame times.
 
 ## 5. The first five minutes, on the headset
 
+Script: [COMPETITION_DEMO_SCRIPT.md](COMPETITION_DEMO_SCRIPT.md).
+
 | # | Beat | Pass when | Result |
 |---|---|---|---|
 | F1 | "Every city begins with a choice." → Begin | card readable, Begin reachable | |
-| F2 | One choice (Homes beside the town) | glowing tiles visible; card "What your decision changed" readable | |
-| F3 | Split | gesture or button | |
-| F4 | Why? | rings visible on both futures; card readable | |
-| F5 | Enter a future, talk to Mira | she is in front of you, bubble readable, lines advance only when you ask | |
-| F6 | The other future, back to the table | closing card "The future isn't written. It's built." | |
-| F7 | Skip intro / Skip tips / Replay intro | all reachable and work | |
-| F8 | Time taken (first-time user) | write minutes | |
+| F2 | Step 1: Homes beside the town | glowing tiles visible; decision card readable ("Now (2026)" / "By 2050") | |
+| F3 | Step 2: turn the dial to 2050 | the card re-explains the decision by 2050 | |
+| F4 | Step 3: split (gesture or button) | both futures in view | |
+| F5 | Step 4: Reality Seam, pinch the handle and sweep | seam follows the hand; label under the near edge readable | |
+| F6 | Step 5–6: enter a future, talk to Mira | she faces you, points at the place she names; bubble readable; lines advance only when asked | |
+| F7 | Step 7: the other future, back to the table | closing card "The future isn't written. Change it." | |
+| F8 | Skip intro / Skip tips / Replay intro | all reachable and work | |
+| F9 | Time taken by a first-time user | write minutes (target ≤ 5) | |
 
 ## 6. Audio
 

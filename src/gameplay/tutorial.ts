@@ -1,18 +1,19 @@
 /**
- * The first five minutes (CAUSALITY F): an interactive journey through the
- * core loop — one choice → split into two futures → Causality Vision → enter a
- * future → talk to Mira → look at the other future. Every step waits for the
+ * The first five minutes (COMPETITION E): an interactive journey through the
+ * core loop — one choice → see it in 2050 (the decision card explains it) →
+ * split into two futures → move the Reality Seam → enter a future → talk to
+ * Mira → the other future. Every step waits for the
  * player's own action; nothing plays by itself, and the full planning tools
  * stay available throughout. Pure (no IWSDK) so it is unit-testable. The
  * intro card ("Every city begins with a choice.") and the closing card ("The
- * future isn't written. It's built.") are in flow-panels.ts.
+ * future isn't written. Change it.") are in flow-panels.ts.
  */
 import type { Year } from '../config/projection.js';
 import { StructureType } from '../config/scenario.js';
 import type { Placement } from '../simulation/metrics.js';
 import type { TerrainMap } from '../world/terrain-map.js';
 
-export type TutorialStep = 'homes' | 'split' | 'why' | 'enter' | 'talk' | 'other' | 'done';
+export type TutorialStep = 'homes' | 'time' | 'split' | 'seam' | 'enter' | 'talk' | 'other' | 'done';
 export type StreetPlan = 'A' | 'B' | 'none';
 
 export interface TutorialContext {
@@ -23,8 +24,10 @@ export interface TutorialContext {
   inStreet?: boolean;
   /** Two futures are held apart ("Split reality"). */
   futuresOpen?: boolean;
-  /** Causality Vision is on. */
+  /** Causality Vision is on (no longer a step; kept for callers). */
   causalityOn?: boolean;
+  /** Reality Seam position (null when closed). */
+  seam?: number | null;
   /** Which future the street shows (when inStreet). */
   streetPlan?: StreetPlan | null;
   /** A conversation with Mira was had (and ended) in this visit. */
@@ -34,15 +37,16 @@ export interface TutorialContext {
 }
 
 export const TUTORIAL_TEXT: Record<Exclude<TutorialStep, 'done'>, string> = {
-  homes: 'Step 1/6: Make one choice. Pinch Homes in the tray and drop it on a glowing tile beside the town.',
-  split: 'Step 2/6: See what your choice changes. Bring both hands together and pull them apart (or tap Split).',
-  why: 'Step 3/6: Tap Why? (or W): rings mark where the two futures differ, and the card says why.',
-  enter: 'Step 4/6: Pinch a future and pull it toward you (or tap Enter future). Someone lives there in 2050.',
-  talk: 'Step 5/6: Meet Mira. Pinch her or tap Talk to Mira.',
-  other: 'Step 6/6: Return, then enter the other future: the same street, another outcome.',
+  homes: 'Step 1/7: Make one choice. Pinch Homes in the tray and drop it on a glowing tile beside the town.',
+  time: 'Step 2/7: Travel to 2050 (turn the time dial or tap 2050). The card shows what your choice did by then.',
+  split: 'Step 3/7: Split the city into two futures: bring both hands together and pull them apart (or tap Split).',
+  seam: 'Step 4/7: Tap Reality Seam, then pinch the golden handle and sweep it: the same place, two futures.',
+  enter: 'Step 5/7: Enter a future (pull it toward you, or tap Enter future). Someone lives there in 2050.',
+  talk: 'Step 6/7: Meet Mira. Pinch her or tap Talk to Mira.',
+  other: 'Step 7/7: Return, then enter the other future: the same street, another outcome.',
 };
 
-const ORDER: TutorialStep[] = ['homes', 'split', 'why', 'enter', 'talk', 'other', 'done'];
+const ORDER: TutorialStep[] = ['homes', 'time', 'split', 'seam', 'enter', 'talk', 'other', 'done'];
 
 export class Tutorial {
   step: TutorialStep = 'homes';
@@ -80,8 +84,10 @@ export class Tutorial {
       const changed = this.baseline === null || (ctx.planVersion ?? 0) > this.baseline;
       const done =
         (this.step === 'homes' && changed && ctx.placements.some((p) => p.type === StructureType.Residential && ctx.servedIds.has(p.id))) ||
+        (this.step === 'time' && ctx.viewYear === 2050) ||
         (this.step === 'split' && !!ctx.futuresOpen) ||
-        (this.step === 'why' && !!ctx.futuresOpen && !!ctx.causalityOn) ||
+        // The seam has been moved (it opens at the middle).
+        (this.step === 'seam' && ctx.seam != null && Math.abs(ctx.seam - 0.5) > 0.03) ||
         (this.step === 'enter' && !!ctx.inStreet && !!ctx.streetPlan) ||
         (this.step === 'talk' && !!ctx.inStreet && !!ctx.talked) ||
         (this.step === 'other' && !!ctx.inStreet && !!ctx.streetPlan && !!this.firstPlan && ctx.streetPlan !== this.firstPlan);
@@ -89,9 +95,8 @@ export class Tutorial {
       if (this.step === 'enter') this.firstPlan = ctx.streetPlan ?? null;
       this.step = ORDER[ORDER.indexOf(this.step) + 1];
       if (this.step === 'done') this.completed = true;
-      // Every step needs a fresh action of its own (Causality Vision may
-      // already be on when the futures split).
-      if (this.step !== 'why') break;
+      // Every step needs a fresh action of its own.
+      break;
     }
     return this.step !== before;
   }

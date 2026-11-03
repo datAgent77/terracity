@@ -75,8 +75,8 @@
   </div>
   <div class="row">
     <div id="st-details-btn" class="dtoggle"><div id="st-details-label" class="dlabel">Details</div></div>
-    <Button id="st-prev" class="button"><ButtonIcon><ChevronLeft></ChevronLeft></ButtonIcon><ButtonLabel>Previous</ButtonLabel></Button>
-    <Button id="st-next" class="button"><ButtonIcon><ChevronRight></ChevronRight></ButtonIcon><ButtonLabel>Next</ButtonLabel></Button>
+    <Button id="st-prev" class="button"><ButtonIcon><ChevronLeft></ChevronLeft></ButtonIcon><ButtonLabel>Prev spot</ButtonLabel></Button>
+    <Button id="st-next" class="button"><ButtonIcon><ChevronRight></ChevronRight></ButtonIcon><ButtonLabel>Next spot</ButtonLabel></Button>
     <Button id="st-return" class="button"><ButtonIcon><LogOut></LogOut></ButtonIcon><ButtonLabel>Return to tabletop</ButtonLabel></Button>
   </div>
 </Panel>

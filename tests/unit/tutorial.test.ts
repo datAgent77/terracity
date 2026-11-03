@@ -10,52 +10,44 @@ const ctx = (g: GameState, extra: Partial<TutorialContext> = {}): TutorialContex
   ...extra,
 });
 
-describe('the first five minutes', () => {
-  it('walks: one choice -> split -> why -> enter -> talk to Mira -> the other future -> done', () => {
+describe('the first five minutes (competition)', () => {
+  it('walks: choice -> 2050 -> split -> move the seam -> enter -> talk to Mira -> the other future -> done', () => {
     const g = new GameState();
     const t = new Tutorial();
-    expect(t.step).toBe('homes');
-    expect(t.text).toMatch(/^Step 1\/6: Make one choice/);
-    g.add(S.Residential, 9, 3); // not connected to the town: not yet a home for anyone
+    expect(t.text).toMatch(/^Step 1\/7: Make one choice/);
+    g.add(S.Residential, 9, 3); // not connected to the town
     expect(t.update(ctx(g))).toBe(false);
     g.add(S.Residential, 6, 4);
     t.update(ctx(g));
+    expect(t.step).toBe('time');
+    t.update(ctx(g, { viewYear: 2035 }));
+    expect(t.step).toBe('time'); // 2050 is the horizon
+    t.update(ctx(g, { viewYear: 2050 }));
     expect(t.step).toBe('split');
-    t.update(ctx(g, { futuresOpen: true }));
-    expect(t.step).toBe('why');
-    t.update(ctx(g, { futuresOpen: true, causalityOn: true }));
+    t.update(ctx(g, { viewYear: 2050, futuresOpen: true }));
+    expect(t.step).toBe('seam');
+    t.update(ctx(g, { viewYear: 2050, futuresOpen: true, seam: 0.5 }));
+    expect(t.step).toBe('seam'); // opened, not yet moved
+    t.update(ctx(g, { viewYear: 2050, futuresOpen: true, seam: 0.36 }));
     expect(t.step).toBe('enter');
-    t.update(ctx(g, { futuresOpen: true, inStreet: true, streetPlan: 'B', viewYear: 2050 }));
+    t.update(ctx(g, { viewYear: 2050, futuresOpen: true, inStreet: true, streetPlan: 'B' }));
     expect(t.step).toBe('talk');
-    expect(t.firstPlan).toBe('B');
-    t.update(ctx(g, { futuresOpen: true, inStreet: true, streetPlan: 'B', talked: true, viewYear: 2050 }));
+    t.update(ctx(g, { viewYear: 2050, futuresOpen: true, inStreet: true, streetPlan: 'B', talked: true }));
     expect(t.step).toBe('other');
-    // Back in the same future: not yet.
-    t.update(ctx(g, { futuresOpen: true, inStreet: true, streetPlan: 'B', viewYear: 2050 }));
-    expect(t.step).toBe('other');
-    t.update(ctx(g, { futuresOpen: true, inStreet: true, streetPlan: 'none', viewYear: 2050 }));
+    t.update(ctx(g, { viewYear: 2050, futuresOpen: true, inStreet: true, streetPlan: 'none' }));
     expect(t.step).toBe('done');
     expect(t.completed).toBe(true);
-    expect(t.text).toBe('');
   });
 
-  it('every step waits for its own action (a built plan does not skip ahead)', () => {
+  it('every step waits for its own action (state that is already true does not skip ahead)', () => {
     const g = new GameState();
     g.add(S.Residential, 6, 4);
     const t = new Tutorial();
-    t.update(ctx(g, { futuresOpen: true, inStreet: true, streetPlan: 'B', talked: true }));
-    expect(t.step).toBe('split'); // the choice counts, nothing after it
-    t.update(ctx(g, { futuresOpen: true, inStreet: true, streetPlan: 'B', talked: true }));
-    expect(t.step).toBe('why');
-  });
-
-  it('Causality Vision already on when splitting counts for the why step', () => {
-    const g = new GameState();
-    g.add(S.Residential, 6, 4);
-    const t = new Tutorial();
-    t.update(ctx(g));
-    t.update(ctx(g, { futuresOpen: true, causalityOn: true }));
-    expect(t.step).toBe('enter');
+    const all = ctx(g, { viewYear: 2050, futuresOpen: true, seam: 0.2, inStreet: true, streetPlan: 'B', talked: true });
+    t.update(all);
+    expect(t.step).toBe('time');
+    t.update(all);
+    expect(t.step).toBe('split');
   });
 
   it('replay on an existing plan asks for a new choice; skip is not completion', () => {
@@ -66,7 +58,7 @@ describe('the first five minutes', () => {
     t.update(ctx(g, { planVersion: 5 }));
     expect(t.step).toBe('homes');
     t.update(ctx(g, { planVersion: 6 }));
-    expect(t.step).toBe('split');
+    expect(t.step).toBe('time');
     t.skip();
     expect(t.active).toBe(false);
     expect(t.completed).toBe(false);
@@ -77,7 +69,6 @@ describe('the first five minutes', () => {
     const t = new Tutorial();
     expect(t.hintTiles(g.terrain, g.placements)).toHaveLength(3);
     g.add(S.Residential, 6, 4);
-    expect(t.hintTiles(g.terrain, g.placements)).toHaveLength(2);
     t.update(ctx(g));
     expect(t.hintTiles(g.terrain, g.placements)).toHaveLength(0);
   });

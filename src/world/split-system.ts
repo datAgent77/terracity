@@ -103,7 +103,7 @@ export class SplitSystem extends createSystem({
     this.tagline = this.card(1400, 160);
     this.tagline.mesh.name = 'tagline';
     this.tagline.mesh.scale.setScalar(0.06);
-    this.paintCard(this.tagline, ["THE FUTURE ISN'T WRITTEN. IT'S BUILT."], 64, 'rgba(15,42,48,0.82)', '#ffe6a6');
+    this.paintCard(this.tagline, ["THE FUTURE ISN'T WRITTEN. CHANGE IT."], 64, 'rgba(15,42,48,0.82)', '#ffe6a6');
     this.world.scene.add(this.tagline.mesh);
 
     this.cleanupFuncs.push(

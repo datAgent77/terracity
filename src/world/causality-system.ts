@@ -106,6 +106,8 @@ export class CausalitySystem extends createSystem({}) {
       planA.subscribe(() => this.refresh()),
       viewYear.subscribe(() => {
         this.focus = -1;
+        // Travelling in time re-explains the last decision in the new year (briefly).
+        if (this.timeline && !futuresOpen.peek() && !streetView.peek()) this.flash = Math.max(this.flash, 7);
         this.refresh();
       }),
       streetView.subscribe(() => this.refresh()),

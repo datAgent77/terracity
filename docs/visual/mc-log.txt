@@ -8,5 +8,5 @@ merged: board=true planUnchanged=true
 xr pinch on handle: held=true
 xr hand drag -> u=0.738 held=true
 xr released: u=0.738 held=false
-xr stats: {"calls":128,"triangles":254432,"geometries":172,"textures":36,"objects":952,"meshes":755,"jsHeapMB":190,"transparent":49}
+xr stats: {"calls":122,"triangles":252108,"geometries":172,"textures":36,"objects":952,"meshes":755,"jsHeapMB":190,"transparent":43}
 page errors: 0 

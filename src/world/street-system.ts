@@ -281,7 +281,7 @@ export class StreetSystem extends createSystem({ placeables: { required: [Placea
       const here = !!this.child && this.dialogue.length > 0;
       const talking = this.convo.active;
       panel.getElementById('st-talk-row')?.setProperties({ display: here ? 'flex' : 'none' });
-      panel.getElementById<UIKit.Text>('st-talk-label')?.setProperties({ text: talking ? (this.convo.index < this.dialogue.length - 1 ? 'Next' : 'Finish') : 'Talk to Mira' });
+      panel.getElementById<UIKit.Text>('st-talk-label')?.setProperties({ text: talking ? (this.convo.index < this.dialogue.length - 1 ? 'Next line' : 'Finish') : 'Talk to Mira' });
       panel.getElementById('st-talk-back')?.setProperties({ display: talking ? 'flex' : 'none' });
       panel.getElementById('st-talk-end')?.setProperties({ display: talking ? 'flex' : 'none' });
       // Guided tips follow the player into the street; the next target glows amber.

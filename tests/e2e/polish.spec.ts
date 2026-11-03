@@ -4,7 +4,7 @@ import { button, key, open, tile, ui } from './helpers';
 const sig = (page: Page, name: string) =>
   page.evaluate((n) => (window.__terracity as unknown as Record<string, { value: unknown }>)[n].value, name);
 
-test('the first five minutes: one choice, two futures, why, Mira, the other future; then the closing card and replay', async ({ page }) => {
+test('the first five minutes: one choice, 2050, two futures, the seam, Mira, the other future; then the closing card and replay', async ({ page }) => {
   test.setTimeout(240_000);
   type Street = { active: boolean; fading: boolean; plan: string; child: { dialogue: string[] } | null };
   const st = () => page.evaluate(() => (window.__terracity as unknown as { street(): Street }).street());
@@ -13,31 +13,39 @@ test('the first five minutes: one choice, two futures, why, Mira, the other futu
   const splitOpen = () => page.waitForFunction(() => { const s = (window.__terracity as unknown as { split(): { t: number; open: boolean } }).split(); return s.open && s.t === 1; });
   await open(page);
   // Beat 2: one choice, and the simulation's own feedback.
-  expect(await sig(page, 'coachText')).toMatch(/^Step 1\/6: Make one choice/);
+  expect(await sig(page, 'coachText')).toMatch(/^Step 1\/7: Make one choice/);
   await key(page, 'Digit1');
   await tile(page, 6, 4);
   await key(page, 'Escape');
-  expect(await sig(page, 'coachText')).toMatch(/^Step 2\/6/);
+  expect(await sig(page, 'coachText')).toMatch(/^Step 2\/7/);
   const card = await page.evaluate(() => (window.__terracity as unknown as { causality(): { card: string[] | null; event: { explanation: string } | null } }).causality());
   expect(card.event?.explanation).toMatch(/housed \+4,000/); // truthful: the ledger's numbers
   await page.screenshot({ path: 'docs/evidence/phase3-e2e-tip2-glow.png' });
-  // Beat 3: the split.
+  // Time: 2050, and the decision card re-evaluated there.
+  await ui(page, 'time-panel', 'year-2050');
+  expect(await sig(page, 'coachText')).toMatch(/^Step 3\/7/);
+  const c2050 = await page.evaluate(() => (window.__terracity as unknown as { causality(): { shown: { year: number } | null } }).causality());
+  expect(c2050.shown?.year).toBe(2050);
+  // The split.
   await ui(page, 'actions-panel', 'btn-split');
   await splitOpen();
-  expect(await sig(page, 'coachText')).toMatch(/^Step 3\/6/);
-  // Beat 4: Causality Vision.
-  await ui(page, 'actions-panel', 'btn-why');
-  expect(await sig(page, 'coachText')).toMatch(/^Step 4\/6/);
-  // Beat 5: enter one future and meet Mira; she talks about this decision.
+  expect(await sig(page, 'coachText')).toMatch(/^Step 4\/7/);
+  // Reality Seam: open it, move it one column.
+  await ui(page, 'actions-panel', 'btn-seam');
+  await page.waitForFunction(() => (window.__terracity as unknown as { split(): { seamVisible: boolean } }).split().seamVisible);
+  expect(await sig(page, 'coachText')).toMatch(/^Step 4\/7/); // opened, not yet moved
+  await key(page, 'ArrowLeft');
+  expect(await sig(page, 'coachText')).toMatch(/^Step 5\/7/);
+  // Enter one future and meet Mira; she talks about this decision.
   await ui(page, 'actions-panel', 'btn-enter');
   await streetSettled(true);
-  expect(await sig(page, 'coachText')).toMatch(/^Step 5\/6/);
+  expect(await sig(page, 'coachText')).toMatch(/^Step 6\/7/);
   const first = await st();
   expect(first.child!.dialogue.join(' ')).toMatch(/other future/);
   await ui(page, 'street-panel', 'st-talk');
-  expect(await sig(page, 'coachText')).toMatch(/^Step 5\/6/); // listening: no push to leave yet
+  expect(await sig(page, 'coachText')).toMatch(/^Step 6\/7/); // listening: no push to leave yet
   await ui(page, 'street-panel', 'st-talk-end');
-  expect(await sig(page, 'coachText')).toMatch(/^Step 6\/6/);
+  expect(await sig(page, 'coachText')).toMatch(/^Step 7\/7/);
   // Beat 6: the other future.
   await ui(page, 'street-panel', 'st-return');
   await streetSettled(false);
@@ -51,13 +59,13 @@ test('the first five minutes: one choice, two futures, why, Mira, the other futu
   await ui(page, 'street-panel', 'st-return');
   await streetSettled(false);
   const overlay = () => page.evaluate(() => (window.__terracity as unknown as { overlay(): { visible: boolean; title: string } }).overlay());
-  expect(await overlay()).toEqual({ visible: true, title: "The future isn't written. It's built." });
+  expect(await overlay()).toEqual({ visible: true, title: "The future isn't written. Change it." });
   await page.screenshot({ path: 'docs/evidence/causality-f-outro.png' });
   // Replay: walk again on the same plan; step 1 asks for a new choice, nothing is cleared.
   const pieces = await page.evaluate(() => (window.__terracity as unknown as { placements(): unknown[] }).placements().length);
   await ui(page, 'overlay-panel', 'ov-secondary');
   expect(await sig(page, 'outroOpen')).toBe(false);
-  expect(await sig(page, 'coachText')).toMatch(/^Step 1\/6/);
+  expect(await sig(page, 'coachText')).toMatch(/^Step 1\/7/);
   expect(await page.evaluate(() => (window.__terracity as unknown as { placements(): unknown[] }).placements().length)).toBe(pieces);
   expect((await overlay()).visible).toBe(false);
 });
@@ -78,7 +86,7 @@ test('tips can be skipped from the HUD chip (and turned back on with H)', async 
   expect(await sig(page, 'coachText')).toBe('');
   expect(await sig(page, 'outroOpen')).toBe(false); // skipping is not finishing
   await key(page, 'KeyH');
-  expect(await sig(page, 'coachText')).toMatch(/Step 1\/6/);
+  expect(await sig(page, 'coachText')).toMatch(/Step 1\/7/);
 });
 
 test('larger text enlarges the panels; sound toggles', async ({ page }) => {
@@ -118,4 +126,27 @@ test('blocked tiles show an X, not only red', async ({ page }) => {
   const plain = await page.evaluate(() => window.__terracity.tileToScreen(9, 3));
   await page.mouse.move(plain!.x, plain!.y);
   await button(page, 'btn-undo'); // harmless click to leave the board
+});
+
+test('contextual controls: one primary action per stage, no duplicate labels', async ({ page }) => {
+  type Btn = { x: number; y: number } | null;
+  const shown = (panel: string, id: string) => page.evaluate(([p, i]) => {
+    const h = window.__terracity as unknown as { uiWorldPosition(p: string, i: string): number[] | undefined; uiToScreen(p: string, i: string): { x: number; y: number } | null };
+    return h.uiToScreen(p, i) as Btn;
+  }, [panel, id]);
+  await open(page);
+  await key(page, 'KeyH'); // tips off
+  // Planning: Undo / Save / Finish are there; the seam is not.
+  const vis = (id: string) => page.evaluate((i) => {
+    const t = window.__terracity as unknown as { uiDisplay?(p: string, i: string): string };
+    return t.uiDisplay?.('actions-panel', i);
+  }, id);
+  expect(await vis('btn-undo')).toBe('flex');
+  expect(await vis('btn-seam')).toBe('none');
+  // Comparing futures: planning controls step aside, the seam appears.
+  await key(page, 'KeyV');
+  await page.waitForFunction(() => (window.__terracity as unknown as { split(): { open: boolean; t: number } }).split().t === 1);
+  for (const id of ['btn-undo', 'btn-save-a', 'btn-finish']) expect(await vis(id)).toBe('none');
+  expect(await vis('btn-seam')).toBe('flex');
+  void shown;
 });
